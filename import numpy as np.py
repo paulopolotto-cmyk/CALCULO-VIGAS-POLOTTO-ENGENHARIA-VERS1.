@@ -54,7 +54,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         num_apoios = num_vaos + 1
         
         if num_vaos < 1:
-            return {"aviso_inicial": "Aguardando a inserção de pelo menos 1 vão normal entre apoios para iniciar os cálculos."}
+            return {"erro": "A viga precisa ter pelo menos 1 vão normal entre apoios para iniciar os cálculos."}
             
         MA = - (bal_esq[0]['q'] * bal_esq[0]['L']**2) / 2 if bal_esq else 0.0
         MZ = - (bal_dir[0]['q'] * bal_dir[0]['L']**2) / 2 if bal_dir else 0.0
@@ -158,7 +158,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         As_apoios = [ajustar_as(calcular_as(m)) for m in M_apoios]
         As_positivos = [ajustar_as(calcular_as(m)) for m in M_positivos]
 
-        # Verificação do esmagamento da biela (Força Cortante Limite de Norma)
+        # Verificação do esmagamento da biela (Força Cortante Limite - NBR 6118)
         fcd_mpa = fck / 1.4
         v1 = 0.6 * (1 - fck / 250)
         Vrd2 = 0.27 * v1 * fcd_mpa * (b / 10) * (d / 10) * 10 
@@ -168,7 +168,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         if falha_cortante:
             estribo_msg = "REDIRECIONAR SEÇÃO!"
             for _ in range(num_vaos):
-                estribos_vaos_texto.append("Seção Inválida")
+                estribos_vaos_texto.append("Seção Insuficiente")
         else:
             fctm = 0.3 * (fck ** (2/3))
             Vc = 0.6 * (((0.7 * fctm) / 1.4) / 10) * b * d 
@@ -284,80 +284,82 @@ if len(st.session_state.lista_vaos) > 0:
             if st.session_state.edit_index == i: st.session_state.edit_index = None
             st.rerun()
 
-    # --- EXECUÇÃO DO MOTOR DE CÁLCULO AUTOMÁTICO ---
-    res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
-    
-    if "aviso_inicial" in res:
-        st.info(res["aviso_inicial"])
-    elif "erro" in res:
-        st.error(res["erro"])
-    else:
-        st.write("---")
-        st.header("🏁 Layout de Detalhamento Estrutural")
+    st.write("")
+    btn_calc = st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary")
+    st.write("")
+
+    if btn_calc:
+        res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
         
-        # VERIFICAÇÃO CRÍTICA DE NORMA (Cisalhamento / Força Cortante)
-        if res['falha_total_biela'] := res['falha_total_biela'] if 'falha_total_biela' in res else res['falha_total_biela'] if 'falha_total_biela' in res else res['falha_cortante']:
-            st.markdown(f"""
-            <div style="background-color:#DC2626; color:white; padding:15px; border-radius:8px; font-weight:bold; font-size:16px;">
-            ⚠️ ERRO CRÍTICO: A seção {b}x{h} cm está FORA DAS NORMAS ATUAIS por Esmagamento de Biela Seca de Concreto!<br>
-            A força cortante atuante de projeto ({res['V_max']*1.4:.2f} kN) superou a resistência limite da seção ({res['Vrd2']:.2f} kN). 
-            Aumente a base (bw) ou a altura (h) imediatamente.
-            </div>
-            """, unsafe_allow_html=True)
+        if "erro" in res:
+            st.error(res["erro"])
+        else:
+            st.write("---")
+            st.header("🏁 Layout de Detalhamento Estrutural")
             
-        # --- DESENHO TÉCNICO DAS FERRAGENS E ESTRIBOS (MATPLOTLIB) ---
-        fig, ax = plt.subplots(figsize=(8, 3.5))
-        ax.set_xlim(-1, len(res['Reacoes']))
-        ax.set_ylim(-1.8, 1.8)
-        ax.axis('off')
-        
-        # Corpo de concreto da viga
-        ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB', label='Viga')
-        
-        # Desenho dos Pilares
-        for idx, r in enumerate(res['Reacoes']):
-            ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
-            ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
-        
-        # Linhas das Armaduras Principais
-        ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
-        ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
-        
-        # Escrita dos Ferros Superiores (Negativos) nos apoios
-        if res['bal_esq']:
-            ax.text(-0.3, 0.45, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-        for i in range(len(res['M_apoios'])-2):
-            ax.text(i+1, 0.45, sugerir_barras(res['As_apoios'][i+1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-        if res['bal_dir']:
-            ax.text(len(res['Reacoes'])-0.7, 0.45, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+            # VERIFICAÇÃO DE NORMA BEM GRANDE EM VERMELHO SE NÃO PASSAR
+            if res['falha_cortante']:
+                st.markdown(f"""
+                <div style="background-color:#DC2626; color:white; padding:18px; border-radius:8px; font-weight:bold; font-size:18px; text-align:center; border: 3px solid #7F1D1D; margin-bottom:20px;">
+                ⚠️ AS DIMENSÕES DA VIGA ({b}x{h} cm) SÃO INSUFICIENTES!<br>
+                A seção atual está fora das especificações de segurança da NBR 6118 (Esmagamento da Biela Seca).<br>
+                O esforço atuante ultrapassou o limite de {res['Vrd2']:.2f} kN. As dimensões precisam ser alteradas imediatamente!
+                </div>
+                """, unsafe_allow_html=True)
+                
+            # --- DESENHO TÉCNICO DAS FERRAGENS E ESTRIBOS (MATPLOTLIB) ---
+            fig, ax = plt.subplots(figsize=(8, 3.5))
+            ax.set_xlim(-1, len(res['Reacoes']))
+            ax.set_ylim(-1.8, 1.8)
+            ax.axis('off')
             
-        # Escrita dos Ferros Inferiores (Positivos) E Especificações dos Estribos Calculados Logo Abaixo
-        for i in range(len(res['vaos_internos'])):
-            # Ferro Positivo
-            ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
-            # Estribo correspondente posicionado estrategicamente abaixo da linha verde
-            texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "RECALCULAR!"
-            ax.text(i + 0.5, -0.35, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
-        
-        # Desenho do Detalhe do Corte Transversal ao lado
-        ax.rectangle = plt.Rectangle((len(res['Reacoes'])-0.2, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//')
-        ax.add_patch(ax.rectangle)
-        ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
-        
-        st.pyplot(fig)
-        
-        # --- RELATÓRIO / ESPECIFICAÇÕES TÉCNICAS INFERIORES ---
-        st.subheader("Relação de Especificações Técnicas")
-        status_norma = "⚠️ REPROVADO (Redimensionar Seção!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
-        
-        out = [
-            f"SEÇÃO TRANSVERSAL OBJETIVO: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
-            f"STATUS DA FORÇA CORTANTE: {status_norma}",
-            f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
-            f"CORTANTE MÁXIMO ATUANTE DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN",
-            f"RESISTÊNCIA MÁXIMA DA BIELA DE CONCRETO (Vrd2): {res['Vrd2']:.2f} kN"
-        ]
-        st.code("\n".join(out), language="text")
+            # Corpo de concreto da viga
+            ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB', label='Viga')
+            
+            # Desenho dos Pilares
+            for idx, r in enumerate(res['Reacoes']):
+                ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
+                ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
+            
+            # Linhas das Armaduras Principais
+            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
+            ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
+            
+            # Escrita dos Ferros Superiores (Negativos) nos apoios
+            if res['bal_esq']:
+                ax.text(-0.3, 0.45, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+            for i in range(len(res['M_apoios'])-2):
+                ax.text(i+1, 0.45, sugerir_barras(res['As_apoios'][i+1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+            if res['bal_dir']:
+                ax.text(len(res['Reacoes'])-0.7, 0.45, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+                
+            # Escrita dos Ferros Inferiores (Positivos) E Estribos Logo Abaixo
+            for i in range(len(res['vaos_internos'])):
+                # Ferro Positivo
+                ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
+                # Estribo correspondente posicionado abaixo da linha verde
+                texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Seção Insuficiente!"
+                ax.text(i + 0.5, -0.35, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
+            
+            # Desenho do Detalhe do Corte Transversal ao lado
+            ax.rectangle = plt.Rectangle((len(res['Reacoes'])-0.2, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//')
+            ax.add_patch(ax.rectangle)
+            ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
+            
+            st.pyplot(fig)
+            
+            # --- RELATÓRIO / ESPECIFICAÇÕES TÉCNICAS INFERIORES ---
+            st.subheader("Relação de Especificações Técnicas")
+            status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
+            
+            out = [
+                f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
+                f"STATUS DA FORÇA CORTANTE: {status_norma}",
+                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
+                f"CORTANTE MÁXIMO ATUANTE DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN",
+                f"RESISTÊNCIA MÁXIMA DA BIELA DE CONCRETO (Vrd2): {res['Vrd2']:.2f} kN"
+            ]
+            st.code("\n".join(out), language="text")
 
 # Botão para Resetar Projeto
 st.write("")
