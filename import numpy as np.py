@@ -52,7 +52,7 @@ st.markdown("""
 st.markdown('<div class="titulo">PROGRAMA DE CÁLCULOS DE VIGAS DA POLOTTO ENGENHARIA</div>', unsafe_allow_html=True)
 st.write("")
 
-# --- MOTOR MATEMÁTICO ---
+# --- MOTOR MATEMÁTICO ADAPTADO PARA POSIÇÃO DA CARGA CONCENTRADA ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
     try:
         b = float(dados_gerais['b'])
@@ -74,29 +74,31 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         if num_vaos < 1:
             return {"erro": "A viga precisa ter pelo menos 1 vão normal entre apoios para calcular."}
             
-        MA = - (bal_esq[0]['q'] * bal_esq[0]['L']**2) / 2 if bal_esq else 0.0
-        MZ = - (bal_dir[0]['q'] * bal_dir[0]['L']**2) / 2 if bal_dir else 0.0
+        MA = - (bal_esq[0]['q'] * bal_esq[0]['L']**2 / 2 + bal_esq[0]['P'] * bal_esq[0]['a']) if bal_esq else 0.0
+        MZ = - (bal_dir[0]['q'] * bal_dir[0]['L']**2 / 2 + bal_dir[0]['P'] * (bal_dir[0]['L'] - bal_dir[0]['a'])) if bal_dir else 0.0
         
         if num_vaos == 1:
             L1 = vaos_internos[0]['L']
             q1 = vaos_internos[0]['q']
             P1 = vaos_internos[0]['P']
+            a1 = vaos_internos[0]['a']
+            b1 = L1 - a1
             
             MB = MZ 
-            VA_iso = q1 * L1 / 2 + P1 / 2
-            VB_iso = VA_iso
-            VA = VA_iso + (MB - MA)/L1
-            VB = VB_iso + (MA - MB)/L1
+            VA_iso = q1 * L1 / 2 + (P1 * b1 / L1 if L1 > 0 else 0)
+            VB_iso = q1 * L1 / 2 + (P1 * a1 / L1 if L1 > 0 else 0)
+            VA = VA_iso + (MB - MA)/L1 if L1 > 0 else VA_iso
+            VB = VB_iso + (MA - MB)/L1 if L1 > 0 else VB_iso
             
-            M_pos = max(0, ((q1 * L1**2)/8 + (P1 * L1)/4) + (MA + MB)/2)
+            M_pos = max(0, ((q1 * L1**2)/8 + (P1 * a1 * b1 / L1 if L1 > 0 else 0)) + (MA + MB)/2)
             
-            q_be = bal_esq[0]['q'] if bal_esq else 0
-            q_bd = bal_dir[0]['q'] if bal_dir else 0
-            V_max = max(abs(VA), abs(VB), q_be * (bal_esq[0]['L'] if bal_esq else 0), q_bd * (bal_dir[0]['L'] if bal_dir else 0))
+            V_max = max(abs(VA), abs(VB))
+            if bal_esq: V_max = max(V_max, bal_esq[0]['q']*bal_esq[0]['L'] + bal_esq[0]['P'])
+            if bal_dir: V_max = max(V_max, bal_dir[0]['q']*bal_dir[0]['L'] + bal_dir[0]['P'])
             
             M_apoios = [MA, MB]
             M_positivos = [M_pos]
-            Reacoes = [VA + q_be * (bal_esq[0]['L'] if bal_esq else 0), VB + q_bd * (bal_dir[0]['L'] if bal_dir else 0)]
+            Reacoes = [VA + (bal_esq[0]['q']*bal_esq[0]['L'] + bal_esq[0]['P'] if bal_esq else 0), VB + (bal_dir[0]['q']*bal_dir[0]['L'] + bal_dir[0]['P'] if bal_dir else 0)]
             V_por_vao = [max(abs(VA), abs(VB))]
         else:
             num_incog = num_apoios - 2
@@ -105,7 +107,13 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             
             W = []
             for v in vaos_internos:
-                W.append((v['q'] * v['L']**3)/24 + (v['P'] * v['L']**2)/16)
+                L_v = v['L']
+                a_v = v['a']
+                b_v = L_v - a_v
+                # Coeficiente de engastamento perfeito adaptado para carga concentrada genérica na posição 'a'
+                term_q = (v['q'] * L_v**3) / 24
+                term_p = (v['P'] * a_v * b_v * (L_v + b_v)) / (6 * L_v) if L_v > 0 else 0
+                W.append(term_q + term_p)
                 
             for i in range(num_incog):
                 L_esq = vaos_internos[i]['L']
@@ -130,20 +138,21 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 L = vaos_internos[i]['L']
                 q = vaos_internos[i]['q']
                 P = vaos_internos[i]['P']
+                a_v = vaos_internos[i]['a']
+                b_v = L - a_v
                 M_esq = M_apoios[i]
                 M_dir = M_apoios[i+1]
                 
-                V_iso = q * L / 2 + P / 2
-                V_hip_esq = (M_dir - M_esq) / L
-                V_hip_dir = (M_esq - M_dir) / L
+                V_iso_esq = q * L / 2 + (P * b_v / L if L > 0 else 0)
+                V_iso_dir = q * L / 2 + (P * a_v / L if L > 0 else 0)
                 
-                V_esq_total = V_iso + V_hip_esq
-                V_dir_total = V_iso + V_hip_dir
+                V_esq_total = V_iso_esq + (M_dir - M_esq) / L if L > 0 else V_iso_esq
+                V_dir_total = V_iso_dir + (M_esq - M_dir) / L if L > 0 else V_iso_dir
                 
                 Reacoes_apoio[i] += V_esq_total
                 Reacoes_apoio[i+1] += V_dir_total
                 
-                M_pos = max(0, ((q * L**2)/8 + (P * L)/4) + (M_esq + M_dir)/2)
+                M_pos = max(0, ((q * L**2)/8 + (P * a_v * b_v / L if L > 0 else 0)) + (M_esq + M_dir)/2)
                 M_positivos.append(M_pos)
                 
                 V_max_vao = max(abs(V_esq_total), abs(V_dir_total))
@@ -151,11 +160,11 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 V_max = max(V_max, V_max_vao)
                 
             if bal_esq:
-                Reacoes_apoio[0] += bal_esq[0]['q'] * bal_esq[0]['L']
-                V_max = max(V_max, bal_esq[0]['q'] * bal_esq[0]['L'])
+                Reacoes_apoio[0] += bal_esq[0]['q'] * bal_esq[0]['L'] + bal_esq[0]['P']
+                V_max = max(V_max, bal_esq[0]['q'] * bal_esq[0]['L'] + bal_esq[0]['P'])
             if bal_dir:
-                Reacoes_apoio[-1] += bal_dir[0]['q'] * bal_dir[0]['L']
-                V_max = max(V_max, bal_dir[0]['q'] * bal_dir[0]['L'])
+                Reacoes_apoio[-1] += bal_dir[0]['q'] * bal_dir[0]['L'] + bal_dir[0]['P']
+                V_max = max(V_max, bal_dir[0]['q'] * bal_dir[0]['L'] + bal_dir[0]['P'])
                 
             Reacoes = list(Reacoes_apoio)
 
@@ -226,18 +235,21 @@ if 'contador' not in st.session_state:
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
-# Mecânica de captura dinâmica para edição estável dentro do st.form
+# Mecânica estável para capturar a edição e alimentar as caixas numéricas
 val_tipo = "Normal"
 init_L = 0.0
 init_q = 0.0
 init_P = 0.0
+init_a = 0.0
 
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
-    val_tipo = st.session_state.lista_vaos[idx]['tipo']
-    init_L = float(st.session_state.lista_vaos[idx]['L'])
-    init_q = float(st.session_state.lista_vaos[idx]['q'])
-    init_P = float(st.session_state.lista_vaos[idx]['P'])
+    if idx < len(st.session_state.lista_vaos):
+        val_tipo = st.session_state.lista_vaos[idx]['tipo']
+        init_L = float(st.session_state.lista_vaos[idx]['L'])
+        init_q = float(st.session_state.lista_vaos[idx]['q'])
+        init_P = float(st.session_state.lista_vaos[idx]['P'])
+        init_a = float(st.session_state.lista_vaos[idx]['a'])
 
 # --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
@@ -254,42 +266,46 @@ num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal
 texto_tramo_atual = f"Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}" if st.session_state.edit_index is None else f"Editando: {st.session_state.lista_vaos[st.session_state.edit_index]['nome']}"
 st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow_html=True)
 
-# Formulário agora recebe de forma dinâmica os valores do vão selecionado pelo Lápis
-with st.form(key=f"viga_form_{st.session_state.edit_index}", clear_on_submit=True):
+# Formulário isolado por índice para destravar a edição do botão do lápis de vez
+with st.form(key=f"viga_form_estavel_{st.session_state.edit_index}", clear_on_submit=True):
     tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(val_tipo))
-    colL, colQ, colP = st.columns(3)
+    colL, colQ, colP, colA = st.columns(4)
     L = colL.number_input("Comprimento [m]", value=init_L, step=0.1)
-    q = colQ.number_input("Carga Distr. (q) [kN/m]", value=init_q, step=0.5)
-    P = colP.number_input("Carga Conc. (P) [kN]", value=init_P, step=0.5)
+    q = colQ.number_input("Carga Distr. [kN/m]", value=init_q, step=0.5)
+    P = colP.number_input("Carga Conc. [kN]", value=init_P, step=0.5)
+    # MELHORIA: Campo para a distância (a) a partir do início do vão
+    a = colA.number_input("Dist. Carga (a) [m]", value=init_a, step=0.1)
     
     texto_botao = "➕ INSERIR TRAMO NA VIGA" if st.session_state.edit_index is None else "💾 SALVAR ALTERAÇÃO DO VÃO"
     btn_inserir = st.form_submit_button(texto_botao)
 
 if btn_inserir:
-    if st.session_state.edit_index is None:
-        if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
-            st.error("Já existe um Balanço Esquerdo!")
-        elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
-            st.error("Já existe um Balanço Direito!")
-        else:
-            nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
-            if tipo == "Normal": st.session_state.contador += 1
-            st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': L, 'q': q, 'P': P})
-            st.rerun()
+    if a > L and tipo == "Normal":
+        st.error("A distância da carga não pode ser maior que o comprimento do vão!")
     else:
-        st.session_state.lista_vaos[st.session_state.edit_index] = {'nome': st.session_state.lista_vaos[st.session_state.edit_index]['nome'], 'tipo': tipo, 'L': L, 'q': q, 'P': P}
-        st.session_state.edit_index = None
-        st.rerun()
+        if st.session_state.edit_index is None:
+            if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
+                st.error("Já existe um Balanço Esquerdo!")
+            elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
+                st.error("Já existe um Balanço Direito!")
+            else:
+                nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
+                if tipo == "Normal": st.session_state.contador += 1
+                st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': L, 'q': q, 'P': P, 'a': a})
+                st.rerun()
+        else:
+            st.session_state.lista_vaos[st.session_state.edit_index] = {'nome': st.session_state.lista_vaos[st.session_state.edit_index]['nome'], 'tipo': tipo, 'L': L, 'q': q, 'P': P, 'a': a}
+            st.session_state.edit_index = None
+            st.rerun()
 
 # Exibição dos Tramos Cadastrados
 if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
         col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        # CORREÇÃO 2: Agora exibe a carga concentrada (P) na própria linha de resumo, mesmo que zerada
-        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN**")
+        # Exibição completa das especificações incluindo a distância da força
+        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN** a **{v['a']}m**")
         
-        # CORREÇÃO 1: Ativação do Lápis alimentando o estado correto de edição do formulário
         if col_edit.button("✏️", key=f"edit_{i}"):
             st.session_state.edit_index = i
             st.rerun()
@@ -297,6 +313,7 @@ if len(st.session_state.lista_vaos) > 0:
         if col_del.button("❌", key=f"del_{i}"):
             if v['tipo'] == "Normal": st.session_state.contador -= 1
             st.session_state.lista_vaos.pop(i)
+            if st.session_state.edit_index == i: st.session_state.edit_index = None
             st.rerun()
 
     st.write("")
@@ -352,12 +369,12 @@ if len(st.session_state.lista_vaos) > 0:
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 
-            # Distribuição dos estribos horizontalmente por vão
+            # Estribos distribuídos legivelmente abaixo de cada pilar correspondente
             for i in range(len(res['vaos_internos'])):
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
                 ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
             
-            # Seção Transversal e Cotas
+            # Desenho do Corte Transversal com as Cotas Técnicas corretas
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
