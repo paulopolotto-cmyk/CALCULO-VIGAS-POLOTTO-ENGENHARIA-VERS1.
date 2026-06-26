@@ -5,28 +5,25 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
-# Estilização CSS para o Botão Amarelo e a Interface
+# Estilização CSS Avançada para forçar a Tecla Amarela de Inserir
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .status-caixa { background-color: #F97316; color: white; padding: 10px; font-weight: bold; border-radius: 5px; border: 1px solid #EA580C; margin-bottom: 15px; }
     .tramo-header { text-align: center; background-color: #E0F2FE; color: #0369A1; padding: 6px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; }
     
-    /* Estilo Especial para o Botão Amarelo de Inserir Tramos */
-    div.stButton > button:first-child[key="btn_inserir"] {
+    /* Forçando a cor amarela no botão de inserir por ID e classe */
+    div.stButton > button {
+        transition: all 0.2s ease;
+    }
+    /* Alvo específico para o botão amarelo usando seletores do Streamlit */
+    button[data-testid="baseButton-secondary"] {
         background-color: #FFDE4D !important;
         color: #000000 !important;
-        font-size: 18px !important;
+        font-size: 16px !important;
         font-weight: bold !important;
-        height: 50px !important;
         border: 2px solid #E6B905 !important;
-        border-radius: 8px !important;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
-        transition: 0.3s !important;
-    }
-    div.stButton > button:first-child[key="btn_inserir"]:hover {
-        background-color: #F4CE24 !important;
-        border-color: #D4A902 !important;
+        border-radius: 6px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -158,7 +155,6 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         As_apoios = [ajustar_as(calcular_as(m)) for m in M_apoios]
         As_positivos = [ajustar_as(calcular_as(m)) for m in M_positivos]
 
-        # Verificação da Força Cortante Limite de Norma (Biela Seca)
         fcd_mpa = fck / 1.4
         v1 = 0.6 * (1 - fck / 250)
         Vrd2 = 0.27 * v1 * fcd_mpa * (b / 10) * (d / 10) * 10 
@@ -242,9 +238,9 @@ L = colL.number_input("Comprimento [m]", value=val_L, step=0.1, key="input_L")
 q = colQ.number_input("Carga Distr. (q) [kN/m]", value=val_q, step=0.5, key="input_q")
 P = colP.number_input("Carga Conc. (P) [kN]", value=val_P, step=0.5, key="input_P")
 
-# Botão Inserir Amarelo Destacado
+# Botão Inserir Ativado como Botão Secundário para herdar a cor Amarela do CSS
 if st.session_state.edit_index is None:
-    if st.button("➕ INSERIR TRAMO NA VIGA", key="btn_inserir"):
+    if st.button("➕ INSERIR TRAMO NA VIGA", type="secondary"):
         if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
             st.error("Já existe um Balanço Esquerdo!")
         elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
@@ -309,20 +305,24 @@ if len(st.session_state.lista_vaos) > 0:
                 """, unsafe_allow_html=True)
                 
             # --- DESENHO TÉCNICO ---
-            fig, ax = plt.subplots(figsize=(8, 3.5))
+            fig, ax = plt.subplots(figsize=(8, 3.8))
             ax.set_xlim(-1, len(res['Reacoes']))
             ax.set_ylim(-1.8, 1.8)
             ax.axis('off')
             
+            # Corpo de concreto da viga
             ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB')
             
+            # Desenho dos Pilares
             for idx, r in enumerate(res['Reacoes']):
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
             
+            # Linhas das Armaduras Principais
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
+            # Escrita dos Ferros Superiores (Negativos) nos apoios
             if res['bal_esq']:
                 ax.text(-0.3, 0.45, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
@@ -330,14 +330,19 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.45, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
+            # CORREÇÃO 1: Afastar a escrita dos estribos deslocando a coordenada Y para baixo (-0.48)
             for i in range(len(res['vaos_internos'])):
+                # Ferro Positivo (Verde)
                 ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
+                # Estribos agora bem separados e nítidos abaixo da linha verde
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Seção Insuficiente!"
-                ax.text(i + 0.5, -0.35, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(i + 0.5, -0.48, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
             
-            ax.rectangle = plt.Rectangle((len(res['Reacoes'])-0.2, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//')
+            # CORREÇÃO 2: Garante o fechamento total das 4 bordas da Seção Transversal (Corte)
+            posX_corte = len(res['Reacoes']) - 0.2
+            ax.rectangle = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=1.5)
             ax.add_patch(ax.rectangle)
-            ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
+            ax.text(posX_corte + 0.2, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
             
             st.pyplot(fig)
             
