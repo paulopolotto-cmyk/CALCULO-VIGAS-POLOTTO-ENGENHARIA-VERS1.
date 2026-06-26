@@ -226,6 +226,19 @@ if 'contador' not in st.session_state:
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
+# Mecânica de captura dinâmica para edição estável dentro do st.form
+val_tipo = "Normal"
+init_L = 0.0
+init_q = 0.0
+init_P = 0.0
+
+if st.session_state.edit_index is not None:
+    idx = st.session_state.edit_index
+    val_tipo = st.session_state.lista_vaos[idx]['tipo']
+    init_L = float(st.session_state.lista_vaos[idx]['L'])
+    init_q = float(st.session_state.lista_vaos[idx]['q'])
+    init_P = float(st.session_state.lista_vaos[idx]['P'])
+
 # --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
 col1, col2, col3, col4 = st.columns(4)
@@ -241,14 +254,16 @@ num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal
 texto_tramo_atual = f"Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}" if st.session_state.edit_index is None else f"Editando: {st.session_state.lista_vaos[st.session_state.edit_index]['nome']}"
 st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow_html=True)
 
-with st.form(key="viga_form", clear_on_submit=True):
-    tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
+# Formulário agora recebe de forma dinâmica os valores do vão selecionado pelo Lápis
+with st.form(key=f"viga_form_{st.session_state.edit_index}", clear_on_submit=True):
+    tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(val_tipo))
     colL, colQ, colP = st.columns(3)
-    L = colL.number_input("Comprimento [m]", value=0.0, step=0.1)
-    q = colQ.number_input("Carga Distr. (q) [kN/m]", value=0.0, step=0.5)
-    P = colP.number_input("Carga Conc. (P) [kN]", value=0.0, step=0.5)
+    L = colL.number_input("Comprimento [m]", value=init_L, step=0.1)
+    q = colQ.number_input("Carga Distr. (q) [kN/m]", value=init_q, step=0.5)
+    P = colP.number_input("Carga Conc. (P) [kN]", value=init_P, step=0.5)
     
-    btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
+    texto_botao = "➕ INSERIR TRAMO NA VIGA" if st.session_state.edit_index is None else "💾 SALVAR ALTERAÇÃO DO VÃO"
+    btn_inserir = st.form_submit_button(texto_botao)
 
 if btn_inserir:
     if st.session_state.edit_index is None:
@@ -271,8 +286,10 @@ if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
         col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m**")
+        # CORREÇÃO 2: Agora exibe a carga concentrada (P) na própria linha de resumo, mesmo que zerada
+        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN**")
         
+        # CORREÇÃO 1: Ativação do Lápis alimentando o estado correto de edição do formulário
         if col_edit.button("✏️", key=f"edit_{i}"):
             st.session_state.edit_index = i
             st.rerun()
@@ -331,23 +348,21 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
-            # Ferros Positivos distributed per span
+            # Ferros Positivos
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 
-            # CORREÇÃO 1: Estribos distribuídos horizontalmente ao longo de cada vão (i + 0.5) abaixo de cada triângulo azul
+            # Distribuição dos estribos horizontalmente por vão
             for i in range(len(res['vaos_internos'])):
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
                 ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
             
-            # CORREÇÃO 2: Cotas de desenho técnico posicionadas nos eixos X e Y externos da seção hachurada
+            # Seção Transversal e Cotas
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
             
-            # Valor da Base (20) posicionado centralizado abaixo do retângulo
             ax.text(posX_corte + 0.2, -0.65, f"{int(b)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
-            # Valor da Altura (45) posicionado ao lado direito do retângulo
             ax.text(posX_corte + 0.5, 0.0, f"{int(h)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
             
             st.pyplot(fig)
