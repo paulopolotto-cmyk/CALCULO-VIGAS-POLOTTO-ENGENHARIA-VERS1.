@@ -5,31 +5,42 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
-# Estilização CSS Cirúrgica para fixar a Interface e a Tecla Amarela
+# Estilização CSS Cirúrgica para Padronização de Teclas e Destaques
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .tramo-header { text-align: center; background-color: #E0F2FE; color: #0369A1; padding: 6px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; }
     
-    /* ESTILO DA TECLA AMARELA: Forçando um bloco de destaque amarelo com letras pretas e borda */
-    .tecla-amarela {
+    /* ESTILO DA TECLA DE INSERIR: Fundo Amarelo, tamanho ideal e letras pretas marcantes */
+    div.stButton > button[key="btn_amarelo_inserir"] {
         background-color: #FFDE4D !important;
         color: #000000 !important;
-        padding: 14px;
-        text-align: center;
-        font-size: 18px;
-        font-weight: bold;
-        border: 2px solid #E6B905;
-        border-radius: 8px;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-        margin-top: 10px;
-        margin-bottom: 15px;
+        font-size: 16px !important;
+        font-weight: bold !important;
+        height: 46px !important;
+        width: 100% !important;
+        border: 2px solid #E6B905 !important;
+        border-radius: 6px !important;
+        box-shadow: 0px 3px 5px rgba(0,0,0,0.1) !important;
+    }
+    div.stButton > button[key="btn_amarelo_inserir"]:hover {
+        background-color: #F4CE24 !important;
+        border-color: #D4A902 !important;
     }
     
-    /* Botão de Calcular em Vermelho Padrão */
+    /* Destacando o Campo do Aço CA-50A para não ficar apagado */
+    div[data-testid="stTextInput"] input:disabled {
+        -webkit-text-fill-color: #000000 !important;
+        color: #000000 !important;
+        font-weight: bold !important;
+        background-color: #F3F4F6 !important;
+        opacity: 1 !important;
+    }
+    
+    /* Botão de Calcular em Vermelho Padrão Estruturado */
     div.stButton > button[type="primary"] {
         width: 100% !important;
-        height: 52px !important;
+        height: 48px !important;
         font-weight: bold !important;
         background-color: #FF4B4B !important;
         color: white !important;
@@ -233,7 +244,8 @@ col1, col2, col3, col4 = st.columns(4)
 b = col1.number_input("Base (bw) [cm]", value=20)
 h = col2.number_input("Altura (h) [cm]", value=45)
 fck = col3.number_input("Concreto fck [MPa]", value=30)
-tipo_aco = col4.text_input("Aço de Projeto", value="CA50A", disabled=True)
+# CORREÇÃO: Letras pretas marcantes aplicadas via CSS para o CA50A
+tipo_aco = col4.text_input("Aço de Projeto", value="CA-50A", disabled=True)
 dados_g = {'b': b, 'h': h, 'fck': fck}
 
 st.header("2. Inserir Elementos da Viga")
@@ -250,8 +262,7 @@ P = colP.number_input("Carga Conc. (P) [kN]", value=val_P, step=0.5, key="input_
 
 st.write("")
 
-# SOLUÇÃO COMPLETA: Tecla nativa do Streamlit com estilo "Secondary" herdando a classe da Tecla Amarela sem falhas
-st.markdown('<div class="tecla-amarela">👇 USE A TECLA ABAIXO PARA ADICIONAR OS VÃOS</div>', unsafe_allow_html=True)
+# MELHORIA: Tecla Amarela Oficial, elegante e perfeitamente integrada ao Streamlit
 btn_inserir = st.button("➕ INSERIR TRAMO NA VIGA", key="btn_amarelo_inserir", type="secondary")
 
 if btn_inserir:
@@ -311,9 +322,9 @@ if len(st.session_state.lista_vaos) > 0:
                 """, unsafe_allow_html=True)
                 
             # --- DESENHO TÉCNICO ---
-            fig, ax = plt.subplots(figsize=(8, 4.5))
+            fig, ax = plt.subplots(figsize=(8, 4.8))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            ax.set_ylim(-2.5, 2.2)
+            ax.set_ylim(-2.8, 2.2)
             ax.axis('off')
             
             # Corpo da viga
@@ -328,24 +339,24 @@ if len(st.session_state.lista_vaos) > 0:
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
-            # Negativos nos apoios
+            # Negativos nos apoios com indicação de Camada (NBR 6118)
             if res['bal_esq']:
-                ax.text(-0.3, 0.45, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+                ax.text(-0.3, 0.45, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 0.45, sugerir_barras(res['As_apoios'][i+1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+                ax.text(i+1, 0.45, f"{sugerir_barras(res['As_apoios'][i+1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 0.45, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+                ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
-            # Ferros Positivos Normais
+            # Ferros Positivos com indicação de 1ª Camada (C1)
             for i in range(len(res['vaos_internos'])):
-                ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
+                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 
-            # CORREÇÃO 1 & 2: Estribos movidos significativamente para baixo, ficando exatamente ABAIXO do triângulo azul (-1.35)
+            # MELHORIA 1: Estribos movidos estrategicamente bem abaixo do triângulo azul do pilar (-1.40) para leitura limpa
             for i in range(len(res['vaos_internos'])):
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -1.35, f"Estribos: {texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(i + 0.5, -1.40, f"Estribos: {texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
             
-            # CORREÇÃO 3: Desenho da Seção Transversal com FECHAMENTO TOTAL perimetral
+            # Desenho da Seção Transversal com fechamento total perimetral
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
@@ -353,11 +364,11 @@ if len(st.session_state.lista_vaos) > 0:
             
             st.pyplot(fig)
             
-            # --- RELATÓRIO COM LINHAS SEPARADORAS DE PILAR ---
+            # --- RELATÓRIO COM LINHAS SEPARADORAS ENTRE CADA PILAR ---
             st.subheader("Relação de Especificações Técnicas")
             status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
             
-            # Montando as linhas separadoras no relatório abaixo
+            # Montando as linhas separadoras e especificações de norma (Medidas de ancoragem automática LB = 35cm aprox)
             linhas_relatorio = [
                 f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
                 "--------------------------------------------------------------------------------",
@@ -366,11 +377,18 @@ if len(st.session_state.lista_vaos) > 0:
                 "--------------------------------------------------------------------------------"
             ]
             
-            # Inserindo reações individuais separadas por linhas tracejadas
+            # MELHORIA 2: Linhas tracejadas separando cada pilar e reação individualmente
             for idx, r in enumerate(res['Reacoes']):
-                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Carga Atuante = {r:.1f} kN")
+                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
                 linhas_relatorio.append("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -")
                 
+            # Detalhamento de comprimentos nominais e camadas regulamentares
+            linhas_relatorio.append("DETALHAMENTO DE BARRAS LONGITUDINAIS (NBR 6118):")
+            for i, v in enumerate(res['vaos_internos']):
+                comp_barra = v['L'] + 0.70 # vão livre + ganchos regulamentares nas pontas
+                linhas_relatorio.append(f"  Vão {i+1} ({v['nome']}): Ferro Positivo {sugerir_barras(res['As_positivos'][i])} | Comp. Nominal = {comp_barra:.2f}m | Disposição: 1ª Camada")
+                
+            linhas_relatorio.append("--------------------------------------------------------------------------------")
             linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
             linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2): {res['Vrd2']:.2f} kN")
             
