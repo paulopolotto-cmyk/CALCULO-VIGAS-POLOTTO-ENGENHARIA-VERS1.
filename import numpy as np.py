@@ -5,12 +5,29 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
+# Estilização CSS para o Botão Amarelo e a Interface
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .status-caixa { background-color: #F97316; color: white; padding: 10px; font-weight: bold; border-radius: 5px; border: 1px solid #EA580C; margin-bottom: 15px; }
-    .stButton>button { width: 100%; font-weight: bold; }
     .tramo-header { text-align: center; background-color: #E0F2FE; color: #0369A1; padding: 6px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; }
+    
+    /* Estilo Especial para o Botão Amarelo de Inserir */
+    div.stButton > button:first-child[key="btn_inserir"] {
+        background-color: #FFDE4D !important;
+        color: #000000 !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        height: 50px !important;
+        border: 2px solid #E6B905 !important;
+        border-radius: 8px !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
+        transition: 0.3s !important;
+    }
+    div.stButton > button:first-child[key="btn_inserir"]:hover {
+        background-color: #F4CE24 !important;
+        border-color: #D4A902 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -37,7 +54,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         num_apoios = num_vaos + 1
         
         if num_vaos < 1:
-            return {"erro": "A viga precisa ter pelo menos 1 vão normal entre apoios."}
+            return {"aviso_inicial": "Aguardando a inserção de pelo menos 1 vão normal entre apoios para iniciar os cálculos."}
             
         MA = - (bal_esq[0]['q'] * bal_esq[0]['L']**2) / 2 if bal_esq else 0.0
         MZ = - (bal_dir[0]['q'] * bal_dir[0]['L']**2) / 2 if bal_dir else 0.0
@@ -141,6 +158,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         As_apoios = [ajustar_as(calcular_as(m)) for m in M_apoios]
         As_positivos = [ajustar_as(calcular_as(m)) for m in M_positivos]
 
+        # Verificação do esmagamento da biela (Força Cortante Limite de Norma)
         fcd_mpa = fck / 1.4
         v1 = 0.6 * (1 - fck / 250)
         Vrd2 = 0.27 * v1 * fcd_mpa * (b / 10) * (d / 10) * 10 
@@ -148,7 +166,9 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         
         estribos_vaos_texto = []
         if falha_cortante:
-            estribo_msg = "ERRO!"
+            estribo_msg = "REDIRECIONAR SEÇÃO!"
+            for _ in range(num_vaos):
+                estribos_vaos_texto.append("Seção Inválida")
         else:
             fctm = 0.3 * (fck ** (2/3))
             Vc = 0.6 * (((0.7 * fctm) / 1.4) / 10) * b * d 
@@ -165,7 +185,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         return {
             "M_apoios": M_apoios, "M_positivos": M_positivos, "Reacoes": Reacoes,
             "As_apoios": As_apoios, "As_positivos": As_positivos,
-            "V_max": V_max, "estribos": estribo_msg, "estribos_lista": estribos_vaos_texto,
+            "V_max": V_max, "Vrd2": Vrd2, "estribos": estribo_msg, "estribos_lista": estribos_vaos_texto,
             "falha_cortante": falha_cortante, "vaos_internos": vaos_internos, 
             "bal_esq": bal_esq, "bal_dir": bal_dir
         }
@@ -201,10 +221,10 @@ if st.session_state.edit_index is not None:
     val_q = st.session_state.lista_vaos[idx]['q']
     val_P = st.session_state.lista_vaos[idx]['P']
 
-# --- INTERFACE ---
+# --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
 col1, col2, col3, col4 = st.columns(4)
-b = col1.number_input("Base (b) [cm]", value=20)
+b = col1.number_input("Base (bw) [cm]", value=20)
 h = col2.number_input("Altura (h) [cm]", value=45)
 fck = col3.number_input("Concreto fck [MPa]", value=30)
 tipo_aco = col4.text_input("Aço de Projeto", value="CA50A", disabled=True)
@@ -222,8 +242,9 @@ L = colL.number_input("Comprimento [m]", value=val_L, step=0.1, key="input_L")
 q = colQ.number_input("Carga Distr. (q) [kN/m]", value=val_q, step=0.5, key="input_q")
 P = colP.number_input("Carga Conc. (P) [kN]", value=val_P, step=0.5, key="input_P")
 
+# Botão Inserir Amarelo Destacado por CSS
 if st.session_state.edit_index is None:
-    if st.button("➕ Inserir Tramo"):
+    if st.button("➕ INSERIR TRAMO NA VIGA", key="btn_inserir"):
         if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
             st.error("Já existe um Balanço Esquerdo!")
         elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
@@ -246,6 +267,7 @@ else:
         st.session_state.edit_index = None
         st.rerun()
 
+# Exibição dos Tramos Cadastrados
 if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
@@ -262,57 +284,84 @@ if len(st.session_state.lista_vaos) > 0:
             if st.session_state.edit_index == i: st.session_state.edit_index = None
             st.rerun()
 
-    st.write("")
-    btn_calc = st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary")
-    st.write("")
+    # --- EXECUÇÃO DO MOTOR DE CÁLCULO AUTOMÁTICO ---
+    res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
+    
+    if "aviso_inicial" in res:
+        st.info(res["aviso_inicial"])
+    elif "erro" in res:
+        st.error(res["erro"])
+    else:
+        st.write("---")
+        st.header("🏁 Layout de Detalhamento Estrutural")
+        
+        # VERIFICAÇÃO CRÍTICA DE NORMA (Cisalhamento / Força Cortante)
+        if res['falha_total_biela'] := res['falha_total_biela'] if 'falha_total_biela' in res else res['falha_total_biela'] if 'falha_total_biela' in res else res['falha_cortante']:
+            st.markdown(f"""
+            <div style="background-color:#DC2626; color:white; padding:15px; border-radius:8px; font-weight:bold; font-size:16px;">
+            ⚠️ ERRO CRÍTICO: A seção {b}x{h} cm está FORA DAS NORMAS ATUAIS por Esmagamento de Biela Seca de Concreto!<br>
+            A força cortante atuante de projeto ({res['V_max']*1.4:.2f} kN) superou a resistência limite da seção ({res['Vrd2']:.2f} kN). 
+            Aumente a base (bw) ou a altura (h) imediatamente.
+            </div>
+            """, unsafe_allow_html=True)
+            
+        # --- DESENHO TÉCNICO DAS FERRAGENS E ESTRIBOS (MATPLOTLIB) ---
+        fig, ax = plt.subplots(figsize=(8, 3.5))
+        ax.set_xlim(-1, len(res['Reacoes']))
+        ax.set_ylim(-1.8, 1.8)
+        ax.axis('off')
+        
+        # Corpo de concreto da viga
+        ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB', label='Viga')
+        
+        # Desenho dos Pilares
+        for idx, r in enumerate(res['Reacoes']):
+            ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
+            ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
+        
+        # Linhas das Armaduras Principais
+        ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
+        ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
+        
+        # Escrita dos Ferros Superiores (Negativos) nos apoios
+        if res['bal_esq']:
+            ax.text(-0.3, 0.45, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+        for i in range(len(res['M_apoios'])-2):
+            ax.text(i+1, 0.45, sugerir_barras(res['As_apoios'][i+1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+        if res['bal_dir']:
+            ax.text(len(res['Reacoes'])-0.7, 0.45, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+            
+        # Escrita dos Ferros Inferiores (Positivos) E Especificações dos Estribos Calculados Logo Abaixo
+        for i in range(len(res['vaos_internos'])):
+            # Ferro Positivo
+            ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
+            # Estribo correspondente posicionado estrategicamente abaixo da linha verde
+            texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "RECALCULAR!"
+            ax.text(i + 0.5, -0.35, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
+        
+        # Desenho do Detalhe do Corte Transversal ao lado
+        ax.rectangle = plt.Rectangle((len(res['Reacoes'])-0.2, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//')
+        ax.add_patch(ax.rectangle)
+        ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
+        
+        st.pyplot(fig)
+        
+        # --- RELATÓRIO / ESPECIFICAÇÕES TÉCNICAS INFERIORES ---
+        st.subheader("Relação de Especificações Técnicas")
+        status_norma = "⚠️ REPROVADO (Redimensionar Seção!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
+        
+        out = [
+            f"SEÇÃO TRANSVERSAL OBJETIVO: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
+            f"STATUS DA FORÇA CORTANTE: {status_norma}",
+            f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
+            f"CORTANTE MÁXIMO ATUANTE DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN",
+            f"RESISTÊNCIA MÁXIMA DA BIELA DE CONCRETO (Vrd2): {res['Vrd2']:.2f} kN"
+        ]
+        st.code("\n".join(out), language="text")
 
-    if btn_calc:
-        res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
-        if "erro" in res:
-            st.error(res["erro"])
-        else:
-            st.header("🏁 Layout de Detalhamento Estrutural")
-            
-            # --- DESENHO TÉCNICO DAS FERRAGENS (MATPLOTLIB) ---
-            fig, ax = plt.subplots(figsize=(8, 3))
-            ax.set_xlim(-1, len(res['Reacoes']))
-            ax.set_ylim(-1.5, 1.5)
-            ax.axis('off')
-            
-            ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB', label='Viga')
-            
-            for idx, r in enumerate(res['Reacoes']):
-                ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
-                ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
-            
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5, label='As Sup (Negativo)')
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5, label='As Inf (Positivo)')
-            
-            if res['bal_esq']:
-                ax.text(-0.3, 0.35, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 0.35, sugerir_barras(res['As_apoios'][i+1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 0.35, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-                
-            for i in range(len(res['vaos_internos'])):
-                ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
-            
-            ax.rectangle = plt.Rectangle((len(res['Reacoes'])-0.2, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//')
-            ax.add_patch(ax.rectangle)
-            ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
-            
-            st.pyplot(fig)
-            
-            st.subheader("Relação de Especificações Técnicas")
-            out = [
-                f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
-                f"ARMADURA TRANSVERSAL (ESTRIBOS): {res['estribos']}",
-                f"CORTANTE MÁXIMO DE PROJETO: {res['V_max']:.2f} kN"
-            ]
-            st.code("\n".join(out), language="text")
-
-if st.button("🔄 Limpar Tudo"):
+# Botão para Resetar Projeto
+st.write("")
+if st.button("🔄 Limpar Tudo e Reiniciar"):
     st.session_state.lista_vaos = []
     st.session_state.contador = 1
     st.session_state.edit_index = None
