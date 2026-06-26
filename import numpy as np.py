@@ -110,7 +110,6 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 L_v = v['L']
                 a_v = v['a']
                 b_v = L_v - a_v
-                # Coeficiente de engastamento perfeito adaptado para carga concentrada genérica na posição 'a'
                 term_q = (v['q'] * L_v**3) / 24
                 term_p = (v['P'] * a_v * b_v * (L_v + b_v)) / (6 * L_v) if L_v > 0 else 0
                 W.append(term_q + term_p)
@@ -227,29 +226,13 @@ def sugerir_barras(as_req):
         if qtd >= 2: return f"{qtd} {nome}"
     return f"{as_req:.2f} cm²"
 
-# --- GERENCIAMENTO DE ESTADO ---
+# --- GERENCIAMENTO DE ESTADO SEGURO ---
 if 'lista_vaos' not in st.session_state:
     st.session_state.lista_vaos = []
 if 'contador' not in st.session_state:
     st.session_state.contador = 1
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
-
-# Mecânica estável para capturar a edição e alimentar as caixas numéricas
-val_tipo = "Normal"
-init_L = 0.0
-init_q = 0.0
-init_P = 0.0
-init_a = 0.0
-
-if st.session_state.edit_index is not None:
-    idx = st.session_state.edit_index
-    if idx < len(st.session_state.lista_vaos):
-        val_tipo = st.session_state.lista_vaos[idx]['tipo']
-        init_L = float(st.session_state.lista_vaos[idx]['L'])
-        init_q = float(st.session_state.lista_vaos[idx]['q'])
-        init_P = float(st.session_state.lista_vaos[idx]['P'])
-        init_a = float(st.session_state.lista_vaos[idx]['a'])
 
 # --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
@@ -262,28 +245,54 @@ dados_g = {'b': b, 'h': h, 'fck': fck}
 
 st.header("2. Inserir Elementos da Viga")
 
-num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
-texto_tramo_atual = f"Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}" if st.session_state.edit_index is None else f"Editando: {st.session_state.lista_vaos[st.session_state.edit_index]['nome']}"
-st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow_html=True)
-
-# Formulário isolado por índice para destravar a edição do botão do lápis de vez
-with st.form(key=f"viga_form_estavel_{st.session_state.edit_index}", clear_on_submit=True):
-    tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(val_tipo))
-    colL, colQ, colP, colA = st.columns(4)
-    L = colL.number_input("Comprimento [m]", value=init_L, step=0.1)
-    q = colQ.number_input("Carga Distr. [kN/m]", value=init_q, step=0.5)
-    P = colP.number_input("Carga Conc. [kN]", value=init_P, step=0.5)
-    # MELHORIA: Campo para a distância (a) a partir do início do vão
-    a = colA.number_input("Dist. Carga (a) [m]", value=init_a, step=0.1)
+# CORREÇÃO DO LÁPIS: Isola o tramo em edição do formulário padrão de inserção
+if st.session_state.edit_index is not None:
+    idx = st.session_state.edit_index
+    st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
     
-    texto_botao = "➕ INSERIR TRAMO NA VIGA" if st.session_state.edit_index is None else "💾 SALVAR ALTERAÇÃO DO VÃO"
-    btn_inserir = st.form_submit_button(texto_botao)
+    with st.form(key="form_edicao_blindado"):
+        tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']))
+        colL, colQ, colP, colA = st.columns(4)
+        L_ed = colL.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1)
+        q_ed = colQ.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5)
+        P_ed = colP.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5)
+        a_ed = colA.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1)
+        
+        col_b1, col_b2 = st.columns(2)
+        btn_salvar = col_b1.form_submit_button("💾 SALVAR ALTERAÇÃO DO VÃO")
+        btn_cancelar = col_b2.form_submit_button("❌ CANCELAR")
+        
+    if btn_salvar:
+        st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': L_ed, 'q': q_ed, 'P': P_ed, 'a': a_ed}
+        st.session_state.edit_index = None
+        st.rerun()
+    if btn_cancelar:
+        st.session_state.edit_index = None
+        st.rerun()
+else:
+    # FORMULÁRIO DE INSERÇÃO: Campos começam totalmente limpos/em branco (None)
+    st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
+    with st.form(key="form_insercao_limpo"):
+        tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
+        colL, colQ, colP, colA = st.columns(4)
+        L = colL.number_input("Comprimento [m]", value=None, step=0.1, placeholder="Digite...")
+        q = colQ.number_input("Carga Distr. [kN/m]", value=None, step=0.5, placeholder="Digite...")
+        P = colP.number_input("Carga Conc. [kN]", value=None, step=0.5, placeholder="Digite...")
+        a = colA.number_input("Dist. Carga (a) [m]", value=None, step=0.1, placeholder="Digite...")
+        
+        btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
-if btn_inserir:
-    if a > L and tipo == "Normal":
-        st.error("A distância da carga não pode ser maior que o comprimento do vão!")
-    else:
-        if st.session_state.edit_index is None:
+    if btn_inserir:
+        v_L = float(L) if L is not None else 0.0
+        v_q = float(q) if q is not None else 0.0
+        v_P = float(P) if P is not None else 0.0
+        v_a = float(a) if a is not None else 0.0
+        
+        if v_a > v_L and tipo == "Normal":
+            st.error("A distância da carga não pode ser maior que o comprimento do vão!")
+        elif v_L <= 0.0:
+            st.error("O comprimento do vão precisa ser maior que zero!")
+        else:
             if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
                 st.error("Já existe um Balanço Esquerdo!")
             elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
@@ -291,19 +300,14 @@ if btn_inserir:
             else:
                 nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
                 if tipo == "Normal": st.session_state.contador += 1
-                st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': L, 'q': q, 'P': P, 'a': a})
+                st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
                 st.rerun()
-        else:
-            st.session_state.lista_vaos[st.session_state.edit_index] = {'nome': st.session_state.lista_vaos[st.session_state.edit_index]['nome'], 'tipo': tipo, 'L': L, 'q': q, 'P': P, 'a': a}
-            st.session_state.edit_index = None
-            st.rerun()
 
 # Exibição dos Tramos Cadastrados
 if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
         col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        # Exibição completa das especificações incluindo a distância da força
         col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN** a **{v['a']}m**")
         
         if col_edit.button("✏️", key=f"edit_{i}"):
@@ -357,7 +361,7 @@ if len(st.session_state.lista_vaos) > 0:
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
-            # Negativos nos apoios
+            # Negativos nos eixos de apoio
             if res['bal_esq']:
                 ax.text(-0.3, 0.45, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
