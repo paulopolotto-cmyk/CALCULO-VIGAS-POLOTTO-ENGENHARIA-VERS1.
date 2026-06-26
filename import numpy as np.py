@@ -373,3 +373,67 @@ if len(st.session_state.lista_vaos) > 0:
             # Armaduras principais
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
+            
+            # Negativos nos eixos de apoio
+            if res['bal_esq']:
+                ax.text(-0.3, 0.45, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+            for i in range(len(res['M_apoios'])-2):
+                ax.text(i+1, 0.45, f"{sugerir_barras(res['As_apoios'][i+1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+            if res['bal_dir']:
+                ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
+                
+            # Ferros Positivos
+            for i in range(len(res['vaos_internos'])):
+                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
+                
+            # Estribos distribuídos legivelmente abaixo de cada pilar correspondente
+            for i in range(len(res['vaos_internos'])):
+                texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
+                ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
+            
+            # Desenho do Corte Transversal com as Cotas Técnicas corretas
+            posX_corte = len(res['Reacoes']) - 0.1
+            caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
+            ax.add_patch(caixa_corte)
+            
+            ax.text(posX_corte + 0.2, -0.65, f"{int(b)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
+            ax.text(posX_corte + 0.5, 0.0, f"{int(h)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
+            
+            st.pyplot(fig)
+            
+            # --- RELATÓRIO COM LINHAS SEPARADORAS ---
+            st.subheader("Relação de Especificações Técnicas")
+            status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
+            
+            linhas_relatorio = [
+                f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
+                "--------------------------------------------------------------------------------",
+                f"STATUS DA FORÇA CORTANTE: {status_norma}",
+                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
+                "--------------------------------------------------------------------------------"
+            ]
+            
+            for idx, r in enumerate(res['Reacoes']):
+                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
+                linhas_relatorio.append("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -")
+                
+            linhas_relatorio.append("DETALHAMENTO DE BARRAS LONGITUDINAIS (NBR 6118):")
+            for i, v in enumerate(res['vaos_internos']):
+                comp_barra = v['L'] + 0.70
+                linhas_relatorio.append(f"  Vão {i+1} ({v['nome']}): Ferro Positivo {sugerir_barras(res['As_positivos'][i])} | Comp. Nominal = {comp_barra:.2f}m | Disposição: 1ª Camada")
+                
+            linhas_relatorio.append("--------------------------------------------------------------------------------")
+            linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
+            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2): {res['Vrd2']:.2f} kN")
+            
+            st.code("\n".join(linhas_relatorio), language="text")
+
+# Botão para Resetar Projeto completamente
+st.write("")
+if st.button("🔄 Limpar Tudo e Reiniciar"):
+    if 'calcular_ativo' in st.session_state:
+        del st.session_state.calcular_ativo
+    st.session_state.lista_vaos = []
+    st.session_state.contador = 1
+    st.session_state.edit_index = None
+    st.rerun()
