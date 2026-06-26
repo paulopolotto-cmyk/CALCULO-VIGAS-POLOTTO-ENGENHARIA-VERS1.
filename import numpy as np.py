@@ -241,7 +241,6 @@ num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal
 texto_tramo_atual = f"Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}" if st.session_state.edit_index is None else f"Editando: {st.session_state.lista_vaos[st.session_state.edit_index]['nome']}"
 st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow_html=True)
 
-# SOLUÇÃO DEFINITIVA CONTRA ERROS DE APAGAR: Formulário nativo que limpa tudo sozinho e inicia em 0.0
 with st.form(key="viga_form", clear_on_submit=True):
     tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
     colL, colQ, colP = st.columns(3)
@@ -307,9 +306,9 @@ if len(st.session_state.lista_vaos) > 0:
                 """, unsafe_allow_html=True)
                 
             # --- DESENHO TÉCNICO ---
-            fig, ax = plt.subplots(figsize=(8, 4.8))
+            fig, ax = plt.subplots(figsize=(8, 5.0))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            ax.set_ylim(-2.8, 2.2)
+            ax.set_ylim(-3.0, 2.2)
             ax.axis('off')
             
             # Corpo da viga
@@ -332,20 +331,24 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
-            # Ferros Positivos
+            # Ferros Positivos distributed per span
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 
-            # Posição dos Estribos: Embaixo dos pilares
+            # CORREÇÃO 1: Estribos distribuídos horizontalmente ao longo de cada vão (i + 0.5) abaixo de cada triângulo azul
             for i in range(len(res['vaos_internos'])):
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -1.40, f"Estribos: {texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
             
-            # Desenho do Corte Transversal Fechado
+            # CORREÇÃO 2: Cotas de desenho técnico posicionadas nos eixos X e Y externos da seção hachurada
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
-            ax.text(posX_corte + 0.2, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
+            
+            # Valor da Base (20) posicionado centralizado abaixo do retângulo
+            ax.text(posX_corte + 0.2, -0.65, f"{int(b)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
+            # Valor da Altura (45) posicionado ao lado direito do retângulo
+            ax.text(posX_corte + 0.5, 0.0, f"{int(h)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
             
             st.pyplot(fig)
             
