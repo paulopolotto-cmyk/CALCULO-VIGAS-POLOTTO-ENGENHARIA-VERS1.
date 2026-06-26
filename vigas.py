@@ -2,7 +2,7 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Configuração da página para o celular S26 Ultra
+# Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
 st.markdown("""
@@ -189,7 +189,6 @@ if 'contador' not in st.session_state:
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
-# Valores padrão dos campos (para permitir edição)
 val_tipo = "Normal"
 val_L = 4.0
 val_q = 15.0
@@ -213,7 +212,6 @@ dados_g = {'b': b, 'h': h, 'fck': fck}
 
 st.header("2. Inserir Elementos da Viga")
 
-# Indicador dinâmico do tramo atual no meio da página
 num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
 texto_tramo_atual = f"Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}" if st.session_state.edit_index is None else f"Editando: {st.session_state.lista_vaos[st.session_state.edit_index]['nome']}"
 st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow_html=True)
@@ -248,7 +246,6 @@ else:
         st.session_state.edit_index = None
         st.rerun()
 
-# Lista de Tramos Inseridos com botões de Deletar e Editar
 if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
@@ -265,7 +262,6 @@ if len(st.session_state.lista_vaos) > 0:
             if st.session_state.edit_index == i: st.session_state.edit_index = None
             st.rerun()
 
-    # Botão Finalizar colocado LOGO APÓS os tramos inseridos
     st.write("")
     btn_calc = st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary")
     st.write("")
@@ -283,20 +279,15 @@ if len(st.session_state.lista_vaos) > 0:
             ax.set_ylim(-1.5, 1.5)
             ax.axis('off')
             
-            # Desenho do Corpo da Viga (Concreto)
             ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB', label='Viga')
             
-            # Desenho das Reações/Pilares e indicação textual abaixo
             for idx, r in enumerate(res['Reacoes']):
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
             
-            # Linha de Ferro Superior (Negativo)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5, label='As Sup (Negativo)')
-            # Linha de Ferro Inferior (Positivo)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5, label='As Inf (Positivo)')
             
-            # Textos das armaduras superiores nos apoios
             if res['bal_esq']:
                 ax.text(-0.3, 0.35, sugerir_barras(res['As_apoios'][0]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
@@ -304,18 +295,15 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.35, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
-            # Textos das armaduras inferiores nos vãos
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
             
-            # Desenho representativo do Corte Transversal ao lado
             ax.rectangle = plt.Rectangle((len(res['Reacoes'])-0.2, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//')
             ax.add_patch(ax.rectangle)
-            ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ce='center', ha='center', fontsize=8, fontweight='bold')
+            ax.text(len(res['Reacoes'])-0.0, 0.5, f"Corte\n{b}x{h}", ha='center', fontsize=8, fontweight='bold')
             
             st.pyplot(fig)
             
-            # Relação textual inferior padrão como já estava
             st.subheader("Relação de Especificações Técnicas")
             out = [
                 f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
