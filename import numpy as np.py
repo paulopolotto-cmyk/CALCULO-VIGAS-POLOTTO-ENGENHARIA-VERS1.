@@ -261,6 +261,8 @@ dados_g = {'b': b, 'h': h, 'fck': fck}
 
 st.header("2. Inserir Elementos da Viga")
 
+num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
+
 # MODO DE EDIÇÃO: Renderiza em linhas cheias verticais para ajuste perfeito em telas de celular
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
