@@ -5,26 +5,35 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
-# ESTILIZAÇÃO AGRESSIVA: Força o negrito em todas as entradas e a cor no botão amarelo
+# ESTILIZAÇÃO AGRESSIVA: Garante legibilidade total no celular (Modo Escuro/Claro)
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
-    .tramo-header { text-align: center; background-color: #E0F2FE; color: #0369A1; padding: 6px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; }
+    .tramo-header { text-align: center; background-color: #FFDE4D; color: #000000; padding: 8px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; border: 1px solid #E6B905; }
     
-    /* FORÇANDO NEGRITO E COR PRETA EM TODOS OS CAMPOS DE ENTRADA E TEXTO DOS INPUTS */
+    /* FORÇANDO FUNDO AMARELO CLARO E TEXTO PRETO EM TODAS AS CAIXAS DE ENTRADA DE DADOS */
     div[data-testid="stNumberInput"] input, 
     div[data-testid="stTextInput"] input,
-    div[data-testid="stNumberInput"] label,
-    div[data-testid="stTextInput"] label,
-    div[data-testid="stSelectbox"] label,
     div[data-testid="stSelectbox"] div[data-baseweb="select"] {
-        -webkit-text-fill-color: #000000 !important;
+        background-color: #FFF9C4 !important;
         color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
         font-weight: bold !important;
-        font-size: 15px !important;
+        font-size: 16px !important;
+        border: 2px solid #E6B905 !important;
+        border-radius: 4px !important;
     }
     
-    /* FORÇANDO BOTOES GERAIS E DO FORMULÁRIO A FICAREM AMARELOS EM DESTAQUE */
+    /* LABELS (TEXTOS DOS CAMPOS) SEMPRE VISÍVEIS EM NEGRITO */
+    div[data-testid="stNumberInput"] label,
+    div[data-testid="stTextInput"] label,
+    div[data-testid="stSelectbox"] label {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+    }
+    
+    /* FORÇANDO O BOTÃO DO FORMULÁRIO A FICAR AMARELO E EM DESTAQUE */
     div[data-testid="stForm"] button, div.stButton > button:not([type="primary"]) {
         background-color: #FFDE4D !important;
         color: #000000 !important;
@@ -52,7 +61,7 @@ st.markdown("""
 st.markdown('<div class="titulo">PROGRAMA DE CÁLCULOS DE VIGAS DA POLOTTO ENGENHARIA</div>', unsafe_allow_html=True)
 st.write("")
 
-# --- MOTOR MATEMÁTICO ADAPTADO PARA POSIÇÃO DA CARGA CONCENTRADA ---
+# --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
     try:
         b = float(dados_gerais['b'])
@@ -247,7 +256,7 @@ st.header("2. Inserir Elementos da Viga")
 
 num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
 
-# CORREÇÃO COMPLETA: Modo de Edição isolado sem usar st.form para evitar o bug de Widget ID Duplicado
+# MODO DE EDIÇÃO: Ajustado sem formulário rígido para não quebrar IDs de Widgets
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
     st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
@@ -271,7 +280,7 @@ if st.session_state.edit_index is not None:
         st.session_state.edit_index = None
         st.rerun()
 else:
-    # FORMULÁRIO DE INSERÇÃO: Campos totalmente limpos/em branco (None)
+    # FORMULÁRIO DE INSERÇÃO: Fundo amarelo nos inputs garante visualização perfeita
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
@@ -340,7 +349,7 @@ if len(st.session_state.lista_vaos) > 0:
                 <div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center; border: 4px solid #7F1D1D; margin-bottom:25px; line-height: 1.5;">
                 ⚠️ AS DIMENSÕES DA VIGA ({b}x{h} cm) SÃO INSUFICIENTES!<br>
                 A seção de concreto está FORA DAS NORMAS ATUAIS (NBR 6118) por falha por esmagamento da biela seca.<br>
-                O esforço total de projeto ultrapassou o limite máximo resistente de {res['Vrd2']:.2f} kN. As dimensões precisam ser alteradas!
+                Suba a tela, altere as dimensões (bw/h) ou o fck e recalcule. Seus vãos continuam salvos!
                 </div>
                 """, unsafe_allow_html=True)
                 
@@ -416,7 +425,7 @@ if len(st.session_state.lista_vaos) > 0:
             
             st.code("\n".join(linhas_relatorio), language="text")
 
-# Botão para Resetar Projeto
+# Botão para Resetar Projeto completamente
 st.write("")
 if st.button("🔄 Limpar Tudo e Reiniciar"):
     if 'calcular_ativo' in st.session_state:
