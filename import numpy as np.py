@@ -24,8 +24,8 @@ st.markdown("""
         font-size: 15px !important;
     }
     
-    /* FORÇANDO O BOTÃO DO FORMULÁRIO A FICAR AMARELO E EM DESTAQUE */
-    div[data-testid="stForm"] button {
+    /* FORÇANDO BOTOES GERAIS E DO FORMULÁRIO A FICAREM AMARELOS EM DESTAQUE */
+    div[data-testid="stForm"] button, div.stButton > button:not([type="primary"]) {
         background-color: #FFDE4D !important;
         color: #000000 !important;
         font-size: 16px !important;
@@ -226,7 +226,7 @@ def sugerir_barras(as_req):
         if qtd >= 2: return f"{qtd} {nome}"
     return f"{as_req:.2f} cm²"
 
-# --- GERENCIAMENTO DE ESTADO SEGURO ---
+# --- GERENCIAMENTO DE ESTADO ---
 if 'lista_vaos' not in st.session_state:
     st.session_state.lista_vaos = []
 if 'contador' not in st.session_state:
@@ -245,23 +245,24 @@ dados_g = {'b': b, 'h': h, 'fck': fck}
 
 st.header("2. Inserir Elementos da Viga")
 
-# CORREÇÃO DO LÁPIS: Isola o tramo em edição do formulário padrão de inserção
+num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
+
+# CORREÇÃO COMPLETA: Modo de Edição isolado sem usar st.form para evitar o bug de Widget ID Duplicado
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
-    st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
     
-    with st.form(key="form_edicao_blindado"):
-        tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']))
-        colL, colQ, colP, colA = st.columns(4)
-        L_ed = colL.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1)
-        q_ed = colQ.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5)
-        P_ed = colP.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5)
-        a_ed = colA.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1)
-        
-        col_b1, col_b2 = st.columns(2)
-        btn_salvar = col_b1.form_submit_button("💾 SALVAR ALTERAÇÃO DO VÃO")
-        btn_cancelar = col_b2.form_submit_button("❌ CANCELAR")
-        
+    tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']), key="ed_tipo")
+    colL, colQ, colP, colA = st.columns(4)
+    L_ed = colL.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1, key="ed_L")
+    q_ed = colQ.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5, key="ed_q")
+    P_ed = colP.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5, key="ed_p")
+    a_ed = colA.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1, key="ed_a")
+    
+    col_b1, col_b2 = st.columns(2)
+    btn_salvar = col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed")
+    btn_cancelar = col_b2.button("❌ CANCELAR", key="btn_cancelar_ed")
+    
     if btn_salvar:
         st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': L_ed, 'q': q_ed, 'P': P_ed, 'a': a_ed}
         st.session_state.edit_index = None
@@ -270,15 +271,15 @@ if st.session_state.edit_index is not None:
         st.session_state.edit_index = None
         st.rerun()
 else:
-    # FORMULÁRIO DE INSERÇÃO: Campos começam totalmente limpos/em branco (None)
+    # FORMULÁRIO DE INSERÇÃO: Campos totalmente limpos/em branco (None)
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
-    with st.form(key="form_insercao_limpo"):
+    with st.form(key="form_insercao_limpo", clear_on_submit=True):
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
         colL, colQ, colP, colA = st.columns(4)
-        L = colL.number_input("Comprimento [m]", value=None, step=0.1, placeholder="Digite...")
-        q = colQ.number_input("Carga Distr. [kN/m]", value=None, step=0.5, placeholder="Digite...")
-        P = colP.number_input("Carga Conc. [kN]", value=None, step=0.5, placeholder="Digite...")
-        a = colA.number_input("Dist. Carga (a) [m]", value=None, step=0.1, placeholder="Digite...")
+        L = colL.number_input("Comprimento [m]", value=None, step=0.1, placeholder="Vazio...")
+        q = colQ.number_input("Carga Distr. [kN/m]", value=None, step=0.5, placeholder="Vazio...")
+        P = colP.number_input("Carga Conc. [kN]", value=None, step=0.5, placeholder="Vazio...")
+        a = colA.number_input("Dist. Carga (a) [m]", value=None, step=0.1, placeholder="Vazio...")
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
