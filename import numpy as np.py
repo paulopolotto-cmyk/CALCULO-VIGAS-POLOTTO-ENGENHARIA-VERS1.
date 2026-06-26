@@ -273,10 +273,10 @@ st.header("2. Inserir Elementos da Viga")
 
 num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
 
-# RESTAURADO: Estrutura em 4 colunas preservada para o funcionamento perfeito
+# Estrutura perfeita em 4 colunas preservada
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
-    st.markdown(f'<div class="tramo-header">✏ Roy: MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
     
     tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']), key="ed_tipo")
     colL, colQ, colP, colA = st.columns(4)
@@ -301,18 +301,20 @@ else:
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
         colL, colQ, colP, colA = st.columns(4)
-        L = colL.number_input("Comprimento [m]", value=None, step=0.1, placeholder="Vazio...")
-        q = colQ.number_input("Carga Distr. [kN/m]", value=None, step=0.5, placeholder="Vazio...")
-        P = colP.number_input("Carga Conc. [kN]", value=None, step=0.5, placeholder="Vazio...")
-        a = colA.number_input("Dist. Carga (a) [m]", value=None, step=0.1, placeholder="Vazio...")
+        
+        # CORREÇÃO DEFINITIVA: Alterado o valor padrão 'value' de 'None' para '0.0' para forçar a visibilidade total das caixas no celular
+        L = colL.number_input("Comprimento [m]", value=0.0, step=0.1)
+        q = colQ.number_input("Carga Distr. [kN/m]", value=0.0, step=0.5)
+        P = colP.number_input("Carga Conc. [kN]", value=0.0, step=0.5)
+        a = colA.number_input("Dist. Carga (a) [m]", value=0.0, step=0.1)
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
     if btn_inserir:
-        v_L = float(L) if L is not None else 0.0
-        v_q = float(q) if q is not None else 0.0
-        v_P = float(P) if P is not None else 0.0
-        v_a = float(a) if a is not None else 0.0
+        v_L = float(L)
+        v_q = float(q)
+        v_P = float(P)
+        v_a = float(a)
         
         if v_a > v_L and tipo == "Normal":
             st.error("A distância da carga não pode ser maior que o comprimento do vão!")
