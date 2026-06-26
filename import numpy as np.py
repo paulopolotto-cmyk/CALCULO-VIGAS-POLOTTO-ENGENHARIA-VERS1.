@@ -227,18 +227,19 @@ if 'contador' not in st.session_state:
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
-# MUDANÇA: Agora o programa inicia com todos os campos de tramo zerados (0.0)
-val_tipo = "Normal"
-val_L = 0.0
-val_q = 0.0
-val_P = 0.0
+# Mecânica segura para iniciar zerado e permitir limpeza posterior
+if 'temp_L' not in st.session_state: st.session_state.temp_L = 0.0
+if 'temp_q' not in st.session_state: st.session_state.temp_q = 0.0
+if 'temp_P' not in st.session_state: st.session_state.temp_P = 0.0
 
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
     val_tipo = st.session_state.lista_vaos[idx]['tipo']
-    val_L = st.session_state.lista_vaos[idx]['L']
-    val_q = st.session_state.lista_vaos[idx]['q']
-    val_P = st.session_state.lista_vaos[idx]['P']
+    st.session_state.temp_L = st.session_state.lista_vaos[idx]['L']
+    st.session_state.temp_q = st.session_state.lista_vaos[idx]['q']
+    st.session_state.temp_P = st.session_state.lista_vaos[idx]['P']
+else:
+    val_tipo = "Normal"
 
 # --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
@@ -257,9 +258,11 @@ st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow
 
 tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(val_tipo))
 colL, colQ, colP = st.columns(3)
-L = colL.number_input("Comprimento [m]", value=val_L, step=0.1, key="input_L")
-q = colQ.number_input("Carga Distr. (q) [kN/m]", value=val_q, step=0.5, key="input_q")
-P = colP.number_input("Carga Conc. (P) [kN]", value=val_P, step=0.5, key="input_P")
+
+# Inputs vinculados de forma segura ao session_state para iniciar em 0.0
+L = colL.number_input("Comprimento [m]", step=0.1, key="temp_L")
+q = colQ.number_input("Carga Distr. (q) [kN/m]", step=0.5, key="temp_q")
+P = colP.number_input("Carga Conc. (P) [kN]", step=0.5, key="temp_P")
 
 st.write("")
 
@@ -275,14 +278,17 @@ if btn_inserir:
             nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
             if tipo == "Normal": st.session_state.contador += 1
             st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': L, 'q': q, 'P': P})
-            # Limpa os campos voltando para zero após a inserção bem-sucedida
-            st.session_state.input_L = 0.0
-            st.session_state.input_q = 0.0
-            st.session_state.input_P = 0.0
+            # Força a limpeza segura dos campos retornando para zero
+            st.session_state.temp_L = 0.0
+            st.session_state.temp_q = 0.0
+            st.session_state.temp_P = 0.0
             st.rerun()
     else:
         st.session_state.lista_vaos[st.session_state.edit_index] = {'nome': st.session_state.lista_vaos[st.session_state.edit_index]['nome'], 'tipo': tipo, 'L': L, 'q': q, 'P': P}
         st.session_state.edit_index = None
+        st.session_state.temp_L = 0.0
+        st.session_state.temp_q = 0.0
+        st.session_state.temp_P = 0.0
         st.rerun()
 
 # Exibição dos Tramos Cadastrados
@@ -402,4 +408,7 @@ if st.button("🔄 Limpar Tudo e Reiniciar"):
     st.session_state.lista_vaos = []
     st.session_state.contador = 1
     st.session_state.edit_index = None
+    st.session_state.temp_L = 0.0
+    st.session_state.temp_q = 0.0
+    st.session_state.temp_P = 0.0
     st.rerun()
