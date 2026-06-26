@@ -11,6 +11,15 @@ st.markdown("""
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .tramo-header { text-align: center; background-color: #FFDE4D; color: #000000; padding: 8px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; border: 1px solid #E6B905; }
     
+    /* TEXTO INDICADOR BLINDADO CONTRA MODO ESCURO */
+    .label-blindado {
+        color: #000000 !important;
+        font-weight: bold !important;
+        font-size: 14px !important;
+        margin-bottom: -5px !important;
+        display: block !important;
+    }
+    
     /* FORÇANDO FUNDO AMARELO CLARO E TEXTO PRETO EM TODAS AS CAIXAS DE ENTRADA */
     div[data-testid="stNumberInput"] input, 
     div[data-testid="stTextInput"] input,
@@ -41,13 +50,11 @@ st.markdown("""
         background-color: #FFF9C4 !important;
     }
     
-    /* LABELS (TEXTOS DOS CAMPOS) SEMPRE VISÍVEIS EM NEGRITO */
+    /* ESCONDE OS LABELS PADRÕES DO STREAMLIT QUE SOMEM NO MODO ESCURO */
     div[data-testid="stNumberInput"] label,
     div[data-testid="stTextInput"] label,
     div[data-testid="stSelectbox"] label {
-        color: #000000 !important;
-        font-weight: bold !important;
-        font-size: 14px !important;
+        display: none !important;
     }
     
     /* FORÇANDO O BOTÃO DO FORMULÁRIO A FICAR AMARELO E EM DESTAQUE */
@@ -261,29 +268,45 @@ if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
 # --- INTERFACE DE ENTRADA DE DADOS ---
-st.header("1. Seção, Concreto e Aço")
-col1, col2, col3, col4 = st.columns(4)
-b = col1.number_input("Base (bw) [cm]", value=20)
-h = col2.number_input("Altura (h) [cm]", value=45)
-fck = col3.number_input("Concreto fck [MPa]", value=30)
-tipo_aco = col4.text_input("Aço de Projeto", value="CA-50A", disabled=True)
-dados_g = {'b': b, 'h': h, 'fck': fck}
+st.markdown('<span class="label-blindado">Base (bw) [cm]</span>', unsafe_allow_html=True)
+b_val = st.number_input("Base (bw) [cm]", value=20, key="main_b")
+
+st.markdown('<span class="label-blindado">Altura (h) [cm]</span>', unsafe_allow_html=True)
+h_val = st.number_input("Altura (h) [cm]", value=45, key="main_h")
+
+st.markdown('<span class="label-blindado">Concreto fck [MPa]</span>', unsafe_allow_html=True)
+fck_val = st.number_input("Concreto fck [MPa]", value=30, key="main_fck")
+
+st.markdown('<span class="label-blindado">Aço de Projeto</span>', unsafe_allow_html=True)
+tipo_aco = st.text_input("Aço de Projeto", value="CA-50A", disabled=True, key="main_aco")
+
+dados_g = {'b': b_val, 'h': h_val, 'fck': fck_val}
 
 st.header("2. Inserir Elementos da Viga")
 
 num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
 
-# Estrutura perfeita em 4 colunas preservada
+# MODO DE EDIÇÃO COM TEXTOS BLINDADOS EM CIMA DAS CÉLULAS
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
     st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
     
+    st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
     tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']), key="ed_tipo")
+    
     colL, colQ, colP, colA = st.columns(4)
-    L_ed = colL.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1, key="ed_L")
-    q_ed = colQ.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5, key="ed_q")
-    P_ed = colP.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5, key="ed_p")
-    a_ed = colA.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1, key="ed_a")
+    with colL:
+        st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
+        L_ed = st.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1, key="ed_L")
+    with colQ:
+        st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
+        q_ed = st.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5, key="ed_q")
+    with colP:
+        st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
+        P_ed = st.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5, key="ed_p")
+    with colA:
+        st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
+        a_ed = st.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1, key="ed_a")
     
     col_b1, col_b2 = st.columns(2)
     btn_salvar = col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed")
@@ -297,16 +320,25 @@ if st.session_state.edit_index is not None:
         st.session_state.edit_index = None
         st.rerun()
 else:
+    # MODO INSERÇÃO COM TITULOS TRAVADOS EM PRETO ACIMA DE CADA CÉLULA E VALOR PADRÃO 0.0
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
+        st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
-        colL, colQ, colP, colA = st.columns(4)
         
-        # CORREÇÃO DEFINITIVA: Alterado o valor padrão 'value' de 'None' para '0.0' para forçar a visibilidade total das caixas no celular
-        L = colL.number_input("Comprimento [m]", value=0.0, step=0.1)
-        q = colQ.number_input("Carga Distr. [kN/m]", value=0.0, step=0.5)
-        P = colP.number_input("Carga Conc. [kN]", value=0.0, step=0.5)
-        a = colA.number_input("Dist. Carga (a) [m]", value=0.0, step=0.1)
+        colL, colQ, colP, colA = st.columns(4)
+        with colL:
+            st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
+            L = st.number_input("Comprimento [m]", value=0.0, step=0.1)
+        with colQ:
+            st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
+            q = st.number_input("Carga Distr. [kN/m]", value=0.0, step=0.5)
+        with colP:
+            st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
+            P = st.number_input("Carga Conc. [kN]", value=0.0, step=0.5)
+        with colA:
+            st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
+            a = st.number_input("Dist. Carga (a) [m]", value=0.0, step=0.1)
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
@@ -365,7 +397,7 @@ if len(st.session_state.lista_vaos) > 0:
             if res['falha_cortante']:
                 st.markdown(f"""
                 <div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center; border: 4px solid #7F1D1D; margin-bottom:25px; line-height: 1.5;">
-                ⚠️ AS DIMENSÕES DA VIGA ({b}x{h} cm) SÃO INSUFICIENTES!<br>
+                ⚠️ AS DIMENSÕES DA VIGA ({b_val}x{h_val} cm) SÃO INSUFICIENTES!<br>
                 A seção de concreto está FORA DAS NORMAS ATUAIS (NBR 6118) por falha por esmagamento da biela seca.<br>
                 Suba a tela, altere as dimensões (bw/h) ou o fck e recalcule. Seus vãos continuam salvos!
                 </div>
@@ -411,8 +443,8 @@ if len(st.session_state.lista_vaos) > 0:
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
             
-            ax.text(posX_corte + 0.2, -0.65, f"{int(b)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
-            ax.text(posX_corte + 0.5, 0.0, f"{int(h)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
+            ax.text(posX_corte + 0.2, -0.65, f"{int(b_val)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
+            ax.text(posX_corte + 0.5, 0.0, f"{int(h_val)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
             
             st.pyplot(fig)
             
@@ -421,7 +453,7 @@ if len(st.session_state.lista_vaos) > 0:
             status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
             
             linhas_relatorio = [
-                f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
+                f"SEÇÃO TRANSVERSAL: {b_val}x{h_val} cm  |  CONCRETO: fck = {fck_val} MPa  |  AÇO: {tipo_aco}",
                 "--------------------------------------------------------------------------------",
                 f"STATUS DA FORÇA CORTANTE: {status_norma}",
                 f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
