@@ -5,13 +5,30 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
-# Estilização CSS Geral para o Layout e Botão de Calcular
+# Estilização CSS Cirúrgica para fixar a Tecla Amarela e Ajustar o Layout
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .tramo-header { text-align: center; background-color: #E0F2FE; color: #0369A1; padding: 6px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; }
     
-    /* Forçando o estilo do botão Finalizar e Calcular (Vermelho) */
+    /* ESTILO DO BOTÃO DE INSERIR: Amarelo estruturado, grande e destacado */
+    div.stButton > button[key="btn_amarelo_inserir"] {
+        background-color: #FFDE4D !important;
+        color: #000000 !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        height: 52px !important;
+        width: 100% !important;
+        border: 2px solid #E6B905 !important;
+        border-radius: 6px !important;
+        box-shadow: 0px 4px 6px rgba(0,0,0,0.1) !important;
+    }
+    div.stButton > button[key="btn_amarelo_inserir"]:hover {
+        background-color: #F4CE24 !important;
+        border-color: #D4A902 !important;
+    }
+    
+    /* Botão de Calcular em Vermelho Padrão */
     div.stButton > button[type="primary"] {
         width: 100% !important;
         height: 52px !important;
@@ -235,34 +252,10 @@ P = colP.number_input("Carga Conc. (P) [kN]", value=val_P, step=0.5, key="input_
 
 st.write("")
 
-# RECURSO DEFINITIVO: Botão Amarelo via HTML Nativo (Ignora bloqueios do Streamlit)
-html_botao_amarelo = """
-<div style="width: 100%; text-align: center;">
-    <button id="click_btn" style="
-        background-color: #FFDE4D;
-        color: #000000;
-        font-size: 16px;
-        font-weight: bold;
-        border: 2px solid #E6B905;
-        border-radius: 6px;
-        height: 52px;
-        width: 100%;
-        cursor: pointer;
-        box-shadow: 0px 4px 6px rgba(0,0,0,0.1);
-    ">➕ INSERIR TRAMO NA VIGA</button>
-</div>
-<script>
-    const btn = document.getElementById('click_btn');
-    btn.addEventListener('click', function() {
-        window.parent.postMessage({type: 'streamlit:setComponentValue', value: true}, '*');
-    });
-</script>
-"""
+# SOLUÇÃO DEFINITIVA: Botão oficial do Streamlit estilizado perfeitamente como amarelo por ID interno
+btn_inserir = st.button("➕ INSERIR TRAMO NA VIGA", key="btn_amarelo_inserir")
 
-# Renderiza o botão perfeitamente amarelo na tela
-executar_insercao = st.components.v1.html(html_botao_amarelo, height=62)
-
-if executar_insercao:
+if btn_inserir:
     if st.session_state.edit_index is None:
         if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
             st.error("Já existe um Balanço Esquerdo!")
@@ -344,13 +337,13 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.45, sugerir_barras(res['As_apoios'][-1]), color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
-            # AJUSTE 1: Estribos significativamente mais distantes para baixo (-0.65) para dar leitura perfeita
+            # CORREÇÃO 1: Estribos afastados para baixo (-0.68) para dar leitura perfeita longe da linha verde
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, sugerir_barras(res['As_positivos'][i]), color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -0.65, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(i + 0.5, -0.68, texto_estribo_vao, color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
             
-            # AJUSTE 2: Desenho da Seção Transversal com FECHAMENTO TOTAL de bordas explícitas (Removido bug de transparência na lateral)
+            # CORREÇÃO 2: Desenho da Seção Transversal com FECHAMENTO TOTAL de bordas explícitas (Z-order forçado para fechar o corte)
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
