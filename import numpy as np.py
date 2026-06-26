@@ -24,9 +24,8 @@ st.markdown("""
         font-size: 15px !important;
     }
     
-    /* ALVO DIRETO NO BOTÃO DE INSERIR: Força o fundo amarelo e letras pretas grossas */
-    div.stButton > button[key="btn_amarelo_inserir"], 
-    div.stButton > button:not([type="primary"]) {
+    /* FORÇANDO O BOTÃO DO FORMULÁRIO A FICAR AMARELO E EM DESTAQUE */
+    div[data-testid="stForm"] button {
         background-color: #FFDE4D !important;
         color: #000000 !important;
         font-size: 16px !important;
@@ -227,20 +226,6 @@ if 'contador' not in st.session_state:
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
-# Mecânica segura para iniciar zerado e permitir limpeza posterior
-if 'temp_L' not in st.session_state: st.session_state.temp_L = 0.0
-if 'temp_q' not in st.session_state: st.session_state.temp_q = 0.0
-if 'temp_P' not in st.session_state: st.session_state.temp_P = 0.0
-
-if st.session_state.edit_index is not None:
-    idx = st.session_state.edit_index
-    val_tipo = st.session_state.lista_vaos[idx]['tipo']
-    st.session_state.temp_L = st.session_state.lista_vaos[idx]['L']
-    st.session_state.temp_q = st.session_state.lista_vaos[idx]['q']
-    st.session_state.temp_P = st.session_state.lista_vaos[idx]['P']
-else:
-    val_tipo = "Normal"
-
 # --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
 col1, col2, col3, col4 = st.columns(4)
@@ -256,17 +241,15 @@ num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal
 texto_tramo_atual = f"Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}" if st.session_state.edit_index is None else f"Editando: {st.session_state.lista_vaos[st.session_state.edit_index]['nome']}"
 st.markdown(f'<div class="tramo-header">{texto_tramo_atual}</div>', unsafe_allow_html=True)
 
-tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(val_tipo))
-colL, colQ, colP = st.columns(3)
-
-# Inputs vinculados de forma segura ao session_state para iniciar em 0.0
-L = colL.number_input("Comprimento [m]", step=0.1, key="temp_L")
-q = colQ.number_input("Carga Distr. (q) [kN/m]", step=0.5, key="temp_q")
-P = colP.number_input("Carga Conc. (P) [kN]", step=0.5, key="temp_P")
-
-st.write("")
-
-btn_inserir = st.button("➕ INSERIR TRAMO NA VIGA", key="btn_amarelo_inserir")
+# SOLUÇÃO DEFINITIVA CONTRA ERROS DE APAGAR: Formulário nativo que limpa tudo sozinho e inicia em 0.0
+with st.form(key="viga_form", clear_on_submit=True):
+    tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
+    colL, colQ, colP = st.columns(3)
+    L = colL.number_input("Comprimento [m]", value=0.0, step=0.1)
+    q = colQ.number_input("Carga Distr. (q) [kN/m]", value=0.0, step=0.5)
+    P = colP.number_input("Carga Conc. (P) [kN]", value=0.0, step=0.5)
+    
+    btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
 if btn_inserir:
     if st.session_state.edit_index is None:
@@ -278,17 +261,10 @@ if btn_inserir:
             nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
             if tipo == "Normal": st.session_state.contador += 1
             st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': L, 'q': q, 'P': P})
-            # Força a limpeza segura dos campos retornando para zero
-            st.session_state.temp_L = 0.0
-            st.session_state.temp_q = 0.0
-            st.session_state.temp_P = 0.0
             st.rerun()
     else:
         st.session_state.lista_vaos[st.session_state.edit_index] = {'nome': st.session_state.lista_vaos[st.session_state.edit_index]['nome'], 'tipo': tipo, 'L': L, 'q': q, 'P': P}
         st.session_state.edit_index = None
-        st.session_state.temp_L = 0.0
-        st.session_state.temp_q = 0.0
-        st.session_state.temp_P = 0.0
         st.rerun()
 
 # Exibição dos Tramos Cadastrados
@@ -408,7 +384,4 @@ if st.button("🔄 Limpar Tudo e Reiniciar"):
     st.session_state.lista_vaos = []
     st.session_state.contador = 1
     st.session_state.edit_index = None
-    st.session_state.temp_L = 0.0
-    st.session_state.temp_q = 0.0
-    st.session_state.temp_P = 0.0
     st.rerun()
