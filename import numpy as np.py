@@ -11,10 +11,11 @@ st.markdown("""
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .tramo-header { text-align: center; background-color: #FFDE4D; color: #000000; padding: 8px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; border: 1px solid #E6B905; }
     
-    /* FORÇANDO FUNDO AMARELO CLARO E TEXTO PRETO EM TODAS AS CAIXAS DE ENTRADA, INCLUINDO SELECTBOX */
+    /* FORÇANDO FUNDO AMARELO CLARO E TEXTO PRETO EM TODAS AS CAIXAS DE ENTRADA */
     div[data-testid="stNumberInput"] input, 
     div[data-testid="stTextInput"] input,
     div[data-testid="stSelectbox"] div[data-baseweb="select"],
+    div[data-testid="stSelectbox"] div[data-baseweb="select"] > div,
     div[data-testid="stSelectbox"] select {
         background-color: #FFF9C4 !important;
         color: #000000 !important;
@@ -25,10 +26,17 @@ st.markdown("""
         border-radius: 4px !important;
     }
     
-    /* MODIFICANDO O MENU EXPANDIDO DO SELECTBOX PARA MANTER O TEXTO PRETO E LEGÍVEL */
-    ul[role="listbox"] li {
+    /* GARANTE QUE O TEXTO SELECIONADO DENTRO DA CAIXA FIQUE PRETO NO CELULAR */
+    div[data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p {
         color: #000000 !important;
         font-weight: bold !important;
+    }
+    
+    /* MODIFICANDO O MENU EXPANDIDO (OPÇÕES) DO SELECTBOX PARA MANTER O TEXTO PRETO E LEGÍVEL */
+    ul[role="listbox"] li, div[role="option"] {
+        color: #000000 !important;
+        font-weight: bold !important;
+        background-color: #FFF9C4 !important;
     }
     
     /* LABELS (TEXTOS DOS CAMPOS) SEMPRE VISÍVEIS EM NEGRITO */
@@ -263,7 +271,7 @@ st.header("2. Inserir Elementos da Viga")
 
 num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
 
-# MODO DE EDIÇÃO: Renderiza em linhas cheias verticais para ajuste perfeito em telas de celular
+# MODO DE EDIÇÃO: Alinhado verticalmente para o celular
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
     st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
@@ -272,170 +280,4 @@ if st.session_state.edit_index is not None:
     L_ed = st.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1, key="ed_L")
     q_ed = st.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5, key="ed_q")
     P_ed = st.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5, key="ed_p")
-    a_ed = st.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1, key="ed_a")
-    
-    col_b1, col_b2 = st.columns(2)
-    btn_salvar = col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed")
-    btn_cancelar = col_b2.button("❌ CANCELAR", key="btn_cancelar_ed")
-    
-    if btn_salvar:
-        st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': L_ed, 'q': q_ed, 'P': P_ed, 'a': a_ed}
-        st.session_state.edit_index = None
-        st.rerun()
-    if btn_cancelar:
-        st.session_state.edit_index = None
-        st.rerun()
-else:
-    # FORMULÁRIO DE INSERÇÃO: Alinhamento vertical limpo de 1 em 1 para preenchimento em celulares
-    st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
-    with st.form(key="form_insercao_limpo", clear_on_submit=True):
-        tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
-        L = st.number_input("Comprimento [m]", value=None, step=0.1, placeholder="Digite o comprimento do vão...")
-        q = st.number_input("Carga Distr. [kN/m]", value=None, step=0.5, placeholder="Digite a carga distribuída (q)...")
-        P = st.number_input("Carga Conc. [kN]", value=None, step=0.5, placeholder="Digite a carga concentrada (P)...")
-        a = st.number_input("Dist. Carga (a) [m]", value=None, step=0.1, placeholder="Digite a distância da carga (a)...")
-        
-        btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
-
-    if btn_inserir:
-        v_L = float(L) if L is not None else 0.0
-        v_q = float(q) if q is not None else 0.0
-        v_P = float(P) if P is not None else 0.0
-        v_a = float(a) if a is not None else 0.0
-        
-        if v_a > v_L and tipo == "Normal":
-            st.error("A distância da carga não pode ser maior que o comprimento do vão!")
-        elif v_L <= 0.0:
-            st.error("O comprimento do vão precisa ser maior que zero!")
-        else:
-            if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
-                st.error("Já existe um Balanço Esquerdo!")
-            elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
-                st.error("Já existe um Balanço Direito!")
-            else:
-                nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
-                if tipo == "Normal": st.session_state.contador += 1
-                st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
-                st.rerun()
-
-# Exibição dos Tramos Cadastrados
-if len(st.session_state.lista_vaos) > 0:
-    st.write("### 📋 Tramos Inseridos no Projeto:")
-    for i, v in enumerate(st.session_state.lista_vaos):
-        col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN** a **{v['a']}m**")
-        
-        if col_edit.button("✏️", key=f"edit_{i}"):
-            st.session_state.edit_index = i
-            st.rerun()
-            
-        if col_del.button("❌", key=f"del_{i}"):
-            if v['tipo'] == "Normal": st.session_state.contador -= 1
-            st.session_state.lista_vaos.pop(i)
-            if st.session_state.edit_index == i: st.session_state.edit_index = None
-            st.rerun()
-
-    st.write("")
-    btn_calc = st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary")
-    st.write("")
-
-    if btn_calc or 'calcular_ativo' in st.session_state:
-        st.session_state.calcular_ativo = True
-        res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
-        
-        if "erro" in res:
-            st.error(res["erro"])
-        else:
-            st.write("---")
-            st.header("🏁 Layout de Detalhamento Estrutural")
-            
-            if res['falha_cortante']:
-                st.markdown(f"""
-                <div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center; border: 4px solid #7F1D1D; margin-bottom:25px; line-height: 1.5;">
-                ⚠️ AS DIMENSÕES DA VIGA ({b}x{h} cm) SÃO INSUFICIENTES!<br>
-                A seção de concreto está FORA DAS NORMAS ATUAIS (NBR 6118) por falha por esmagamento da biela seca.<br>
-                Suba a tela, altere as dimensões (bw/h) ou o fck e recalcule. Seus vãos continuam salvos!
-                </div>
-                """, unsafe_allow_html=True)
-                
-            # --- DESENHO TÉCNICO ---
-            fig, ax = plt.subplots(figsize=(8, 5.0))
-            ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            ax.set_ylim(-3.0, 2.2)
-            ax.axis('off')
-            
-            # Corpo da viga
-            ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB')
-            
-            # Pilares (Triângulos azuis)
-            for idx, r in enumerate(res['Reacoes']):
-                ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
-                ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
-            
-            # Armaduras principais
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
-            
-            # Negativos nos eixos de apoio
-            if res['bal_esq']:
-                ax.text(-0.3, 0.45, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 0.45, f"{sugerir_barras(res['As_apoios'][i+1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-                
-            # Ferros Positivos
-            for i in range(len(res['vaos_internos'])):
-                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
-                
-            # Estribos distribuídos legivelmente abaixo de cada pilar correspondente
-            for i in range(len(res['vaos_internos'])):
-                texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
-            
-            # Desenho do Corte Transversal com as Cotas Técnicas corretas
-            posX_corte = len(res['Reacoes']) - 0.1
-            caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
-            ax.add_patch(caixa_corte)
-            
-            ax.text(posX_corte + 0.2, -0.65, f"{int(b)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
-            ax.text(posX_corte + 0.5, 0.0, f"{int(h)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
-            
-            st.pyplot(fig)
-            
-            # --- RELATÓRIO COM LINHAS SEPARADORAS ---
-            st.subheader("Relação de Especificações Técnicas")
-            status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
-            
-            linhas_relatorio = [
-                f"SEÇÃO TRANSVERSAL: {b}x{h} cm  |  CONCRETO: fck = {fck} MPa  |  AÇO: {tipo_aco}",
-                "--------------------------------------------------------------------------------",
-                f"STATUS DA FORÇA CORTANTE: {status_norma}",
-                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
-                "--------------------------------------------------------------------------------"
-            ]
-            
-            for idx, r in enumerate(res['Reacoes']):
-                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
-                linhas_relatorio.append("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -")
-                
-            linhas_relatorio.append("DETALHAMENTO DE BARRAS LONGITUDINAIS (NBR 6118):")
-            for i, v in enumerate(res['vaos_internos']):
-                comp_barra = v['L'] + 0.70
-                linhas_relatorio.append(f"  Vão {i+1} ({v['nome']}): Ferro Positivo {sugerir_barras(res['As_positivos'][i])} | Comp. Nominal = {comp_barra:.2f}m | Disposição: 1ª Camada")
-                
-            linhas_relatorio.append("--------------------------------------------------------------------------------")
-            linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
-            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2): {res['Vrd2']:.2f} kN")
-            
-            st.code("\n".join(linhas_relatorio), language="text")
-
-# Botão para Resetar Projeto completamente
-st.write("")
-if st.button("🔄 Limpar Tudo e Reiniciar"):
-    if 'calcular_ativo' in st.session_state:
-        del st.session_state.calcular_ativo
-    st.session_state.lista_vaos = []
-    st.session_state.contador = 1
-    st.session_state.edit_index = None
-    st.rerun()
+    a_ed = st.number_
