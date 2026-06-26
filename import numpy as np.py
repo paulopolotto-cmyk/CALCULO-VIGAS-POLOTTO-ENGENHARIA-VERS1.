@@ -227,9 +227,10 @@ if 'contador' not in st.session_state:
 if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
+# MUDANÇA: Agora o programa inicia com todos os campos de tramo zerados (0.0)
 val_tipo = "Normal"
-val_L = 4.0
-val_q = 15.0
+val_L = 0.0
+val_q = 0.0
 val_P = 0.0
 
 if st.session_state.edit_index is not None:
@@ -262,7 +263,6 @@ P = colP.number_input("Carga Conc. (P) [kN]", value=val_P, step=0.5, key="input_
 
 st.write("")
 
-# ATUALIZAÇÃO DO BOTÃO: Vinculado à chave correta do CSS para assumir a cor amarela marcante
 btn_inserir = st.button("➕ INSERIR TRAMO NA VIGA", key="btn_amarelo_inserir")
 
 if btn_inserir:
@@ -275,6 +275,10 @@ if btn_inserir:
             nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
             if tipo == "Normal": st.session_state.contador += 1
             st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': L, 'q': q, 'P': P})
+            # Limpa os campos voltando para zero após a inserção bem-sucedida
+            st.session_state.input_L = 0.0
+            st.session_state.input_q = 0.0
+            st.session_state.input_P = 0.0
             st.rerun()
     else:
         st.session_state.lista_vaos[st.session_state.edit_index] = {'nome': st.session_state.lista_vaos[st.session_state.edit_index]['nome'], 'tipo': tipo, 'L': L, 'q': q, 'P': P}
@@ -350,7 +354,7 @@ if len(st.session_state.lista_vaos) > 0:
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 
-            # Ajuste de Posição dos Estribos: Posicionados bem abaixo do triângulo do pilar (-1.40)
+            # Posição dos Estribos: Embaixo dos pilares
             for i in range(len(res['vaos_internos'])):
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
                 ax.text(i + 0.5, -1.40, f"Estribos: {texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', fontweight='bold', style='italic')
