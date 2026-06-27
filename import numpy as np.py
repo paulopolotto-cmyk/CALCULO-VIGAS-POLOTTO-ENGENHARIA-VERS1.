@@ -98,12 +98,15 @@ st.markdown("""
 st.markdown('<div class="titulo">PROGRAMA DE CÁLCULOS DE VIGAS DA POLOTTO ENGENHARIA</div>', unsafe_allow_html=True)
 st.write("")
 
-# --- FUNÇÃO AUXILIAR PARA CONVERTER TEXTO DO CELULAR PARA NÚMERO TRATANDO VÍRGULA ---
+# --- FUNÇÃO AUXILIAR CORRIGIDA PARA TRATAR ENTRADAS INCOMPLETAS DURANTE A DIGITAÇÃO ---
 def converter_valor(texto, padrao=0.0):
     if not texto or str(texto).strip() == "":
         return padrao
     try:
         txt_limpo = str(texto).replace(",", ".").strip()
+        # Se o usuário digitou apenas "." ou "-" provisoriamente, ignora o erro temporário
+        if txt_limpo in [".", "-", "-."]:
+            return padrao
         return float(txt_limpo)
     except:
         return padrao
@@ -377,16 +380,17 @@ else:
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
+    # MUDANÇA CRÍTICA: A validação só roda se o botão de inserção for ativado
     if btn_inserir:
         v_L = converter_valor(L, 0.0)
         v_q = converter_valor(q, 0.0)
         v_P = converter_valor(P, 0.0)
         v_a = converter_valor(a, 0.0)
         
-        if v_a > v_L and tipo == "Normal":
-            st.error("A distância da carga não pode ser maior que o comprimento do vão!")
-        elif v_L <= 0.0:
+        if v_L <= 0.0:
             st.error("O comprimento do vão precisa ser maior que zero!")
+        elif v_a > v_L and tipo == "Normal":
+            st.error("A distância da carga não pode ser maior que o comprimento do vão!")
         else:
             if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
                 st.error("Já existe um Balanço Esquerdo!")
@@ -506,16 +510,4 @@ if len(st.session_state.lista_vaos) > 0:
                 
             linhas_relatorio.append("--------------------------------------------------------------------------------")
             linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
-            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2): {res['Vrd2']:.2f} kN")
-            
-            st.code("\n".join(linhas_relatorio), language="text")
-
-# Botão para Resetar Projeto completamente
-st.write("")
-if st.button("🔄 Limpar Tudo e Reiniciar"):
-    if 'calcular_ativo' in st.session_state:
-        del st.session_state.calcular_ativo
-    st.session_state.lista_vaos = []
-    st.session_state.contador = 1
-    st.session_state.edit_index = None
-    st.rerun()
+            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2):
