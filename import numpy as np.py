@@ -40,6 +40,14 @@ st.markdown("""
         border-radius: 4px !important;
     }
     
+    /* ESTILIZAÇÃO DO TEXTO FANTASMA (PLACEHOLDER) PARA FICAR VISÍVEL NO CELULAR */
+    input::placeholder {
+        color: #555555 !important;
+        opacity: 1 !important;
+        font-style: italic !important;
+        font-size: 14px !important;
+    }
+    
     /* CORREÇÃO DO CELULAR: Garante que o texto selecionado dentro da célula fique preto e legível */
     div[data-testid="stSelectbox"] div[data-baseweb="select"] span,
     div[data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p {
@@ -89,6 +97,16 @@ st.markdown("""
 
 st.markdown('<div class="titulo">PROGRAMA DE CÁLCULOS DE VIGAS DA POLOTTO ENGENHARIA</div>', unsafe_allow_html=True)
 st.write("")
+
+# --- FUNÇÃO AUXILIAR PARA CONVERTER TEXTO DO CELULAR PARA NÚMERO TRATANDO VÍRGULA ---
+def converter_valor(texto, padrao=0.0):
+    if not texto or str(texto).strip() == "":
+        return padrao
+    try:
+        txt_limpo = str(texto).replace(",", ".").strip()
+        return float(txt_limpo)
+    except:
+        return padrao
 
 # --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
@@ -276,13 +294,16 @@ if 'edit_index' not in st.session_state:
 st.header("1. Seção, Concreto e Aço")
 
 st.markdown('<span class="label-blindado">Base (bw) [cm]</span>', unsafe_allow_html=True)
-b_val = st.number_input("Base (bw) [cm]", value=20, key="main_b")
+b_raw = st.text_input("Base (bw) [cm]", value="20", key="main_b")
+b_val = converter_valor(b_raw, 20.0)
 
 st.markdown('<span class="label-blindado">Altura (h) [cm]</span>', unsafe_allow_html=True)
-h_val = st.number_input("Altura (h) [cm]", value=45, key="main_h")
+h_raw = st.text_input("Altura (h) [cm]", value="45", key="main_h")
+h_val = converter_valor(h_raw, 45.0)
 
 st.markdown('<span class="label-blindado">Concreto fck [MPa]</span>', unsafe_allow_html=True)
-fck_val = st.number_input("Concreto fck [MPa]", value=30, key="main_fck")
+fck_raw = st.text_input("Concreto fck [MPa]", value="30", key="main_fck")
+fck_val = converter_valor(fck_raw, 30.0)
 
 st.markdown('<span class="label-blindado">Aço de Projeto</span>', unsafe_allow_html=True)
 tipo_aco = st.text_input("Aço de Projeto", value="CA-50A", disabled=True, key="main_aco")
@@ -304,30 +325,37 @@ if st.session_state.edit_index is not None:
     colL, colQ, colP, colA = st.columns(4)
     with colL:
         st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
-        L_ed = st.number_input("Comprimento [m]", value=float(st.session_state.lista_vaos[idx]['L']), step=0.1, key="ed_L")
+        L_ed = st.text_input("Comprimento [m]", value=str(st.session_state.lista_vaos[idx]['L']), key="ed_L")
     with colQ:
         st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
-        q_ed = st.number_input("Carga Distr. [kN/m]", value=float(st.session_state.lista_vaos[idx]['q']), step=0.5, key="ed_q")
+        q_ed = st.text_input("Carga Distr. [kN/m]", value=str(st.session_state.lista_vaos[idx]['q']), key="ed_q")
     with colP:
         st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
-        P_ed = st.number_input("Carga Conc. [kN]", value=float(st.session_state.lista_vaos[idx]['P']), step=0.5, key="ed_p")
+        P_ed = st.text_input("Carga Conc. [kN]", value=str(st.session_state.lista_vaos[idx]['P']), key="ed_p")
     with colA:
         st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
-        a_ed = st.number_input("Dist. Carga (a) [m]", value=float(st.session_state.lista_vaos[idx]['a']), step=0.1, key="ed_a")
+        a_ed = st.text_input("Dist. Carga (a) [m]", value=str(st.session_state.lista_vaos[idx]['a']), key="ed_a")
     
     col_b1, col_b2 = st.columns(2)
     btn_salvar = col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed")
     btn_cancelar = col_b2.button("❌ CANCELAR", key="btn_cancelar_ed")
     
     if btn_salvar:
-        st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': L_ed, 'q': q_ed, 'P': P_ed, 'a': a_ed}
+        st.session_state.lista_vaos[idx] = {
+            'nome': st.session_state.lista_vaos[idx]['nome'], 
+            'tipo': tipo_ed, 
+            'L': converter_valor(L_ed), 
+            'q': converter_valor(q_ed), 
+            'P': converter_valor(P_ed), 
+            'a': converter_valor(a_ed)
+        }
         st.session_state.edit_index = None
         st.rerun()
     if btn_cancelar:
         st.session_state.edit_index = None
         st.rerun()
 else:
-    # MODO INSERÇÃO COM TÍTULOS PROTEGIDOS (TARJA AMARELA + LETRA VERMELHA)
+    # MODO INSERÇÃO COM TEXTO FANTASMA (PLACEHOLDER) - TOTALMENTE VAZIOS AO COMEÇAR
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
@@ -336,24 +364,24 @@ else:
         colL, colQ, colP, colA = st.columns(4)
         with colL:
             st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
-            L = st.number_input("Comprimento [m]", value=0.0, step=0.1)
+            L = st.text_input("Comprimento [m]", placeholder="Digitar...", value="")
         with colQ:
             st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
-            q = st.number_input("Carga Distr. [kN/m]", value=0.0, step=0.5)
+            q = st.text_input("Carga Distr. [kN/m]", placeholder="Digitar...", value="")
         with colP:
             st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
-            P = st.number_input("Carga Conc. [kN]", value=0.0, step=0.5)
+            P = st.text_input("Carga Conc. [kN]", placeholder="Digitar...", value="")
         with colA:
             st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
-            a = st.number_input("Dist. Carga (a) [m]", value=0.0, step=0.1)
+            a = st.text_input("Dist. Carga (a) [m]", placeholder="Digitar...", value="")
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
     if btn_inserir:
-        v_L = float(L)
-        v_q = float(q)
-        v_P = float(P)
-        v_a = float(a)
+        v_L = converter_valor(L, 0.0)
+        v_q = converter_valor(q, 0.0)
+        v_P = converter_valor(P, 0.0)
+        v_a = converter_valor(a, 0.0)
         
         if v_a > v_L and tipo == "Normal":
             st.error("A distância da carga não pode ser maior que o comprimento do vão!")
