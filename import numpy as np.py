@@ -11,13 +11,18 @@ st.markdown("""
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .tramo-header { text-align: center; background-color: #FFDE4D; color: #000000; padding: 8px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; border: 1px solid #E6B905; }
     
-    /* TEXTO INDICADOR BLINDADO CONTRA MODO ESCURO */
+    /* TARJA AMARELA COM LETRAS EM VERMELHO NEGRITO - MÁXIMO CONTRASTE CONTRA O PRETO */
     .label-blindado {
-        color: #000000 !important;
+        background-color: #FFDE4D !important;
+        color: #CC0000 !important;
         font-weight: bold !important;
-        font-size: 14px !important;
-        margin-bottom: -5px !important;
-        display: block !important;
+        font-size: 15px !important;
+        padding: 4px 8px !important;
+        border-radius: 4px !important;
+        display: inline-block !important;
+        margin-bottom: 4px !important;
+        margin-top: 10px !important;
+        border: 1px solid #E6B905 !important;
     }
     
     /* FORÇANDO FUNDO AMARELO CLARO E TEXTO PRETO EM TODAS AS CAIXAS DE ENTRADA */
@@ -268,6 +273,8 @@ if 'edit_index' not in st.session_state:
     st.session_state.edit_index = None
 
 # --- INTERFACE DE ENTRADA DE DADOS ---
+st.header("1. Seção, Concreto e Aço")
+
 st.markdown('<span class="label-blindado">Base (bw) [cm]</span>', unsafe_allow_html=True)
 b_val = st.number_input("Base (bw) [cm]", value=20, key="main_b")
 
@@ -320,7 +327,7 @@ if st.session_state.edit_index is not None:
         st.session_state.edit_index = None
         st.rerun()
 else:
-    # MODO INSERÇÃO COM TITULOS TRAVADOS EM PRETO ACIMA DE CADA CÉLULA E VALOR PADRÃO 0.0
+    # MODO INSERÇÃO COM TÍTULOS PROTEGIDOS (TARJA AMARELA + LETRA VERMELHA)
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
