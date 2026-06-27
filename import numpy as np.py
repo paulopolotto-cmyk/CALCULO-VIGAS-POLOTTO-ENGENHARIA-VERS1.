@@ -510,4 +510,16 @@ if len(st.session_state.lista_vaos) > 0:
                 
             linhas_relatorio.append("--------------------------------------------------------------------------------")
             linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
-            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2):
+            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2): {res['Vrd2']:.2f} kN")
+            
+            st.code("\n".join(linhas_relatorio), language="text")
+
+# Botão para Resetar Projeto completamente
+st.write("")
+if st.button("🔄 Limpar Tudo e Reiniciar"):
+    if 'calcular_ativo' in st.session_state:
+        del st.session_state.calcular_ativo
+    st.session_state.lista_vaos = []
+    st.session_state.contador = 1
+    st.session_state.edit_index = None
+    st.rerun()
