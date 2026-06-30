@@ -500,37 +500,41 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ln.legend(loc="lower left", fontsize=9)
             st.pyplot(fig_ln)
 
-            # --- NOVO BLOCO 2: CORTE TRANSVERSAL ULTRA MINIATURA (AFADO E AUMENTADO) ---
+            # --- NOVO BLOCO 2: CORTE TRANSVERSAL BLINDADO (UNIVERSAL E SEM SOBREPOSIÇÃO) ---
             st.subheader("📐 Corte Transversal da Seção")
             
             col_esq, col_centro, col_dir = st.columns([1.4, 1.0, 1.4])
             
             with col_centro:
-                fig_ct, ax_ct = plt.subplots(figsize=(0.7, 1.1))
-                ax_ct.set_xlim(-11, b_val + 11)  # Expandido para dar espaço total lateral às dimensões
-                ax_ct.set_ylim(-11, h_val + 11)  # Expandido para dar espaço total inferior às dimensões
+                # Usamos coordenadas fixas de 0 a 10 no matplotlib para a proporção nunca quebrar
+                fig_ct, ax_ct = plt.subplots(figsize=(0.9, 1.3))
+                ax_ct.set_xlim(-3, 13)  
+                ax_ct.set_ylim(-3, 13)
                 ax_ct.set_aspect('equal')
                 
-                ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
-                ax_ct.add_patch(plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=0.8))
+                # Desenho fixo da seção (retângulo de largura 4 e altura 9)
+                ax_ct.add_patch(plt.Rectangle((2, 0), 4, 9, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
+                # Estribo interno
+                ax_ct.add_patch(plt.Rectangle((2.4, 0.4), 3.2, 8.2, edgecolor='#78350F', facecolor='none', linewidth=0.8))
                 
-                # Barras superiores (Porta-Estribos)
-                ax_ct.plot(3.5, h_val-3.5, 'o', color='black', markersize=4) 
-                ax_ct.plot(b_val-3.5, h_val-3.5, 'o', color='black', markersize=4) 
+                # Barras superiores fixas nos cantos do estribo
+                ax_ct.plot(2.7, 8.2, 'o', color='black', markersize=4) 
+                ax_ct.plot(5.3, 8.2, 'o', color='black', markersize=4) 
                 
-                # Barras inferiores (Reforço positivo)
-                ax_ct.plot(3.5, 3.5, 'o', color='red', markersize=4.5)
-                ax_ct.plot(b_val/2, 3.5, 'o', color='red', markersize=4.5)
-                ax_ct.plot(b_val-3.5, 3.5, 'o', color='red', markersize=4.5)
+                # Barras inferiores fixas no fundo do estribo
+                ax_ct.plot(2.7, 0.8, 'o', color='red', markersize=4.5)
+                ax_ct.plot(4.0, 0.8, 'o', color='red', markersize=4.5)
+                ax_ct.plot(5.3, 0.8, 'o', color='red', markersize=4.5)
                 
+                # Armadura de pele opcional
                 if res['tem_pele']:
-                    ax_ct.plot(3.5, h_val/2, 'o', color='green', markersize=3)
-                    ax_ct.plot(b_val-3.5, h_val/2, 'o', color='green', markersize=3)
-                    ax_ct.text(b_val/2, h_val/2 + 2.5, "Pele", color='green', ha='center', fontsize=6, fontweight='bold')
+                    ax_ct.plot(2.7, 4.5, 'o', color='green', markersize=3)
+                    ax_ct.plot(5.3, 4.5, 'o', color='green', markersize=3)
+                    ax_ct.text(4.0, 4.9, "Pele", color='green', ha='center', fontsize=6, fontweight='bold')
 
-                # Afastamento expandido das cotas para acabar totalmente com a sobreposição
-                ax_ct.text(b_val/2, -7.5, f"bw={int(b_val)}", ha='center', fontsize=7.5, fontweight='bold', color='#1E3A8A')
-                ax_ct.text(-7.5, h_val/2, f"h={int(h_val)}", va='center', rotation=90, fontsize=7.5, fontweight='bold', color='#1E3A8A')
+                # Cotas posicionadas perfeitamente fora do retângulo de desenho
+                ax_ct.text(4.0, -1.8, f"bw={int(b_val)}", ha='center', fontsize=8, fontweight='bold', color='#1E3A8A')
+                ax_ct.text(-1.2, 4.5, f"h={int(h_val)}", va='center', rotation=90, fontsize=8, fontweight='bold', color='#1E3A8A')
                 ax_ct.axis('off')
                 st.pyplot(fig_ct)
 
@@ -554,4 +558,24 @@ if len(st.session_state.lista_vaos) > 0:
                 f"SEÇÃO TRANSVERSAL: {b_val}x{h_val} cm  |  CONCRETO: fck = {fck_val} MPa  |  AÇO: {tipo_aco}",
                 "--------------------------------------------------------------------------------",
                 f"STATUS DA FORÇA CORTANTE: {status_norma}",
-                f"ARMADURA TRANSVERSAL
+                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
+                f"ARMADURA DE PELE TRANSVERSAL: {res['pele']}",
+                "--------------------------------------------------------------------------------"
+            ]
+            for idx, r in enumerate(res['Reacoes']):
+                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
+            
+            linhas_relatorio.append("--------------------------------------------------------------------------------")
+            linhas_relatorio.append("📊 PARÂMETROS DE CONTROLE DE DUCTILIDADE DA LINHA NEUTRA:")
+            for i, v in enumerate(res['vaos_internos']):
+                linhas_relatorio.append(f"  Vão {i+1}: Posição LN (x) = {res['x_pos'][i]:.2f} cm | Relação LN (x/d) = {res['xi_pos'][i]:.3f} (Limite NBR = 0.450)")
+                
+            st.code("\n".join(linhas_relatorio), language="text")
+
+st.write("")
+if st.button("🔄 Limpar Tudo e Reiniciar", key="btn_reiniciar_viga"):
+    st.session_state.lista_vaos = []
+    st.session_state.contador = 1
+    st.session_state.edit_index = None
+    st.session_state.res_calculo = None
+    st.rerun()
