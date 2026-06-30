@@ -98,13 +98,12 @@ st.markdown("""
 st.markdown('<div class="titulo">PROGRAMA DE CÁLCULOS DE VIGAS DA POLOTTO ENGENHARIA</div>', unsafe_allow_html=True)
 st.write("")
 
-# --- FUNÇÃO AUXILIAR CORRIGIDA PARA TRATAR ENTRADAS INCOMPLETAS DURANTE A DIGITAÇÃO ---
+# --- FUNÇÃO AUXILIAR PARA CONVERTER TEXTO DO CELULAR PARA NÚMERO ---
 def converter_valor(texto, padrao=0.0):
     if not texto or str(texto).strip() == "":
         return padrao
     try:
         txt_limpo = str(texto).replace(",", ".").strip()
-        # Se o usuário digitou apenas "." ou "-" provisoriamente, ignora o erro temporário
         if txt_limpo in [".", "-", "-."]:
             return padrao
         return float(txt_limpo)
@@ -226,12 +225,25 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 
             Reacoes = list(Reacoes_apoio)
 
-        def calcular_as(M_k):
-            if abs(M_k) <= 0.05: return 0.0
+        # ARMAZENAMENTO DE PARÂMETROS DA LINHA NEUTRA
+        xi_vaos = []
+        x_vaos = []
+
+        def calcular_as_e_ln(M_k):
+            if abs(M_k) <= 0.05: 
+                xi_vaos.append(0.0)
+                x_vaos.append(0.0)
+                return 0.0
             M_d = abs(M_k) * 100 * gamma_f 
             k_md = M_d / (b * (d**2) * fcd)
-            if k_md > 0.295: return -1 
+            if k_md > 0.295: 
+                xi_vaos.append(99.0)
+                x_vaos.append(99.0)
+                return -1 
             xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
+            x_cm = xi * d
+            xi_vaos.append(xi)
+            x_vaos.append(x_cm)
             return M_d / ((d * (1 - 0.4 * xi)) * fyd)
 
         As_min = 0.0015 * b * h
@@ -240,8 +252,27 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             if as_calc == 0: return 0
             return max(as_calc, As_min)
 
-        As_apoios = [ajustar_as(calcular_as(m)) for m in M_apoios]
-        As_positivos = [ajustar_as(calcular_as(m)) for m in M_positivos]
+        As_apoios = [ajustar_as(calcular_as_e_ln(m)) for m in M_apoios]
+        # Limpar listas para recalcular para os positivos de forma independente
+        xi_pos, x_pos = [], []
+        for m in M_positivos:
+            M_d = abs(m) * 100 * gamma_f
+            k_md = M_d / (b * (d**2) * fcd)
+            if k_md > 0.295 or abs(m) <= 0.05:
+                xi_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
+                x_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
+            else:
+                xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
+                xi_pos.append(xi)
+                x_pos.append(xi * d)
+        As_positivos = [ajustar_as(calcular_as_e_ln(m)) for m in M_positivos]
+
+        # VERIFICAÇÃO DE ARMADURA DE PELE (NBR 6118 - Item 17.3.5.2.3)
+        if h > 60.0:
+            as_pele_total = 0.0010 * b * h # 0.10% da seção total (0.05% por face)
+            pele_msg = f"OBRIGATÓRIA: {as_pele_total:.2f} cm² total (Usar 2x2 ø6.3mm nas laterais)"
+        else:
+            pele_msg = "DISPENSADA POR NORMA (h <= 60cm)"
 
         fcd_mpa = fck / 1.4
         v1 = 0.6 * (1 - fck / 250)
@@ -271,14 +302,15 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             "As_apoios": As_apoios, "As_positivos": As_positivos,
             "V_max": V_max, "Vrd2": Vrd2, "estribos": estribo_msg, "estribos_lista": estribos_vaos_texto,
             "falha_cortante": falha_cortante, "vaos_internos": vaos_internos, 
-            "bal_esq": bal_esq, "bal_dir": bal_dir
+            "bal_esq": bal_esq, "bal_dir": bal_dir, "pele": pele_msg,
+            "xi_pos": xi_pos, "x_pos": x_pos
         }
     except Exception as e:
         return {"erro": str(e)}
 
 def sugerir_barras(as_req):
     if as_req == -1: return "Redim.!"
-    if as_req <= 0: return "2 ø 8.0mm"
+    if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
     bitolas = [("ø10mm", 0.79), ("ø12.5mm", 1.23), ("ø16mm", 2.01)]
     for nome, area in bitolas:
         qtd = int(np.ceil(as_req / area))
@@ -317,11 +349,9 @@ st.header("2. Inserir Elementos da Viga")
 
 num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
 
-# MODO DE EDIÇÃO COM TEXTOS BLINDADOS EM CIMA DAS CÉLULAS
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
     st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
-    
     st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
     tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']), key="ed_tipo")
     
@@ -345,12 +375,8 @@ if st.session_state.edit_index is not None:
     
     if btn_salvar:
         st.session_state.lista_vaos[idx] = {
-            'nome': st.session_state.lista_vaos[idx]['nome'], 
-            'tipo': tipo_ed, 
-            'L': converter_valor(L_ed), 
-            'q': converter_valor(q_ed), 
-            'P': converter_valor(P_ed), 
-            'a': converter_valor(a_ed)
+            'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 
+            'L': converter_valor(L_ed), 'q': converter_valor(q_ed), 'P': converter_valor(P_ed), 'a': converter_valor(a_ed)
         }
         st.session_state.edit_index = None
         st.rerun()
@@ -358,7 +384,6 @@ if st.session_state.edit_index is not None:
         st.session_state.edit_index = None
         st.rerun()
 else:
-    # MODO INSERÇÃO COM TEXTO FANTASMA (PLACEHOLDER) - TOTALMENTE VAZIOS AO COMEÇAR
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
@@ -380,7 +405,6 @@ else:
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
-    # MUDANÇA CRÍTICA: A validação só roda se o botão de inserção for ativado
     if btn_inserir:
         v_L = converter_valor(L, 0.0)
         v_q = converter_valor(q, 0.0)
@@ -402,17 +426,14 @@ else:
                 st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
                 st.rerun()
 
-# Exibição dos Tramos Cadastrados
 if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
         col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
         col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN** a **{v['a']}m**")
-        
         if col_edit.button("✏️", key=f"edit_{i}"):
             st.session_state.edit_index = i
             st.rerun()
-            
         if col_del.button("❌", key=f"del_{i}"):
             if v['tipo'] == "Normal": st.session_state.contador -= 1
             st.session_state.lista_vaos.pop(i)
@@ -442,25 +463,20 @@ if len(st.session_state.lista_vaos) > 0:
                 </div>
                 """, unsafe_allow_html=True)
                 
-            # --- DESENHO TÉCNICO ---
             fig, ax = plt.subplots(figsize=(8, 5.0))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
             ax.set_ylim(-3.0, 2.2)
             ax.axis('off')
             
-            # Corpo da viga
             ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB')
             
-            # Pilares (Triângulos azuis)
             for idx, r in enumerate(res['Reacoes']):
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
             
-            # Armaduras principais
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
-            # Negativos nos eixos de apoio
             if res['bal_esq']:
                 ax.text(-0.3, 0.45, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
@@ -468,16 +484,13 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
                 
-            # Ferros Positivos
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
                 
-            # Estribos distribuídos legivelmente abaixo de cada pilar correspondente
             for i in range(len(res['vaos_internos'])):
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
                 ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
             
-            # Desenho do Corte Transversal com as Cotas Técnicas corretas
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
             ax.add_patch(caixa_corte)
@@ -487,7 +500,6 @@ if len(st.session_state.lista_vaos) > 0:
             
             st.pyplot(fig)
             
-            # --- RELATÓRIO COM LINHAS SEPARADORAS ---
             st.subheader("Relação de Especificações Técnicas")
             status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
             
@@ -496,6 +508,7 @@ if len(st.session_state.lista_vaos) > 0:
                 "--------------------------------------------------------------------------------",
                 f"STATUS DA FORÇA CORTANTE: {status_norma}",
                 f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
+                f"ARMADURA DE PELE TRANSVERSAL: {res['pele']}",
                 "--------------------------------------------------------------------------------"
             ]
             
@@ -507,6 +520,11 @@ if len(st.session_state.lista_vaos) > 0:
             for i, v in enumerate(res['vaos_internos']):
                 comp_barra = v['L'] + 0.70
                 linhas_relatorio.append(f"  Vão {i+1} ({v['nome']}): Ferro Positivo {sugerir_barras(res['As_positivos'][i])} | Comp. Nominal = {comp_barra:.2f}m | Disposição: 1ª Camada")
+            
+            linhas_relatorio.append("--------------------------------------------------------------------------------")
+            linhas_relatorio.append("📊 PARÂMETROS DE CONTROLE DE DUCTILIDADE DA LINHA NEUTRA:")
+            for i, v in enumerate(res['vaos_internos']):
+                linhas_relatorio.append(f"  Vão {i+1}: Posição LN (x) = {res['x_pos'][i]:.2f} cm | Relação LN (x/d) = {res['xi_pos'][i]:.3f} (Limite NBR = 0.450)")
                 
             linhas_relatorio.append("--------------------------------------------------------------------------------")
             linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
@@ -514,7 +532,6 @@ if len(st.session_state.lista_vaos) > 0:
             
             st.code("\n".join(linhas_relatorio), language="text")
 
-# Botão para Resetar Projeto completamente
 st.write("")
 if st.button("🔄 Limpar Tudo e Reiniciar"):
     if 'calcular_ativo' in st.session_state:
