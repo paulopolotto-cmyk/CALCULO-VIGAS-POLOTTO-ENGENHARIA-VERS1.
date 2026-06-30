@@ -11,7 +11,6 @@ st.markdown("""
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
     .tramo-header { text-align: center; background-color: #FFDE4D; color: #000000; padding: 8px; font-weight: bold; border-radius: 5px; margin-bottom: 10px; border: 1px solid #E6B905; }
     
-    /* TARJA AMARELA COM LETRAS EM VERMELHO NEGRITO - MÁXIMO CONTRASTE CONTRA O PRETO */
     .label-blindado {
         background-color: #FFDE4D !important;
         color: #CC0000 !important;
@@ -25,7 +24,6 @@ st.markdown("""
         border: 1px solid #E6B905 !important;
     }
     
-    /* FORÇANDO FUNDO AMARELO CLARO E TEXTO PRETO EM TODAS AS CAIXAS DE ENTRADA */
     div[data-testid="stNumberInput"] input, 
     div[data-testid="stTextInput"] input,
     div[data-testid="stSelectbox"] div[data-baseweb="select"],
@@ -40,7 +38,6 @@ st.markdown("""
         border-radius: 4px !important;
     }
     
-    /* ESTILIZAÇÃO DO TEXTO FANTASMA (PLACEHOLDER) PARA FICAR VISÍVEL NO CELULAR */
     input::placeholder {
         color: #555555 !important;
         opacity: 1 !important;
@@ -48,7 +45,6 @@ st.markdown("""
         font-size: 14px !important;
     }
     
-    /* CORREÇÃO DO CELULAR: Garante que o texto selecionado dentro da célula fique preto e legível */
     div[data-testid="stSelectbox"] div[data-baseweb="select"] span,
     div[data-testid="stSelectbox"] [data-testid="stMarkdownContainer"] p {
         color: #000000 !important;
@@ -56,21 +52,12 @@ st.markdown("""
         -webkit-text-fill-color: #000000 !important;
     }
     
-    /* MODIFICANDO O MENU EXPANDIDO (OPÇÕES) DO SELECTBOX PARA MANTER O TEXTO PRETO */
-    ul[role="listbox"] li, div[role="option"] {
-        color: #000000 !important;
-        font-weight: bold !important;
-        background-color: #FFF9C4 !important;
-    }
-    
-    /* ESCONDE OS LABELS PADRÕES DO STREAMLIT QUE SOMEM NO MODO ESCURO */
     div[data-testid="stNumberInput"] label,
     div[data-testid="stTextInput"] label,
     div[data-testid="stSelectbox"] label {
         display: none !important;
     }
     
-    /* FORÇANDO O BOTÃO DO FORMULÁRIO A FICAR AMARELO E EM DESTAQUE */
     div[data-testid="stForm"] button, div.stButton > button:not([type="primary"]) {
         background-color: #FFDE4D !important;
         color: #000000 !important;
@@ -80,10 +67,8 @@ st.markdown("""
         width: 100% !important;
         border: 2px solid #E6B905 !important;
         border-radius: 6px !important;
-        box-shadow: 0px 3px 5px rgba(0,0,0,0.1) !important;
     }
     
-    /* Mantendo o Botão de Calcular em Vermelho Marcante */
     div.stButton > button[type="primary"] {
         width: 100% !important;
         height: 50px !important;
@@ -98,7 +83,6 @@ st.markdown("""
 st.markdown('<div class="titulo">PROGRAMA DE CÁLCULOS DE VIGAS DA POLOTTO ENGENHARIA</div>', unsafe_allow_html=True)
 st.write("")
 
-# --- FUNÇÃO AUXILIAR PARA CONVERTER TEXTO DO CELULAR PARA NÚMERO ---
 def converter_valor(texto, padrao=0.0):
     if not texto or str(texto).strip() == "":
         return padrao
@@ -110,7 +94,7 @@ def converter_valor(texto, padrao=0.0):
     except:
         return padrao
 
-# --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
+# --- MOTOR MATEMÁTICO ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
     try:
         b = float(dados_gerais['b'])
@@ -225,25 +209,15 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 
             Reacoes = list(Reacoes_apoio)
 
-        # ARMAZENAMENTO DE PARÂMETROS DA LINHA NEUTRA
-        xi_vaos = []
-        x_vaos = []
-
+        xi_pos, x_pos = [], []
         def calcular_as_e_ln(M_k):
             if abs(M_k) <= 0.05: 
-                xi_vaos.append(0.0)
-                x_vaos.append(0.0)
                 return 0.0
             M_d = abs(M_k) * 100 * gamma_f 
             k_md = M_d / (b * (d**2) * fcd)
             if k_md > 0.295: 
-                xi_vaos.append(99.0)
-                x_vaos.append(99.0)
                 return -1 
             xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
-            x_cm = xi * d
-            xi_vaos.append(xi)
-            x_vaos.append(x_cm)
             return M_d / ((d * (1 - 0.4 * xi)) * fyd)
 
         As_min = 0.0015 * b * h
@@ -253,23 +227,24 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             return max(as_calc, As_min)
 
         As_apoios = [ajustar_as(calcular_as_e_ln(m)) for m in M_apoios]
-        xi_pos, x_pos = [], []
+        
         for m in M_positivos:
             M_d = abs(m) * 100 * gamma_f
             k_md = M_d / (b * (d**2) * fcd)
             if k_md > 0.295 or abs(m) <= 0.05:
-                xi_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
-                x_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
+                xi_pos.append(0.0 if abs(m) <= 0.05 else 0.45)
+                x_pos.append(0.0 if abs(m) <= 0.05 else 0.45 * d)
             else:
                 xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
                 xi_pos.append(xi)
                 x_pos.append(xi * d)
         As_positivos = [ajustar_as(calcular_as_e_ln(m)) for m in M_positivos]
 
-        # VERIFICAÇÃO DE ARMADURA DE PELE (NBR 6118 - Item 17.3.5.2.3)
-        if h > 60.0:
+        # ARMADURA DE PELE
+        tem_pele = h > 60.0
+        if tem_pele:
             as_pele_total = 0.0010 * b * h 
-            pele_msg = f"OBRIGATÓRIA: {as_pele_total:.2f} cm² total (Usar 2x2 ø6.3mm nas laterais)"
+            pele_msg = f"OBRIGATÓRIA: {as_pele_total:.2f} cm² total (2x2 ø6.3mm nas laterais)"
         else:
             pele_msg = "DISPENSADA POR NORMA (h <= 60cm)"
 
@@ -279,264 +254,176 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
         falha_cortante = (V_max * gamma_f) > Vrd2
         
         estribos_vaos_texto = []
+        num_estribos_total = 0
         if falha_cortante:
             estribo_msg = "REDIRECIONAR SEÇÃO!"
-            for _ in range(num_vaos):
-                estribos_vaos_texto.append("Seção Insuficiente")
+            for _ in range(num_vaos): estribos_vaos_texto.append("Seção Insuficiente")
         else:
             fctm = 0.3 * (fck ** (2/3))
             Vc = 0.6 * (((0.7 * fctm) / 1.4) / 10) * b * d 
-            for v_curr in V_por_vao:
-                Vsw = max(0, (v_curr * gamma_f) - Vc)
+            for v_curr in vaos_internos:
+                Vsw = max(0, (v_curr['q'] * v_curr['L'] * gamma_f) - Vc)
                 Asw_s = max((Vsw / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
                 esp = min((2 * 0.196 / Asw_s) * 100, min(0.6 * d, 30.0))
                 estribos_vaos_texto.append(f"ø5.0 c/{esp:.1f}cm")
-            Vsw_max = max(0, (V_max * gamma_f) - Vc)
-            Asw_s_max = max((Vsw_max / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
-            esp_max = min((2 * 0.196 / Asw_s_max) * 100, min(0.6 * d, 30.0))
-            estribo_msg = f"ø5.0 c/{esp_max:.1f}cm"
+                num_estribos_total += int(np.ceil((v_curr['L'] * 100) / esp)) + 1
+            estribo_msg = estribos_vaos_texto[0]
 
         return {
             "M_apoios": M_apoios, "M_positivos": M_positivos, "Reacoes": Reacoes,
             "As_apoios": As_apoios, "As_positivos": As_positivos,
             "V_max": V_max, "Vrd2": Vrd2, "estribos": estribo_msg, "estribos_lista": estribos_vaos_texto,
             "falha_cortante": falha_cortante, "vaos_internos": vaos_internos, 
-            "bal_esq": bal_esq, "bal_dir": bal_dir, "pele": pele_msg,
-            "xi_pos": xi_pos, "x_pos": x_pos
+            "bal_esq": bal_esq, "bal_dir": bal_dir, "pele": pele_msg, "tem_pele": tem_pele,
+            "xi_pos": xi_pos, "x_pos": x_pos, "num_estribos": num_estribos_total
         }
     except Exception as e:
         return {"erro": str(e)}
 
 def sugerir_barras(as_req):
     if as_req == -1: return "Redim.!"
-    if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
+    if as_req <= 0: return "2 ø 8.0mm"
     bitolas = [("ø10mm", 0.79), ("ø12.5mm", 1.23), ("ø16mm", 2.01)]
     for nome, area in bitolas:
         qtd = int(np.ceil(as_req / area))
         if qtd >= 2: return f"{qtd} {nome}"
-    return f"{as_req:.2f} cm²"
+    return f"2 ø 10mm"
 
-# --- GERENCIAMENTO DE ESTADO ---
-if 'lista_vaos' not in st.session_state:
-    st.session_state.lista_vaos = []
-if 'contador' not in st.session_state:
-    st.session_state.contador = 1
-if 'edit_index' not in st.session_state:
-    st.session_state.edit_index = None
+# --- INTERFACE ---
+if 'lista_vaos' not in st.session_state: st.session_state.lista_vaos = []
+if 'contador' not in st.session_state: st.session_state.contador = 1
+if 'edit_index' not in st.session_state: st.session_state.edit_index = None
 
-# --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
-
-# CORREÇÃO CIRÚRGICA: Alterado os valores iniciais (value) para o padrão de 15x50 cm e Concreto de 25 MPa
-st.markdown('<span class="label-blindado">Base (bw) [cm]</span>', unsafe_allow_html=True)
-b_raw = st.text_input("Base (bw) [cm]", value="15", key="main_b")
-b_val = converter_valor(b_raw, 15.0)
-
-st.markdown('<span class="label-blindado">Altura (h) [cm]</span>', unsafe_allow_html=True)
-h_raw = st.text_input("Altura (h) [cm]", value="50", key="main_h")
-h_val = converter_valor(h_raw, 50.0)
-
-st.markdown('<span class="label-blindado">Concreto fck [MPa]</span>', unsafe_allow_html=True)
-fck_raw = st.text_input("Concreto fck [MPa]", value="25", key="main_fck")
-fck_val = converter_valor(fck_raw, 25.0)
-
-st.markdown('<span class="label-blindado">Aço de Projeto</span>', unsafe_allow_html=True)
-tipo_aco = st.text_input("Aço de Projeto", value="CA-50A", disabled=True, key="main_aco")
+col_b, col_h, col_f = st.columns(3)
+with col_b:
+    st.markdown('<span class="label-blindado">Base (bw) [cm]</span>', unsafe_allow_html=True)
+    b_val = converter_valor(st.text_input("Base (bw) [cm]", value="15", key="main_b"), 15.0)
+with col_h:
+    st.markdown('<span class="label-blindado">Altura (h) [cm]</span>', unsafe_allow_html=True)
+    h_val = converter_valor(st.text_input("Altura (h) [cm]", value="50", key="main_h"), 50.0)
+with col_f:
+    st.markdown('<span class="label-blindado">fck [MPa]</span>', unsafe_allow_html=True)
+    fck_val = converter_valor(st.text_input("Concreto fck [MPa]", value="25", key="main_fck"), 25.0)
 
 dados_g = {'b': b_val, 'h': h_val, 'fck': fck_val}
 
 st.header("2. Inserir Elementos da Viga")
-
-num_normais = sum(1 for v in st.session_state.lista_vaos if v['tipo'] == 'Normal')
-
 if st.session_state.edit_index is not None:
     idx = st.session_state.edit_index
-    st.markdown(f'<div class="tramo-header">✏️ MODIFICANDO TRAMO: {st.session_state.lista_vaos[idx]["nome"]}</div>', unsafe_allow_html=True)
     st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
-    tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']), key="ed_tipo")
-    
-    colL, colQ, colP, colA = st.columns(4)
-    with colL:
-        st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
-        L_ed = st.text_input("Comprimento [m]", value=str(st.session_state.lista_vaos[idx]['L']), key="ed_L")
-    with colQ:
-        st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
-        q_ed = st.text_input("Carga Distr. [kN/m]", value=str(st.session_state.lista_vaos[idx]['q']), key="ed_q")
-    with colP:
-        st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
-        P_ed = st.text_input("Carga Conc. [kN]", value=str(st.session_state.lista_vaos[idx]['P']), key="ed_p")
-    with colA:
-        st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
-        a_ed = st.text_input("Dist. Carga (a) [m]", value=str(st.session_state.lista_vaos[idx]['a']), key="ed_a")
-    
-    col_b1, col_b2 = st.columns(2)
-    btn_salvar = col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed")
-    btn_cancelar = col_b2.button("❌ CANCELAR", key="btn_cancelar_ed")
-    
-    if btn_salvar:
-        st.session_state.lista_vaos[idx] = {
-            'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 
-            'L': converter_valor(L_ed), 'q': converter_valor(q_ed), 'P': converter_valor(P_ed), 'a': converter_valor(a_ed)
-        }
-        st.session_state.edit_index = None
-        st.rerun()
-    if btn_cancelar:
+    tipo_ed = st.selectbox("Tipo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], key="ed_tipo")
+    L_ed = st.text_input("Comprimento [m]", value=str(st.session_state.lista_vaos[idx]['L']), key="ed_L")
+    q_ed = st.text_input("Carga Distr. [kN/m]", value=str(st.session_state.lista_vaos[idx]['q']), key="ed_q")
+    P_ed = st.text_input("Carga Conc. [kN]", value=str(st.session_state.lista_vaos[idx]['P']), key="ed_p")
+    a_ed = st.text_input("Dist. Carga [m]", value=str(st.session_state.lista_vaos[idx]['a']), key="ed_a")
+    if st.button("💾 SALVAR ALTERAÇÃO"):
+        st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': converter_valor(L_ed), 'q': converter_valor(q_ed), 'P': converter_valor(P_ed), 'a': converter_valor(a_ed)}
         st.session_state.edit_index = None
         st.rerun()
 else:
-    st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
-    with st.form(key="form_insercao_limpo", clear_on_submit=True):
-        st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
+    with st.form(key="form_insercao", clear_on_submit=True):
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"])
-        
         colL, colQ, colP, colA = st.columns(4)
-        with colL:
-            st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
-            L = st.text_input("Comprimento [m]", placeholder="Digitar...", value="")
-        with colQ:
-            st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
-            q = st.text_input("Carga Distr. [kN/m]", placeholder="Digitar...", value="")
-        with colP:
-            st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
-            P = st.text_input("Carga Conc. [kN]", placeholder="Digitar...", value="")
-        with colA:
-            st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
-            a = st.text_input("Dist. Carga (a) [m]", placeholder="Digitar...", value="")
-        
-        btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
-
-    if btn_inserir:
-        v_L = converter_valor(L, 0.0)
-        v_q = converter_valor(q, 0.0)
-        v_P = converter_valor(P, 0.0)
-        v_a = converter_valor(a, 0.0)
-        
-        if v_L <= 0.0:
-            st.error("O comprimento do vão precisa ser maior que zero!")
-        elif v_a > v_L and tipo == "Normal":
-            st.error("A distância da carga não pode ser maior que o comprimento do vão!")
-        else:
-            if tipo == "Balanço Esquerdo" and any(v['tipo'] == "Balanço Esquerdo" for v in st.session_state.lista_vaos):
-                st.error("Já existe um Balanço Esquerdo!")
-            elif tipo == "Balanço Direito" and any(v['tipo'] == "Balanço Direito" for v in st.session_state.lista_vaos):
-                st.error("Já existe um Balanço Direito!")
-            else:
-                nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
+        L = colL.text_input("Comp. [m]", placeholder="0.0")
+        q = colQ.text_input("q [kN/m]", placeholder="0.0")
+        P = colP.text_input("P [kN]", placeholder="0.0")
+        a = colA.text_input("a [m]", placeholder="0.0")
+        if st.form_submit_button("➕ INSERIR TRAMO"):
+            v_L, v_q, v_P, v_a = converter_valor(L), converter_valor(q), converter_valor(P), converter_valor(a)
+            if v_L > 0:
+                nome_t = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
                 if tipo == "Normal": st.session_state.contador += 1
-                st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
+                st.session_state.lista_vaos.append({'nome': nome_t, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
                 st.rerun()
 
 if len(st.session_state.lista_vaos) > 0:
-    st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
-        col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m** | P = **{v['P']} kN** a **{v['a']}m**")
-        if col_edit.button("✏️", key=f"edit_{i}"):
-            st.session_state.edit_index = i
-            st.rerun()
-        if col_del.button("❌", key=f"del_{i}"):
-            if v['tipo'] == "Normal": st.session_state.contador -= 1
-            st.session_state.lista_vaos.pop(i)
-            if st.session_state.edit_index == i: st.session_state.edit_index = None
-            st.rerun()
-
-    st.write("")
-    btn_calc = st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary")
-    st.write("")
-
-    if btn_calc or 'calcular_ativo' in st.session_state:
-        st.session_state.calcular_ativo = True
+        st.write(f"**{v['nome']}** | L = {v['L']}m | q = {v['q']} kN/m")
+    
+    if st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary"):
         res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
-        
-        if "erro" in res:
-            st.error(res["erro"])
+        if "erro" in res: st.error(res["erro"])
         else:
-            st.write("---")
-            st.header("🏁 Layout de Detalhamento Estrutural")
-            
-            if res['falha_cortante']:
-                st.markdown(f"""
-                <div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center; border: 4px solid #7F1D1D; margin-bottom:25px; line-height: 1.5;">
-                ⚠️ AS DIMENSÕES DA VIGA ({b_val}x{h_val} cm) SÃO INSUFICIENTES!<br>
-                A seção de concreto está FORA DAS NORMAS ATUAIS (NBR 6118) por falha por esmagamento da biela seca.<br>
-                Suba a tela, altere as dimensões (bw/h) ou o fck e recalcule. Seus vãos continuam salvos!
-                </div>
-                """, unsafe_allow_html=True)
-                
-            fig, ax = plt.subplots(figsize=(8, 5.0))
-            ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            ax.set_ylim(-3.0, 2.2)
+            # --- 1. VISÃO LONGITUDINAL E DE DETALHAMENTO ---
+            st.subheader("🏁 Desenho Longitudinal da Armadura")
+            fig, ax = plt.subplots(figsize=(8, 3))
+            ax.set_xlim(-0.5, len(res['vaos_internos']))
+            ax.set_ylim(-1.5, 1.5)
             ax.axis('off')
-            
-            ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB')
-            
+            ax.fill_between([-0.2, len(res['vaos_internos'])-0.8], 0.4, -0.4, color='#E5E7EB') # Corpo viga
             for idx, r in enumerate(res['Reacoes']):
-                ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
-                ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
-            
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
-            
-            if res['bal_esq']:
-                ax.text(-0.3, 0.45, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 0.45, f"{sugerir_barras(res['As_apoios'][i+1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 0.45, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-                
-            for i in range(len(res['vaos_internos'])):
-                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
-                
-            for i in range(len(res['vaos_internos'])):
-                texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -1.40, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
-            
-            posX_corte = len(res['Reacoes']) - 0.1
-            caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0, zorder=5)
-            ax.add_patch(caixa_corte)
-            
-            ax.text(posX_corte + 0.2, -0.65, f"{int(b_val)}", ha='center', va='top', fontsize=9, fontweight='bold', color='black')
-            ax.text(posX_corte + 0.5, 0.0, f"{int(h_val)}", ha='left', va='center', fontsize=9, fontweight='bold', color='black')
-            
+                ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=12)
             st.pyplot(fig)
-            
-            st.subheader("Relação de Especificações Técnicas")
-            status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
-            
-            linhas_relatorio = [
-                f"SEÇÃO TRANSVERSAL: {b_val}x{h_val} cm  |  CONCRETO: fck = {fck_val} MPa  |  AÇO: {tipo_aco}",
-                "--------------------------------------------------------------------------------",
-                f"STATUS DA FORÇA CORTANTE: {status_norma}",
-                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
-                f"ARMADURA DE PELE TRANSVERSAL: {res['pele']}",
-                "--------------------------------------------------------------------------------"
-            ]
-            
-            for idx, r in enumerate(res['Reacoes']):
-                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
-                linhas_relatorio.append("- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -")
-                
-            linhas_relatorio.append("DETALHAMENTO DE BARRAS LONGITUDINAIS (NBR 6118):")
-            for i, v in enumerate(res['vaos_internos']):
-                comp_barra = v['L'] + 0.70
-                linhas_relatorio.append(f"  Vão {i+1} ({v['nome']}): Ferro Positivo {sugerir_barras(res['As_positivos'][i])} | Comp. Nominal = {comp_barra:.2f}m | Disposição: 1ª Camada")
-            
-            linhas_relatorio.append("--------------------------------------------------------------------------------")
-            linhas_relatorio.append("📊 PARÂMETROS DE CONTROLE DE DUCTILIDADE DA LINHA NEUTRA:")
-            for i, v in enumerate(res['vaos_internos']):
-                linhas_relatorio.append(f"  Vão {i+1}: Posição LN (x) = {res['x_pos'][i]:.2f} cm | Relação LN (x/d) = {res['xi_pos'][i]:.3f} (Limite NBR = 0.450)")
-                
-            linhas_relatorio.append("--------------------------------------------------------------------------------")
-            linhas_relatorio.append(f"CORTANTE MÁXIMO DE PROJETO (Vsd): {res['V_max'] * 1.4:.2f} kN")
-            linhas_relatorio.append(f"RESISTÊNCIA MÁXIMA DA BIELA (Vrd2): {res['Vrd2']:.2f} kN")
-            
-            st.code("\n".join(linhas_relatorio), language="text")
 
-st.write("")
-if st.button("🔄 Limpar Tudo e Reiniciar"):
-    if 'calcular_ativo' in st.session_state:
-        del st.session_state.calcular_ativo
-    st.session_state.lista_vaos = []
-    st.session_state.contador = 1
-    st.session_state.edit_index = None
-    st.rerun()
+            # --- 2. NOVO GRAPH: LINHA NEUTRA LONGITUDINAL PARA FUROS ---
+            st.subheader("🚧 Zoneamento Seguro para Furos e Passagens (Linha Neutra)")
+            fig_ln, ax_ln = plt.subplots(figsize=(8, 3.5))
+            L_total = sum(v['L'] for v in res['vaos_internos'])
+            ax_ln.set_xlim(0, L_total)
+            ax_ln.set_ylim(-h_val, 0)
+            ax_ln.set_ylabel("Altura da Viga (cm)", fontweight='bold')
+            ax_ln.set_xlabel("Comprimento da Viga (m)", fontweight='bold')
+            
+            # Desenha corpo da viga
+            ax_ln.fill_between([0, L_total], 0, -h_val, color='#F3F4F6')
+            
+            # Plota a Linha Neutra ao longo dos vãos
+            curr_x = 0
+            for i, v in enumerate(res['vaos_internos']):
+                ln_v = res['x_pos'][i] if res['x_pos'][i] > 0 else 4.0
+                # Zona Comprimida (Acima da LN) - Proibida!
+                ax_ln.fill_between([curr_x, curr_x + v['L']], 0, -ln_v, color='#FCA5A5', alpha=0.6, label="ZONA COMPRIMIDA (PROIBIDO FURAR)" if i==0 else "")
+                # Zona Tracionada (Abaixo da LN) - Permitida!
+                ax_ln.fill_between([curr_x, curr_x + v['L']], -ln_v, -h_val, color='#BBF7D0', alpha=0.6, label="ZONA TRACIONADA (PERMITIDO FURAR)" if i==0 else "")
+                # Linha Neutra Pontilhada
+                ax_ln.plot([curr_x, curr_x + v['L']], [-ln_v, -ln_v], 'r--', linewidth=2)
+                ax_ln.text(curr_x + v['L']/2, -ln_v - 3, f"LN = {ln_v:.1f}cm", color='red', ha='center', fontsize=9, fontweight='bold')
+                curr_x += v['L']
+                
+            ax_ln.legend(loc="lower left", fontsize=8)
+            ax_ln.grid(True, linestyle=':', alpha=0.5)
+            st.pyplot(fig_ln)
+
+            # --- 3. NOVO GRAPH: CORTE TRANSVERSAL DA VIGA ---
+            st.subheader("📐 Corte Transversal da Viga")
+            fig_ct, ax_ct = plt.subplots(figsize=(4, 5))
+            ax_ct.set_xlim(-2, b_val + 2)
+            ax_ct.set_ylim(-2, h_val + 2)
+            ax_ct.set_aspect('equal')
+            ax_ct.grid(True, linestyle=':', alpha=0.4)
+            
+            # Desenha seção de concreto
+            secao = plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=3, label="Concreto")
+            ax_ct.add_patch(secao)
+            # Desenha o estribo interno (cobrimento de 3cm)
+            estribo_des = plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=1.5, linestyle='-', label="Estribo ø5mm")
+            ax_ct.add_patch(estribo_des)
+            
+            # Desenha Barras de Porta-Estribo (Topo)
+            ax_ct.plot([3, b_val-3], [h_val-3, h_val-3], 'oo', color='black', markersize=10, label="Porta-Estribo 2ø8.0")
+            # Desenha Barras Positivas (Base)
+            ax_ct.plot([3, b_val/2, b_val-3], [3, 3, 3], 'or', markersize=12, label="Reforço Positivo")
+            
+            # Desenha Armadura de Pele se houver
+            if res['tem_pele']:
+                ax_ct.plot([3, b_val-3], [h_val/2, h_val/2], 'og', markersize=9, label="Pele 2x2ø6.3")
+                ax_ct.text(b_val/2, h_val/2 + 1, "Arm. Pele", color='green', ha='center', fontsize=8, fontweight='bold')
+
+            ax_ct.text(b_val/2, -1.5, f"bw = {int(b_val)} cm", ha='center', fontweight='bold', color='#1E3A8A')
+            ax_ct.text(-1.5, h_val/2, f"h = {int(h_val)} cm", va='center', rotation=90, fontweight='bold', color='#1E3A8A')
+            st.pyplot(fig_ct)
+
+            # --- 4. NOVA TABELA DE FERROS (TABELA DE AÇO COMPLETA) ---
+            st.subheader("📊 Tabela Ferroviária / Quantitativo de Aço")
+            L_v_1 = res['vaos_internos'][0]['L']
+            
+            data_tabela = [
+                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": "ø10.0 mm" if "10mm" in sugerir_barras(res['As_positivos'][0]) else "ø12.5 mm", "Qtd": "3", "Comp. Unit (m)": f"{L_v_1 + 0.60:.2f}", "Uso": "Flexão Positiva"},
+                {"Pos": "N2", "Tipo": "Porta-Estribo (Topo)", "Bitola": "ø8.0 mm", "Qtd": "2", "Comp. Unit (m)": f"{L_v_1 + 0.60:.2f}", "Uso": "Montagem da Gaiola"},
+                {"Pos": "N3", "Tipo": "Estribos", "Bitola": "ø5.0 mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{(2*b_val + 2*h_val - 8)/100:.2f}", "Uso": "Esforço Cortante"}
+            ]
+            if res['tem_pele']:
+                data_tabela.append({"Pos": "N4", "Tipo": "Armadura Pele", "Bitola": "ø6.3 mm", "Qtd": "4", "Comp. Unit (m)": f"{L_v_1 + 0.60:.2f}", "Uso": "Anti-fissuração lateral"})
+                
+            st.table(data_tabela)
