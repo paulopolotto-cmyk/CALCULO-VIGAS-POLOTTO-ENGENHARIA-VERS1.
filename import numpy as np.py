@@ -253,7 +253,6 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             return max(as_calc, As_min)
 
         As_apoios = [ajustar_as(calcular_as_e_ln(m)) for m in M_apoios]
-        # Limpar listas para recalcular para os positivos de forma independente
         xi_pos, x_pos = [], []
         for m in M_positivos:
             M_d = abs(m) * 100 * gamma_f
@@ -269,7 +268,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
 
         # VERIFICAÇÃO DE ARMADURA DE PELE (NBR 6118 - Item 17.3.5.2.3)
         if h > 60.0:
-            as_pele_total = 0.0010 * b * h # 0.10% da seção total (0.05% por face)
+            as_pele_total = 0.0010 * b * h 
             pele_msg = f"OBRIGATÓRIA: {as_pele_total:.2f} cm² total (Usar 2x2 ø6.3mm nas laterais)"
         else:
             pele_msg = "DISPENSADA POR NORMA (h <= 60cm)"
@@ -328,17 +327,18 @@ if 'edit_index' not in st.session_state:
 # --- INTERFACE DE ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
 
+# CORREÇÃO CIRÚRGICA: Alterado os valores iniciais (value) para o padrão de 15x50 cm e Concreto de 25 MPa
 st.markdown('<span class="label-blindado">Base (bw) [cm]</span>', unsafe_allow_html=True)
-b_raw = st.text_input("Base (bw) [cm]", value="20", key="main_b")
-b_val = converter_valor(b_raw, 20.0)
+b_raw = st.text_input("Base (bw) [cm]", value="15", key="main_b")
+b_val = converter_valor(b_raw, 15.0)
 
 st.markdown('<span class="label-blindado">Altura (h) [cm]</span>', unsafe_allow_html=True)
-h_raw = st.text_input("Altura (h) [cm]", value="45", key="main_h")
-h_val = converter_valor(h_raw, 45.0)
+h_raw = st.text_input("Altura (h) [cm]", value="50", key="main_h")
+h_val = converter_valor(h_raw, 50.0)
 
 st.markdown('<span class="label-blindado">Concreto fck [MPa]</span>', unsafe_allow_html=True)
-fck_raw = st.text_input("Concreto fck [MPa]", value="30", key="main_fck")
-fck_val = converter_valor(fck_raw, 30.0)
+fck_raw = st.text_input("Concreto fck [MPa]", value="25", key="main_fck")
+fck_val = converter_valor(fck_raw, 25.0)
 
 st.markdown('<span class="label-blindado">Aço de Projeto</span>', unsafe_allow_html=True)
 tipo_aco = st.text_input("Aço de Projeto", value="CA-50A", disabled=True, key="main_aco")
