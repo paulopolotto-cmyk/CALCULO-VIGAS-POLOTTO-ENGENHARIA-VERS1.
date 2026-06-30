@@ -110,6 +110,7 @@ def converter_valor(texto, padrao=0.0):
     except:
         return padrao
 
+# --- DECLARAÇÃO ANTECIPADA PARA EVITAR NAMEERROR ---
 def sugerir_barras(as_req):
     if as_req == -1: return "Redim.!"
     if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
