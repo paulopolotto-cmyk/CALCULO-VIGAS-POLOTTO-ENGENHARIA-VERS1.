@@ -112,18 +112,16 @@ def converter_valor(texto, padrao=0.0):
 
 # --- DECLARAÇÃO ANTECIPADA PARA EVITAR NAMEERROR ---
 def sugerir_barras(as_req):
-    import numpy as as_np
     if as_req == -1: return "Redim.!"
     if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
     bitolas = [("ø10mm", 0.79), ("ø12.5mm", 1.23), ("ø16mm", 2.01)]
     for nome, area in bitolas:
-        qtd = int(as_np.ceil(as_req / area))
+        qtd = int(np.ceil(as_req / area))
         if qtd >= 2: return f"{qtd} {nome}"
     return f"2 ø 10mm"
 
 # --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
-    import numpy as m_np
     try:
         b = float(dados_gerais['b'])
         h = float(dados_gerais['h'])
@@ -172,8 +170,8 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             V_por_vao = [max(abs(VA), abs(VB))]
         else:
             num_incog = num_apoios - 2
-            A_mat = m_np.zeros((num_incog, num_incog))
-            B_mat = m_np.zeros(num_incog)
+            A_mat = np.zeros((num_incog, num_incog))
+            B_mat = np.zeros(num_incog)
             
             W = []
             for v in vaos_internos:
@@ -195,10 +193,10 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             B_mat[0] -= vaos_internos[0]['L'] * MA
             B_mat[-1] -= vaos_internos[-1]['L'] * MZ
             
-            M_sol = m_np.linalg.solve(A_mat, B_mat)
+            M_sol = np.linalg.solve(A_mat, B_mat)
             M_apoios = [MA] + list(M_sol) + [MZ]
             
-            Reacoes_apoio = m_np.zeros(num_apoios)
+            Reacoes_apoio = np.zeros(num_apoios)
             M_positivos = []
             V_max = 0.0
             V_por_vao = []
@@ -249,7 +247,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 xi_vaos.append(99.0)
                 x_vaos.append(99.0)
                 return -1 
-            xi = 1.25 * (1 - m_np.sqrt(1 - 2 * k_md))
+            xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
             x_cm = xi * d
             xi_vaos.append(xi)
             x_vaos.append(x_cm)
@@ -270,7 +268,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 xi_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
                 x_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
             else:
-                xi = 1.25 * (1 - m_np.sqrt(1 - 2 * k_md))
+                xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
                 xi_pos.append(xi)
                 x_pos.append(xi * d)
         As_positivos = [ajustar_as(calcular_as_e_ln(m)) for m in M_positivos]
@@ -300,7 +298,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 Asw_s = max((Vsw / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
                 esp = min((2 * 0.196 / Asw_s) * 100, min(0.6 * d, 30.0))
                 estribos_vaos_texto.append(f"ø5.0 c/{esp:.1f}cm")
-                num_estribos_total += int(m_np.ceil((v_curr['L'] * 100) / esp)) + 1
+                num_estribos_total += int(np.ceil((v_curr['L'] * 100) / esp)) + 1
             Vsw_max = max(0, (V_max * gamma_f) - Vc)
             Asw_s_max = max((Vsw_max / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
             esp_max = min((2 * 0.196 / Asw_s_max) * 100, min(0.6 * d, 30.0))
@@ -317,10 +315,11 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
     except Exception as e:
         return {"erro": str(e)}
 
-# --- GERENCIAMENTO DE ESTADO ---
+# --- GERENCIAMENTO DE ESTADO SÉRIO ---
 if 'lista_vaos' not in st.session_state: st.session_state.lista_vaos = []
 if 'contador' not in st.session_state: st.session_state.contador = 1
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None
+if 'res_calculo' not in st.session_state: st.session_state.res_calculo = None
 
 # --- ENTRADA DE DADOS ---
 st.header("1. Seção, Concreto e Aço")
@@ -368,6 +367,7 @@ if st.session_state.edit_index is not None:
     if col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed"):
         st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': converter_valor(L_ed), 'q': converter_valor(q_ed), 'P': converter_valor(P_ed), 'a': converter_valor(a_ed)}
         st.session_state.edit_index = None
+        st.session_state.res_calculo = None # limpa cálculo desatualizado
         st.rerun()
     if col_b2.button("❌ CANCELAR", key="btn_cancelar_ed"):
         st.session_state.edit_index = None
@@ -393,6 +393,7 @@ else:
             nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
             if tipo == "Normal": st.session_state.contador += 1
             st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
+            st.session_state.res_calculo = None # limpa cálculo antigo
             st.rerun()
 
 if len(st.session_state.lista_vaos) > 0:
@@ -403,15 +404,18 @@ if len(st.session_state.lista_vaos) > 0:
         if col_edit.button("✏️", key=f"edit_{i}"): st.session_state.edit_index = i; st.rerun()
         if col_del.button("❌", key=f"del_{i}"):
             if v['tipo'] == "Normal": st.session_state.contador -= 1
-            st.session_state.lista_vaos.pop(i); st.rerun()
+            st.session_state.lista_vaos.pop(i)
+            st.session_state.res_calculo = None
+            st.rerun()
 
     st.write("")
-    btn_calc = st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary")
+    if st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary"):
+        st.session_state.res_calculo = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
+        st.rerun()
     st.write("")
 
-    if btn_calc or 'calcular_ativo' in st.session_state:
-        st.session_state.calcular_ativo = True
-        res = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
+    if st.session_state.res_calculo is not None:
+        res = st.session_state.res_calculo
         
         if "erro" in res: st.error(res["erro"])
         else:
@@ -421,7 +425,6 @@ if len(st.session_state.lista_vaos) > 0:
             if res['falha_cortante']:
                 st.markdown(f'<div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center;">⚠️ AS DIMENSÕES DA VIGA ({b_val}x{h_val} cm) SÃO INSUFICIENTES!</div>', unsafe_allow_html=True)
                 
-            # O GRÁFICO ORIGINAL INTEGROU O CABEÇALHO COM ESPECIFICAÇÃO DO FERRO DE VOLTA:
             fig, ax = plt.subplots(figsize=(8, 4.5))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
             ax.set_ylim(-2.8, 2.2)
@@ -439,7 +442,7 @@ if len(st.session_state.lista_vaos) > 0:
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
-            # ADICIONANDO ESPECIFICAÇÃO DO FERRO NO CABEÇALHO DO DESENHO
+            # Armaduras nos apoios
             if res['bal_esq']:
                 ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
@@ -452,7 +455,7 @@ if len(st.session_state.lista_vaos) > 0:
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
                 ax.text(i + 0.5, -1.30, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
             
-            # Caixa indicadora de seção original
+            # Caixa indicadora de seção transversal no gráfico
             posX_corte = len(res['Reacoes']) - 0.1
             caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0)
             ax.add_patch(caixa_corte)
@@ -473,9 +476,7 @@ if len(st.session_state.lista_vaos) > 0:
             curr_x = 0
             for i, v in enumerate(res['vaos_internos']):
                 ln_v = res['x_pos'][i] if (res['x_pos'][i] > 0 and res['x_pos'][i] < h_val) else 0.35 * h_val
-                # Zona Comprimida (Vermelho - Proibido!)
                 ax_ln.fill_between([curr_x, curr_x + v['L']], 0, -ln_v, color='#FCA5A5', alpha=0.6, label="ZONA COMPRIMIDA (PROIBIDO FURAR)" if i==0 else "")
-                # Zona Tracionada (Verde - Liberado!)
                 ax_ln.fill_between([curr_x, curr_x + v['L']], -ln_v, -h_val, color='#BBF7D0', alpha=0.6, label="ZONA TRACIONADA (PERMITIDO FURAR)" if i==0 else "")
                 ax_ln.plot([curr_x, curr_x + v['L']], [-ln_v, -ln_v], 'r--', linewidth=2)
                 ax_ln.text(curr_x + v['L']/2, -ln_v - 3, f"LN = {ln_v:.1f}cm", color='red', ha='center', fontsize=9, fontweight='bold')
@@ -490,11 +491,9 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ct.set_ylim(-2, h_val + 2)
             ax_ct.set_aspect('equal')
             
-            # Concreto e estribos
             ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=3))
             ax_ct.add_patch(plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=1.5))
             
-            # Bolinhas das armaduras
             ax_ct.plot([3.5, b_val-3.5], [h_val-3.5, h_val-3.5], 'oo', color='black', markersize=10) # Porta-estribo
             ax_ct.plot([3.5, b_val/2, b_val-3.5], [3.5, 3.5, 3.5], 'or', markersize=11) # Positivo
             
@@ -543,5 +542,8 @@ if len(st.session_state.lista_vaos) > 0:
 
 st.write("")
 if st.button("🔄 Limpar Tudo e Reiniciar"):
-    if 'calcular_ativo' in st.session_state: del st.session_state.calcular_ativo
-    st.session_state.lista_vaos = []; st.session_state.contador = 1; st.session_state.edit_index = None; st.rerun()
+    st.session_state.lista_vaos = []
+    st.session_state.contador = 1
+    st.session_state.edit_index = None
+    st.session_state.res_calculo = None
+    st.rerun()
