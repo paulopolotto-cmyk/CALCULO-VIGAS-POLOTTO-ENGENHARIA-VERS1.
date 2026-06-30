@@ -500,15 +500,15 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ln.legend(loc="lower left", fontsize=9)
             st.pyplot(fig_ln)
 
-            # --- NOVO BLOCO 2: CORTE TRANSVERSAL ULTRA MINIATURA (AFASTADO E AUMENTADO) ---
+            # --- NOVO BLOCO 2: CORTE TRANSVERSAL ULTRA MINIATURA (AFADO E AUMENTADO) ---
             st.subheader("📐 Corte Transversal da Seção")
             
             col_esq, col_centro, col_dir = st.columns([1.4, 1.0, 1.4])
             
             with col_centro:
                 fig_ct, ax_ct = plt.subplots(figsize=(0.7, 1.1))
-                ax_ct.set_xlim(-9, b_val + 9)  # Expandido para acomodar os textos sem trombar
-                ax_ct.set_ylim(-9, h_val + 9)
+                ax_ct.set_xlim(-11, b_val + 11)  # Expandido para dar espaço total lateral às dimensões
+                ax_ct.set_ylim(-11, h_val + 11)  # Expandido para dar espaço total inferior às dimensões
                 ax_ct.set_aspect('equal')
                 
                 ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
@@ -528,9 +528,9 @@ if len(st.session_state.lista_vaos) > 0:
                     ax_ct.plot(b_val-3.5, h_val/2, 'o', color='green', markersize=3)
                     ax_ct.text(b_val/2, h_val/2 + 2.5, "Pele", color='green', ha='center', fontsize=6, fontweight='bold')
 
-                # Afastamento seguro das dimensões para evitar qualquer sobreposição e aumento do tamanho
-                ax_ct.text(b_val/2, -5.5, f"bw={int(b_val)}", ha='center', fontsize=7.5, fontweight='bold', color='#1E3A8A')
-                ax_ct.text(-6.5, h_val/2, f"h={int(h_val)}", va='center', rotation=90, fontsize=7.5, fontweight='bold', color='#1E3A8A')
+                # Afastamento expandido das cotas para acabar totalmente com a sobreposição
+                ax_ct.text(b_val/2, -7.5, f"bw={int(b_val)}", ha='center', fontsize=7.5, fontweight='bold', color='#1E3A8A')
+                ax_ct.text(-7.5, h_val/2, f"h={int(h_val)}", va='center', rotation=90, fontsize=7.5, fontweight='bold', color='#1E3A8A')
                 ax_ct.axis('off')
                 st.pyplot(fig_ct)
 
@@ -554,24 +554,4 @@ if len(st.session_state.lista_vaos) > 0:
                 f"SEÇÃO TRANSVERSAL: {b_val}x{h_val} cm  |  CONCRETO: fck = {fck_val} MPa  |  AÇO: {tipo_aco}",
                 "--------------------------------------------------------------------------------",
                 f"STATUS DA FORÇA CORTANTE: {status_norma}",
-                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
-                f"ARMADURA DE PELE TRANSVERSAL: {res['pele']}",
-                "--------------------------------------------------------------------------------"
-            ]
-            for idx, r in enumerate(res['Reacoes']):
-                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
-            
-            linhas_relatorio.append("--------------------------------------------------------------------------------")
-            linhas_relatorio.append("📊 PARÂMETROS DE CONTROLE DE DUCTILIDADE DA LINHA NEUTRA:")
-            for i, v in enumerate(res['vaos_internos']):
-                linhas_relatorio.append(f"  Vão {i+1}: Posição LN (x) = {res['x_pos'][i]:.2f} cm | Relação LN (x/d) = {res['xi_pos'][i]:.3f} (Limite NBR = 0.450)")
-                
-            st.code("\n".join(linhas_relatorio), language="text")
-
-st.write("")
-if st.button("🔄 Limpar Tudo e Reiniciar", key="btn_reiniciar_viga"):
-    st.session_state.lista_vaos = []
-    st.session_state.contador = 1
-    st.session_state.edit_index = None
-    st.session_state.res_calculo = None
-    st.rerun()
+                f"ARMADURA TRANSVERSAL
