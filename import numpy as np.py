@@ -110,7 +110,7 @@ def converter_valor(texto, padrao=0.0):
     except:
         return padrao
 
-# --- DECLARAÇÃO ANTECIPADA PARA EVITAR NAMEERROR ---
+# --- DECLARAÇÃO DA FUNÇÃO DE SUGESTÃO DE BARRAS ---
 def sugerir_barras(as_req):
     if as_req == -1: return "Redim.!"
     if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
@@ -244,8 +244,8 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             M_d = abs(M_k) * 100 * gamma_f 
             k_md = M_d / (b * (d**2) * fcd)
             if k_md > 0.295: 
-                xi_vaos.append(99.0)
-                x_vaos.append(99.0)
+                xi_vaos.append(0.45)
+                x_vaos.append(0.45 * d)
                 return -1 
             xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
             x_cm = xi * d
@@ -265,8 +265,8 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             M_d = abs(m) * 100 * gamma_f
             k_md = M_d / (b * (d**2) * fcd)
             if k_md > 0.295 or abs(m) <= 0.05:
-                xi_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
-                x_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
+                xi_pos.append(0.0 if abs(m) <= 0.05 else 0.45)
+                x_pos.append(0.0 if abs(m) <= 0.05 else 0.45 * d)
             else:
                 xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
                 xi_pos.append(xi)
@@ -299,10 +299,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 esp = min((2 * 0.196 / Asw_s) * 100, min(0.6 * d, 30.0))
                 estribos_vaos_texto.append(f"ø5.0 c/{esp:.1f}cm")
                 num_estribos_total += int(np.ceil((v_curr['L'] * 100) / esp)) + 1
-            Vsw_max = max(0, (V_max * gamma_f) - Vc)
-            Asw_s_max = max((Vsw_max / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
-            esp_max = min((2 * 0.196 / Asw_s_max) * 100, min(0.6 * d, 30.0))
-            estribo_msg = f"ø5.0 c/{esp_max:.1f}cm"
+            estribo_msg = estribos_vaos_texto[0]
 
         return {
             "M_apoios": M_apoios, "M_positivos": M_positivos, "Reacoes": Reacoes,
@@ -367,7 +364,7 @@ if st.session_state.edit_index is not None:
     if col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed"):
         st.session_state.lista_vaos[idx] = {'nome': st.session_state.lista_vaos[idx]['nome'], 'tipo': tipo_ed, 'L': converter_valor(L_ed), 'q': converter_valor(q_ed), 'P': converter_valor(P_ed), 'a': converter_valor(a_ed)}
         st.session_state.edit_index = None
-        st.session_state.res_calculo = None # limpa cálculo desatualizado
+        st.session_state.res_calculo = None 
         st.rerun()
     if col_b2.button("❌ CANCELAR", key="btn_cancelar_ed"):
         st.session_state.edit_index = None
@@ -393,7 +390,7 @@ else:
             nome_tramo = f"Vão {st.session_state.contador}" if tipo == "Normal" else tipo
             if tipo == "Normal": st.session_state.contador += 1
             st.session_state.lista_vaos.append({'nome': nome_tramo, 'tipo': tipo, 'L': v_L, 'q': v_q, 'P': v_P, 'a': v_a})
-            st.session_state.res_calculo = None # limpa cálculo antigo
+            st.session_state.res_calculo = None 
             st.rerun()
 
 if len(st.session_state.lista_vaos) > 0:
@@ -484,7 +481,7 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ln.legend(loc="lower left", fontsize=8)
             st.pyplot(fig_ln)
 
-            # --- NOVO BLOCO 2: CORTE TRANSVERSAL COMPLETO ---
+            # --- NOVO BLOCO 2: CORTE TRANSVERSAL COMPLETO (CORRIGIDO CORRETAMENTE COM 'o') ---
             st.subheader("📐 Corte Transversal da Seção")
             fig_ct, ax_ct = plt.subplots(figsize=(3.5, 4.5))
             ax_ct.set_xlim(-2, b_val + 2)
@@ -494,11 +491,18 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=3))
             ax_ct.add_patch(plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=1.5))
             
-            ax_ct.plot([3.5, b_val-3.5], [h_val-3.5, h_val-3.5], 'oo', color='black', markersize=10) # Porta-estribo
-            ax_ct.plot([3.5, b_val/2, b_val-3.5], [3.5, 3.5, 3.5], 'or', markersize=11) # Positivo
+            # FIX DE DUPLO MARCADOR: Mudado de 'oo' para 'o' simples. Agora vai abrir liso!
+            ax_ct.plot(3.5, h_val-3.5, 'o', color='black', markersize=10) 
+            ax_ct.plot(b_val-3.5, h_val-3.5, 'o', color='black', markersize=10) 
+            
+            # Barras do reforço inferior positivo
+            ax_ct.plot(3.5, 3.5, 'o', color='red', markersize=11)
+            ax_ct.plot(b_val/2, 3.5, 'o', color='red', markersize=11)
+            ax_ct.plot(b_val-3.5, 3.5, 'o', color='red', markersize=11)
             
             if res['tem_pele']:
-                ax_ct.plot([3.5, b_val-3.5], [h_val/2, h_val/2], 'og', markersize=9)
+                ax_ct.plot(3.5, h_val/2, 'o', color='green', markersize=9)
+                ax_ct.plot(b_val-3.5, h_val/2, 'o', color='green', markersize=9)
                 ax_ct.text(b_val/2, h_val/2 + 1.5, "Pele ø6.3", color='green', ha='center', fontsize=8, fontweight='bold')
 
             ax_ct.text(b_val/2, -1.8, f"bw = {int(b_val)} cm", ha='center', fontweight='bold', color='#1E3A8A')
