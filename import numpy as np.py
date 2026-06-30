@@ -481,37 +481,37 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ln.legend(loc="lower left", fontsize=8)
             st.pyplot(fig_ln)
 
-            # --- NOVO BLOCO 2: CORTE TRANSVERSAL COMPLETO (COMPACTADO E CENTRALIZADO) ---
+            # --- NOVO BLOCO 2: CORTE TRANSVERSAL ULTRA MINIATURA ---
             st.subheader("📐 Corte Transversal da Seção")
             
-            # Criação de 3 colunas: a do meio conterá o gráfico bem menor e focado
-            col_esq, col_centro, col_dir = st.columns([1.2, 1.0, 1.2])
+            # Centralizando o corte com colunas
+            col_esq, col_centro, col_dir = st.columns([1.5, 0.8, 1.5])
             
             with col_centro:
-                fig_ct, ax_ct = plt.subplots(figsize=(1.5, 2.2))  # Tamanho reduzido e otimizado
-                ax_ct.set_xlim(-2, b_val + 2)
-                ax_ct.set_ylim(-2, h_val + 2)
+                fig_ct, ax_ct = plt.subplots(figsize=(0.7, 1.1))  # Reduzido mais da metade! Miniatura perfeita.
+                ax_ct.set_xlim(-3, b_val + 3)
+                ax_ct.set_ylim(-3, h_val + 3)
                 ax_ct.set_aspect('equal')
                 
-                ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=2))
-                ax_ct.add_patch(plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=1.0))
+                ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
+                ax_ct.add_patch(plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=0.8))
                 
                 # Barras superiores (Porta-Estribos)
-                ax_ct.plot(3.5, h_val-3.5, 'o', color='black', markersize=6) 
-                ax_ct.plot(b_val-3.5, h_val-3.5, 'o', color='black', markersize=6) 
+                ax_ct.plot(3.5, h_val-3.5, 'o', color='black', markersize=4) 
+                ax_ct.plot(b_val-3.5, h_val-3.5, 'o', color='black', markersize=4) 
                 
                 # Barras inferiores (Reforço positivo)
-                ax_ct.plot(3.5, 3.5, 'o', color='red', markersize=7)
-                ax_ct.plot(b_val/2, 3.5, 'o', color='red', markersize=7)
-                ax_ct.plot(b_val-3.5, 3.5, 'o', color='red', markersize=7)
+                ax_ct.plot(3.5, 3.5, 'o', color='red', markersize=4.5)
+                ax_ct.plot(b_val/2, 3.5, 'o', color='red', markersize=4.5)
+                ax_ct.plot(b_val-3.5, 3.5, 'o', color='red', markersize=4.5)
                 
                 if res['tem_pele']:
-                    ax_ct.plot(3.5, h_val/2, 'o', color='green', markersize=5)
-                    ax_ct.plot(b_val-3.5, h_val/2, 'o', color='green', markersize=5)
-                    ax_ct.text(b_val/2, h_val/2 + 1.5, "Pele ø6.3", color='green', ha='center', fontsize=6, fontweight='bold')
+                    ax_ct.plot(3.5, h_val/2, 'o', color='green', markersize=3)
+                    ax_ct.plot(b_val-3.5, h_val/2, 'o', color='green', markersize=3)
+                    ax_ct.text(b_val/2, h_val/2 + 1.5, "Pele", color='green', ha='center', fontsize=4, fontweight='bold')
 
-                ax_ct.text(b_val/2, -1.8, f"bw={int(b_val)}", ha='center', fontsize=7, fontweight='bold', color='#1E3A8A')
-                ax_ct.text(-1.8, h_val/2, f"h={int(h_val)}", va='center', rotation=90, fontsize=7, fontweight='bold', color='#1E3A8A')
+                ax_ct.text(b_val/2, -2.5, f"bw={int(b_val)}", ha='center', fontsize=6, fontweight='bold', color='#1E3A8A')
+                ax_ct.text(-2.5, h_val/2, f"h={int(h_val)}", va='center', rotation=90, fontsize=6, fontweight='bold', color='#1E3A8A')
                 ax_ct.axis('off')
                 st.pyplot(fig_ct)
 
