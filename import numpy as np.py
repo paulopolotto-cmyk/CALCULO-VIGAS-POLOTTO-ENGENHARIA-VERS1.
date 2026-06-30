@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
-# ESTILIZAÇÃO AGRESSIVA REINSTALADA: Garante o layout maravilhoso anterior
+# ESTILIZAÇÃO AGRESSIVA REINSTALADA + CONTORNO SEGURO PARA TABELAS (IMPRESSÃO)
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
@@ -38,6 +38,25 @@ st.markdown("""
         font-size: 16px !important;
         border: 2px solid #E6B905 !important;
         border-radius: 4px !important;
+    }
+    
+    /* CONTORNO E BORDAS DA TABELA DE FERROS (PERFEITO PARA IMPRESSÃO) */
+    div[data-testid="stTable"] table {
+        border-collapse: collapse !important;
+        width: 100% !important;
+        border: 2px solid #94A3B8 !important;
+    }
+    div[data-testid="stTable"] th {
+        background-color: #F1F5F9 !important;
+        color: #000000 !important;
+        border: 1px solid #CBD5E1 !important;
+        padding: 8px !important;
+        font-weight: bold !important;
+    }
+    div[data-testid="stTable"] td {
+        border: 1px solid #CBD5E1 !important;
+        color: #000000 !important;
+        padding: 8px !important;
     }
     
     /* ESTILIZAÇÃO DO TEXTO FANTASMA (PLACEHOLDER) */
@@ -396,163 +415,4 @@ else:
 if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
-        col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m**")
-        if col_edit.button("✏️", key=f"edit_{i}"): st.session_state.edit_index = i; st.rerun()
-        if col_del.button("❌", key=f"del_{i}"):
-            if v['tipo'] == "Normal": st.session_state.contador -= 1
-            st.session_state.lista_vaos.pop(i)
-            st.session_state.res_calculo = None
-            st.rerun()
-
-    st.write("")
-    if st.button("⚡ FINALIZAR E CALCULAR VIGA", type="primary"):
-        st.session_state.res_calculo = calcular_viga_dinamica(dados_g, st.session_state.lista_vaos)
-        st.rerun()
-    st.write("")
-
-    if st.session_state.res_calculo is not None:
-        res = st.session_state.res_calculo
-        
-        if "erro" in res: st.error(res["erro"])
-        else:
-            st.write("---")
-            st.header("🏁 Layout de Detalhamento Estrutural")
-            
-            if res['falha_cortante']:
-                st.markdown(f'<div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center;">⚠️ AS DIMENSÕES DA VIGA ({b_val}x{h_val} cm) SÃO INSUFICIENTES!</div>', unsafe_allow_html=True)
-                
-            fig, ax = plt.subplots(figsize=(8, 4.5))
-            ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            ax.set_ylim(-2.8, 2.2)
-            ax.axis('off')
-            
-            # Desenho da viga
-            ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB')
-            
-            # Pilares e reações
-            for idx, r in enumerate(res['Reacoes']):
-                ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
-                ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=9, fontweight='bold')
-            
-            # Linhas de armaduras longitudinais
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
-            
-            # Armaduras nos apoios
-            if res['bal_esq']:
-                ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 0.55, f"{sugerir_barras(res['As_apoios'][i+1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-            if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 0.55, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
-                
-            for i in range(len(res['vaos_internos'])):
-                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=8, ha='center', fontweight='bold')
-                texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -1.30, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=8, ha='center', va='top', fontweight='bold', style='italic')
-            
-            # Caixa indicadora de seção transversal no gráfico
-            posX_corte = len(res['Reacoes']) - 0.1
-            caixa_corte = plt.Rectangle((posX_corte, -0.4), 0.4, 0.8, edgecolor='black', facecolor='#F3F4F6', hatch='//', linewidth=2.0)
-            ax.add_patch(caixa_corte)
-            ax.text(posX_corte + 0.2, -0.65, f"{int(b_val)}", ha='center', va='top', fontsize=9, fontweight='bold')
-            ax.text(posX_corte + 0.5, 0.0, f"{int(h_val)}", ha='left', va='center', fontsize=9, fontweight='bold')
-            st.pyplot(fig)
-
-            # --- NOVO BLOCO 1: VISÃO LONGITUDINAL DA LINHA NEUTRA (ESTUDO PARA FUROS) ---
-            st.subheader("🚧 Zoneamento Seguro para Furos e Passagens (Linha Neutra)")
-            fig_ln, ax_ln = plt.subplots(figsize=(8, 3.5))
-            L_total = sum(v['L'] for v in res['vaos_internos'])
-            ax_ln.set_xlim(0, L_total)
-            ax_ln.set_ylim(-h_val, 0)
-            ax_ln.set_ylabel("Altura da Viga (cm)", fontweight='bold')
-            ax_ln.set_xlabel("Comprimento da Viga (m)", fontweight='bold')
-            ax_ln.fill_between([0, L_total], 0, -h_val, color='#F3F4F6')
-            
-            curr_x = 0
-            for i, v in enumerate(res['vaos_internos']):
-                ln_v = res['x_pos'][i] if (res['x_pos'][i] > 0 and res['x_pos'][i] < h_val) else 0.35 * h_val
-                ax_ln.fill_between([curr_x, curr_x + v['L']], 0, -ln_v, color='#FCA5A5', alpha=0.6, label="ZONA COMPRIMIDA (PROIBIDO FURAR)" if i==0 else "")
-                ax_ln.fill_between([curr_x, curr_x + v['L']], -ln_v, -h_val, color='#BBF7D0', alpha=0.6, label="ZONA TRACIONADA (PERMITIDO FURAR)" if i==0 else "")
-                ax_ln.plot([curr_x, curr_x + v['L']], [-ln_v, -ln_v], 'r--', linewidth=2)
-                ax_ln.text(curr_x + v['L']/2, -ln_v - 3, f"LN = {ln_v:.1f}cm", color='red', ha='center', fontsize=9, fontweight='bold')
-                curr_x += v['L']
-            ax_ln.legend(loc="lower left", fontsize=8)
-            st.pyplot(fig_ln)
-
-            # --- NOVO BLOCO 2: CORTE TRANSVERSAL ULTRA MINIATURA ---
-            st.subheader("📐 Corte Transversal da Seção")
-            
-            # Centralizando o corte com colunas
-            col_esq, col_centro, col_dir = st.columns([1.5, 0.8, 1.5])
-            
-            with col_centro:
-                fig_ct, ax_ct = plt.subplots(figsize=(0.7, 1.1))  # Reduzido mais da metade! Miniatura perfeita.
-                ax_ct.set_xlim(-3, b_val + 3)
-                ax_ct.set_ylim(-3, h_val + 3)
-                ax_ct.set_aspect('equal')
-                
-                ax_ct.add_patch(plt.Rectangle((0, 0), b_val, h_val, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
-                ax_ct.add_patch(plt.Rectangle((2, 2), b_val-4, h_val-4, edgecolor='#78350F', facecolor='none', linewidth=0.8))
-                
-                # Barras superiores (Porta-Estribos)
-                ax_ct.plot(3.5, h_val-3.5, 'o', color='black', markersize=4) 
-                ax_ct.plot(b_val-3.5, h_val-3.5, 'o', color='black', markersize=4) 
-                
-                # Barras inferiores (Reforço positivo)
-                ax_ct.plot(3.5, 3.5, 'o', color='red', markersize=4.5)
-                ax_ct.plot(b_val/2, 3.5, 'o', color='red', markersize=4.5)
-                ax_ct.plot(b_val-3.5, 3.5, 'o', color='red', markersize=4.5)
-                
-                if res['tem_pele']:
-                    ax_ct.plot(3.5, h_val/2, 'o', color='green', markersize=3)
-                    ax_ct.plot(b_val-3.5, h_val/2, 'o', color='green', markersize=3)
-                    ax_ct.text(b_val/2, h_val/2 + 1.5, "Pele", color='green', ha='center', fontsize=4, fontweight='bold')
-
-                ax_ct.text(b_val/2, -2.5, f"bw={int(b_val)}", ha='center', fontsize=6, fontweight='bold', color='#1E3A8A')
-                ax_ct.text(-2.5, h_val/2, f"h={int(h_val)}", va='center', rotation=90, fontsize=6, fontweight='bold', color='#1E3A8A')
-                ax_ct.axis('off')
-                st.pyplot(fig_ct)
-
-            # --- NOVO BLOCO 3: QUANTITATIVO / TABELA DE FERROS ---
-            st.subheader("📊 Quantitativo e Listagem de Aço")
-            comp_padrao = res['vaos_internos'][0]['L'] + 0.60
-            data_tabela = [
-                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": "ø10.0 mm", "Qtd": "3", "Comp. Unit (m)": f"{comp_padrao:.2f}", "Função": "Flexão Positiva"},
-                {"Pos": "N2", "Tipo": "Porta-Estribo", "Bitola": "ø8.0 mm", "Qtd": "2", "Comp. Unit (m)": f"{comp_padrao:.2f}", "Função": "Montagem da Viga"},
-                {"Pos": "N3", "Tipo": "Estribos", "Bitola": "ø5.0 mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{(2*b_val + 2*h_val - 8)/100:.2f}", "Função": "Força Cortante"}
-            ]
-            if res['tem_pele']:
-                data_tabela.append({"Pos": "N4", "Tipo": "Armadura Pele", "Bitola": "ø6.3 mm", "Qtd": "4", "Comp. Unit (m)": f"{comp_padrao:.2f}", "Função": "Pele Lateral"})
-            st.table(data_tabela)
-
-            # Relatório Técnico Original em Texto
-            st.subheader("Relação de Especificações Técnicas")
-            status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
-            
-            linhas_relatorio = [
-                f"SEÇÃO TRANSVERSAL: {b_val}x{h_val} cm  |  CONCRETO: fck = {fck_val} MPa  |  AÇO: {tipo_aco}",
-                "--------------------------------------------------------------------------------",
-                f"STATUS DA FORÇA CORTANTE: {status_norma}",
-                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
-                f"ARMADURA DE PELE TRANSVERSAL: {res['pele']}",
-                "--------------------------------------------------------------------------------"
-            ]
-            for idx, r in enumerate(res['Reacoes']):
-                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
-            
-            linhas_relatorio.append("--------------------------------------------------------------------------------")
-            linhas_relatorio.append("📊 PARÂMETROS DE CONTROLE DE DUCTILIDADE DA LINHA NEUTRA:")
-            for i, v in enumerate(res['vaos_internos']):
-                linhas_relatorio.append(f"  Vão {i+1}: Posição LN (x) = {res['x_pos'][i]:.2f} cm | Relação LN (x/d) = {res['xi_pos'][i]:.3f} (Limite NBR = 0.450)")
-                
-            st.code("\n".join(linhas_relatorio), language="text")
-
-st.write("")
-if st.button("🔄 Limpar Tudo e Reiniciar"):
-    st.session_state.lista_vaos = []
-    st.session_state.contador = 1
-    st.session_state.edit_index = None
-    st.session_state.res_calculo = None
-    st.rerun()
+        col_text, col
