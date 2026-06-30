@@ -112,16 +112,18 @@ def converter_valor(texto, padrao=0.0):
 
 # --- DECLARAÇÃO ANTECIPADA PARA EVITAR NAMEERROR ---
 def sugerir_barras(as_req):
+    import numpy as as_np
     if as_req == -1: return "Redim.!"
     if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
     bitolas = [("ø10mm", 0.79), ("ø12.5mm", 1.23), ("ø16mm", 2.01)]
     for nome, area in bitolas:
-        qtd = int(np.ceil(as_req / area))
+        qtd = int(as_np.ceil(as_req / area))
         if qtd >= 2: return f"{qtd} {nome}"
     return f"2 ø 10mm"
 
 # --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
+    import numpy as m_np
     try:
         b = float(dados_gerais['b'])
         h = float(dados_gerais['h'])
@@ -170,8 +172,8 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             V_por_vao = [max(abs(VA), abs(VB))]
         else:
             num_incog = num_apoios - 2
-            A_mat = np.zeros((num_incog, num_incog))
-            B_mat = np.zeros(num_incog)
+            A_mat = m_np.zeros((num_incog, num_incog))
+            B_mat = m_np.zeros(num_incog)
             
             W = []
             for v in vaos_internos:
@@ -193,10 +195,10 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
             B_mat[0] -= vaos_internos[0]['L'] * MA
             B_mat[-1] -= vaos_internos[-1]['L'] * MZ
             
-            M_sol = np.linalg.solve(A_mat, B_mat)
+            M_sol = m_np.linalg.solve(A_mat, B_mat)
             M_apoios = [MA] + list(M_sol) + [MZ]
             
-            Reacoes_apoio = np.zeros(num_apoios)
+            Reacoes_apoio = m_np.zeros(num_apoios)
             M_positivos = []
             V_max = 0.0
             V_por_vao = []
@@ -247,7 +249,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 xi_vaos.append(99.0)
                 x_vaos.append(99.0)
                 return -1 
-            xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
+            xi = 1.25 * (1 - m_np.sqrt(1 - 2 * k_md))
             x_cm = xi * d
             xi_vaos.append(xi)
             x_vaos.append(x_cm)
@@ -268,7 +270,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 xi_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
                 x_pos.append(0.0 if abs(m) <= 0.05 else 99.0)
             else:
-                xi = 1.25 * (1 - np.sqrt(1 - 2 * k_md))
+                xi = 1.25 * (1 - m_np.sqrt(1 - 2 * k_md))
                 xi_pos.append(xi)
                 x_pos.append(xi * d)
         As_positivos = [ajustar_as(calcular_as_e_ln(m)) for m in M_positivos]
@@ -298,7 +300,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
                 Asw_s = max((Vsw / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
                 esp = min((2 * 0.196 / Asw_s) * 100, min(0.6 * d, 30.0))
                 estribos_vaos_texto.append(f"ø5.0 c/{esp:.1f}cm")
-                num_estribos_total += int(np.ceil((v_curr['L'] * 100) / esp)) + 1
+                num_estribos_total += int(m_np.ceil((v_curr['L'] * 100) / esp)) + 1
             Vsw_max = max(0, (V_max * gamma_f) - Vc)
             Asw_s_max = max((Vsw_max / (0.9 * d * fyd)) * 100, 0.2 * (fctm / 10) * b / 43.5 * 100)
             esp_max = min((2 * 0.196 / Asw_s_max) * 100, min(0.6 * d, 30.0))
@@ -437,7 +439,7 @@ if len(st.session_state.lista_vaos) > 0:
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
-            # ADICIONANDO ESPECIFICAÇÃO DO FERRO NO CABEÇALHO DO DESENHO (Como era antes)
+            # ADICIONANDO ESPECIFICAÇÃO DO FERRO NO CABEÇALHO DO DESENHO
             if res['bal_esq']:
                 ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=8, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
