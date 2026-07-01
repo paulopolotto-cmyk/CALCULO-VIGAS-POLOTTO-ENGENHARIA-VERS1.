@@ -349,10 +349,13 @@ else:
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], key="form_tipo")
+        
+        # RESTAURADAS TODAS AS ENTRADAS ORIGINAIS COM SEUS RESPECTIVOS LABELS NO FORMULÁRIO
         L = st.text_input("Comprimento do vão que tem que digitar", placeholder="Ex: 4.50", value="", key="inp_L")
         q = st.text_input("Carga que tem que digitar", placeholder="Ex: 12.5", value="", key="inp_q")
-        P = st.text_input("Carga concentrada que tem que digitar", placeholder="Ex: 0.0", value="", key="inp_P")
-        a = st.text_input("distância que tem que digitar", placeholder="Ex: 0.0", value="", key="inp_a")
+        P = st.text_input("Carga concentrada que tem que digitar", placeholder="Ex: 0.0 se não houver", value="", key="inp_P")
+        a = st.text_input("distância que tem que digitar", placeholder="Ex: 0.0 se não houver", value="", key="inp_a")
+        
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
     if btn_inserir:
@@ -391,7 +394,7 @@ if len(st.session_state.lista_vaos) > 0:
             st.write("---")
             st.header("🏁 Layout de Detalhamento Estrutural")
             
-            fig, ax = plt.subplots(figsize=(8, 5.0))
+            fig, ax = plt.subplots(figsize=(8, 5.2))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
             ax.set_ylim(-3.3, 5.8)
             ax.axis('off')
@@ -402,6 +405,7 @@ if len(st.session_state.lista_vaos) > 0:
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=10, fontweight='bold')
             
+            # Porta-Estribos e Positivos estruturais
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=2.0)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
@@ -415,7 +419,7 @@ if len(st.session_state.lista_vaos) > 0:
                     pos_x_carga = i + (v_inst['a'] / v_inst['L'])
                     ax.annotate('', xy=(pos_x_carga, 0.4), xytext=(pos_x_carga, 1.2), arrowprops=dict(facecolor='#DC2626', shrink=0.05, width=1.5, headwidth=6))
             
-            # ALTERADO PARA "Arm. Negativa" CONFORME ADAPTADO PARA O SEU LAYOUT DO CELULAR
+            # TEXTO "Arm. Negativa" DE FORMA CENTRALIZADA E ABREVIADA CONTRA ENCAVALAMENTOS
             L_padrao_neg = 1.80  
             for idx_apoio in range(len(res['M_apoios'])):
                 pos_x_apoio = idx_apoio
@@ -431,7 +435,7 @@ if len(st.session_state.lista_vaos) > 0:
             
             st.pyplot(fig)
 
-            # --- TABELA DE FERROS NOMINAL ---
+            # --- TABELA 1: LISTAGEM NOMINAL ---
             st.subheader("📊 Quantitativo e Listagem Nominal de Aço")
             comp_padrao_pos = sum(v['L'] for v in res['vaos_internos']) + 0.60
             
@@ -443,22 +447,50 @@ if len(st.session_state.lista_vaos) > 0:
             bitola_neg = "ø10.0mm" if "10.0mm" in txt_neg else "ø12.5mm" if "12.5mm" in txt_neg else "ø16.0mm"
             qtd_neg_total = (int(txt_neg.split()[0]) if txt_neg[0].isdigit() else 2) * len(res['M_apoios'])
 
-            peso_N1 = qtd_pos_base * comp_padrao_pos * obter_peso_linear(bitola_pos)
+            w_pos = obter_peso_linear(bitola_pos)
+            w_neg = obter_peso_linear(bitola_neg)
+            w_est = obter_peso_linear("ø5.0mm")
+
+            peso_N1 = qtd_pos_base * comp_padrao_pos * w_pos
             peso_N2 = 2 * comp_padrao_pos * obter_peso_linear("ø8.0mm")
-            peso_N3 = qtd_neg_total * L_padrao_neg * obter_peso_linear(bitola_neg)
+            peso_N3 = qtd_neg_total * L_padrao_neg * w_neg
             comp_estribo = (2 * b_val + 2 * h_val - 8) / 100
-            peso_N4 = res['num_estribos'] * comp_estribo * obter_peso_linear("ø5.0mm")
+            peso_N4 = res['num_estribos'] * comp_estribo * w_est
             
             peso_nominal_total = peso_N1 + peso_N2 + peso_N3 + peso_N4
 
             data_tabela = [
-                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": bitola_pos, "Qtd": str(qtd_pos_base), "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total": f"{peso_N1:.2f} kg", "Função": "Flexão Positiva"},
-                {"Pos": "N2", "Tipo": "Porta-Estribo", "Bitola": "ø8.0mm", "Qtd": "2", "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total": f"{peso_N2:.2f} kg", "Função": "Montagem Superior"},
-                {"Pos": "N3", "Tipo": "Negativo (Apoios)", "Bitola": bitola_neg, "Qtd": str(qtd_neg_total), "Comp. Unit (m)": f"{L_padrao_neg:.2f}", "Peso Total": f"{peso_N3:.2f} kg", "Função": "Flexão Negativa"},
-                {"Pos": "N4", "Tipo": "Estribos", "Bitola": "ø5.0mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{comp_estribo:.2f}", "Peso Total": f"{peso_N4:.2f} kg", "Função": "Força Cortante"},
-                {"Pos": "-", "Tipo": "TOTAL GERAL VIGA", "Bitola": "-", "Qtd": "-", "Comp. Unit (m)": "-", "Peso Total": f"{peso_nominal_total:.2f} kg", "Função": "Resumo Nominal"}
+                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": bitola_pos, "Qtd": str(qtd_pos_base), "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total (kg)": f"{peso_N1:.2f}", "Função": "Flexão Positiva"},
+                {"Pos": "N2", "Tipo": "Porta-Estribo", "Bitola": "ø8.0mm", "Qtd": "2", "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total (kg)": f"{peso_N2:.2f}", "Função": "Montagem Superior"},
+                {"Pos": "N3", "Tipo": "Negativo (Apoios)", "Bitola": bitola_neg, "Qtd": str(qtd_neg_total), "Comp. Unit (m)": f"{L_padrao_neg:.2f}", "Peso Total (kg)": f"{peso_N3:.2f}", "Função": "Flexão Negativa"},
+                {"Pos": "N4", "Tipo": "Estribos", "Bitola": "ø5.0mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{comp_estribo:.2f}", "Peso Total (kg)": f"{peso_N4:.2f}", "Função": "Força Cortante"},
+                {"Pos": "-", "Tipo": "TOTAL GERAL VIGA", "Bitola": "-", "Qtd": "-", "Comp. Unit (m)": "-", "Peso Total (kg)": f"**{peso_nominal_total:.2f} kg**", "Função": "Resumo Nominal"}
             ]
             st.table(data_tabela)
+
+            # --- RESTAURADA A TABELA 2: LISTA COMERCIAL PARA COMPRA (+10%) ---
+            st.subheader("🛒 Lista Comercial para Compra de Aço (Inclui +10% de Perda)")
+            
+            qtd_compra_pos = int(np.ceil(float(qtd_pos_base) * 1.10))
+            qtd_compra_pe = 2 
+            qtd_compra_neg = int(np.ceil(float(qtd_neg_total) * 1.10))
+            qtd_compra_estribos = int(np.ceil(float(res['num_estribos']) * 1.10))
+
+            peso_c_pos = qtd_compra_pos * comp_padrao_pos * w_pos
+            peso_c_pe = qtd_compra_pe * comp_padrao_pos * obter_peso_linear("ø8.0mm")
+            peso_c_neg = qtd_compra_neg * L_padrao_neg * w_neg
+            peso_c_est = qtd_compra_estribos * comp_estribo * w_est
+            
+            peso_compra_total = peso_c_pos + peso_c_pe + peso_c_neg + peso_c_est
+
+            tabela_compra = [
+                {"Bitola": bitola_pos, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_pos_base), "Qtd p/ Compra (+10%)": f"{qtd_compra_pos} brs", "Peso Compra": f"{peso_c_pos:.2f} kg", "Uso": "Positivos"},
+                {"Bitola": "ø8.0mm", "Especificação": "CA-50 (Montagem)", "Qtd Original": "2", "Qtd p/ Compra (+10%)": f"{qtd_compra_pe} brs", "Peso Compra": f"{peso_c_pe:.2f} kg", "Uso": "Porta-Estribos"},
+                {"Bitola": bitola_neg, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_neg_total), "Qtd p/ Compra (+10%)": f"{qtd_compra_neg} brs", "Peso Compra": f"{peso_c_neg:.2f} kg", "Uso": "Negativos"},
+                {"Bitola": "ø5.0mm", "Especificação": "CA-60 (Pronto)", "Qtd Original": str(res['num_estribos']), "Qtd p/ Compra (+10%)": f"{qtd_compra_estribos} est", "Peso Compra": f"{peso_c_est:.2f} kg", "Uso": "Estribos"},
+                {"Bitola": "TOTAL", "Especificação": "PESO DE COMPRA CONSOLIDADO", "Qtd Original": "-", "Qtd p/ Compra (+10%)": "-", "Peso Compra": f"**{peso_compra_total:.2f} kg**", "Uso": "-"}
+            ]
+            st.table(tabela_compra)
 
             st.subheader("Relação de Especificações Técnicas")
             st.code(f"SEÇÃO: {b_val}x{h_val} cm | CONCRETO: fck = {fck_val} MPa\nESTRIBOS GERAIS: {res['estribos']}", language="text")
