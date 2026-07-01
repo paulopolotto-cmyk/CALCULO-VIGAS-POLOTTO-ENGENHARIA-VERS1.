@@ -132,12 +132,12 @@ def converter_valor(texto, padrao=0.0):
 # --- DECLARAÇÃO DA FUNÇÃO DE SUGESTÃO DE BARRAS ---
 def sugerir_barras(as_req):
     if as_req == -1: return "Redim.!"
-    if as_req <= 0: return "2 ø 8.0mm (Porta-Estribo)"
-    bitolas = [("ø10mm", 0.79), ("ø12.5mm", 1.23), ("ø16mm", 2.01)]
+    if as_req <= 0: return "2 ø 8.0mm"
+    bitolas = [("ø10.0mm", 0.79), ("ø12.5mm", 1.23), ("ø16.0mm", 2.01)]
     for nome, area in bitolas:
         qtd = int(np.ceil(as_req / area))
         if qtd >= 2: return f"{qtd} {nome}"
-    return f"2 ø 10mm"
+    return f"2 ø 10.0mm"
 
 # --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
@@ -331,7 +331,7 @@ def calcular_viga_dinamica(dados_gerais, lista_vaos):
     except Exception as e:
         return {"erro": str(e)}
 
-# --- GERENCIAMENTO DE ESTADO SÉRIO ---
+# --- GERENCIAMENTO DE ESTADO ---
 if 'lista_vaos' not in st.session_state: st.session_state.lista_vaos = []
 if 'contador' not in st.session_state: st.session_state.contador = 1
 if 'edit_index' not in st.session_state: st.session_state.edit_index = None
@@ -441,7 +441,7 @@ if len(st.session_state.lista_vaos) > 0:
             if res['falha_cortante']:
                 st.markdown(f'<div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center;">⚠️ AS DIMENSÕES DA VIGA ({b_val}x{h_val} cm) SÃO INSUFICIENTES!</div>', unsafe_allow_html=True)
                 
-            fig, ax = plt.subplots(figsize=(8, 5.0))
+            fig, ax = plt.subplots(figsize=(8, 5.2))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
             ax.set_ylim(-3.3, 2.5)
             ax.axis('off')
@@ -475,17 +475,18 @@ if len(st.session_state.lista_vaos) > 0:
                     ax.text(pos_x_carga, 1.25, f"P = {v_inst['P']:.1f} kN\na = {v_inst['a']:.2f} m", 
                             color='#DC2626', fontsize=8, ha='center', va='bottom', fontweight='bold')
             
-            # Armaduras nos apoios (Negativos)
+            # --- ARMA_DURAS NOS APOIOS (NEGATIVOS) + COMPRIMENTO (c = x metros) ---
+            L_padrao_neg = 1.80  # Valor base estimado de corte da barra
             if res['bal_esq']:
-                ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
+                ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 0.55, f"{sugerir_barras(res['As_apoios'][i+1])}\n(C1)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
+                ax.text(i+1, 0.55, f"{sugerir_barras(res['As_apoios'][i+1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
             if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 0.55, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
+                ax.text(len(res['Reacoes'])-0.7, 0.55, f"{sugerir_barras(res['As_apoios'][-1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
                 
             # Detalhamento de Positivos e Estribos
             for i in range(len(res['vaos_internos'])):
-                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=9, ha='center', fontweight='bold')
+                ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])}", color='#16A34A', fontsize=9, ha='center', fontweight='bold')
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
                 ax.text(i + 0.5, -2.10, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=9, ha='center', va='top', fontweight='bold', style='italic')
             
@@ -497,7 +498,7 @@ if len(st.session_state.lista_vaos) > 0:
             ax.text(posX_corte + 0.5, 0.0, f"{int(h_val)}", ha='left', va='center', fontsize=10, fontweight='bold')
             st.pyplot(fig)
 
-            # --- NOVO BLOCO 1: VISÃO LONGITUDINAL DA LINHA NEUTRA (ESTUDO PARA FUROS) ---
+            # --- NOVO BLOCO 1: VISÃO LONGITUDINAL DA LINHA NEUTRA ---
             st.subheader("🚧 Zoneamento Seguro para Furos e Passagens (Linha Neutra)")
             fig_ln, ax_ln = plt.subplots(figsize=(8, 3.5))
             L_total = sum(v['L'] for v in res['vaos_internos'])
@@ -518,51 +519,64 @@ if len(st.session_state.lista_vaos) > 0:
             ax_ln.legend(loc="lower left", fontsize=9)
             st.pyplot(fig_ln)
 
-            # --- NOVO BLOCO 2: CORTE TRANSVERSAL BLINDADO (UNIVERSAL E SEM SOBREPOSIÇÃO) ---
+            # --- NOVO BLOCO 2: CORTE TRANSVERSAL BLINDADO ---
             st.subheader("📐 Corte Transversal da Seção")
-            
             col_esq, col_centro, col_dir = st.columns([1.4, 1.0, 1.4])
-            
             with col_centro:
                 fig_ct, ax_ct = plt.subplots(figsize=(0.9, 1.3))
                 ax_ct.set_xlim(-3, 13)  
                 ax_ct.set_ylim(-3, 13)
                 ax_ct.set_aspect('equal')
-                
                 ax_ct.add_patch(plt.Rectangle((2, 0), 4, 9, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
                 ax_ct.add_patch(plt.Rectangle((2.4, 0.4), 3.2, 8.2, edgecolor='#78350F', facecolor='none', linewidth=0.8))
-                
-                # Barras superiores fixas nos cantos do estribo
                 ax_ct.plot(2.7, 8.2, 'o', color='black', markersize=4) 
                 ax_ct.plot(5.3, 8.2, 'o', color='black', markersize=4) 
-                
-                # Barras inferiores fixas no fundo do estribo
                 ax_ct.plot(2.7, 0.8, 'o', color='red', markersize=4.5)
                 ax_ct.plot(4.0, 0.8, 'o', color='red', markersize=4.5)
                 ax_ct.plot(5.3, 0.8, 'o', color='red', markersize=4.5)
-                
                 if res['tem_pele']:
                     ax_ct.plot(2.7, 4.5, 'o', color='green', markersize=3)
                     ax_ct.plot(5.3, 4.5, 'o', color='green', markersize=3)
-                    ax_ct.text(4.0, 4.9, "Pele", color='green', ha='center', fontsize=6, fontweight='bold')
-
-                # Cotas posicionadas perfeitamente fora do retângulo de desenho
                 ax_ct.text(4.0, -1.8, f"bw={int(b_val)}", ha='center', fontsize=8, fontweight='bold', color='#1E3A8A')
                 ax_ct.text(-1.2, 4.5, f"h={int(h_val)}", va='center', rotation=90, fontsize=8, fontweight='bold', color='#1E3A8A')
                 ax_ct.axis('off')
                 st.pyplot(fig_ct)
 
-            # --- NOVO BLOCO 3: QUANTITATIVO / TABELA DE FERROS ENVELOPADA ---
-            st.subheader("📊 Quantitativo e Listagem de Aço")
-            comp_padrao = res['vaos_internos'][0]['L'] + 0.60
+            # --- NOVO BLOCO 3: QUANTITATIVO / TABELA DE FERROS NOMINAL ---
+            st.subheader("📊 Quantitativo e Listagem Nominal de Aço")
+            comp_padrao_pos = res['vaos_internos'][0]['L'] + 0.60
+            
+            # Capturando dinamicamente as bitolas sugeridas
+            txt_pos = sugerir_barras(res['As_positivos'][0])
+            bitola_pos = "ø10.0 mm" if "ø10.0mm" in txt_pos else "ø12.5 mm" if "ø12.5mm" in txt_pos else "ø16.0 mm"
+            qtd_pos = int(txt_pos.split()[0]) if txt_pos[0].isdigit() else 2
+            
+            txt_neg = sugerir_barras(res['As_apoios'][0])
+            bitola_neg = "ø10.0 mm" if "ø10.0mm" in txt_neg else "ø12.5 mm" if "ø12.5mm" in txt_neg else "ø16.0 mm"
+            qtd_neg_por_apoio = int(txt_neg.split()[0]) if txt_neg[0].isdigit() else 2
+            qtd_neg_total = qtd_neg_por_apoio * len(res['M_apoios'])
+
             data_tabela = [
-                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": "ø10.0 mm", "Qtd": "3", "Comp. Unit (m)": f"{comp_padrao:.2f}", "Função": "Flexão Positiva"},
-                {"Pos": "N2", "Tipo": "Porta-Estribo", "Bitola": "ø8.0 mm", "Qtd": "2", "Comp. Unit (m)": f"{comp_padrao:.2f}", "Função": "Montagem da Viga"},
+                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": bitola_pos, "Qtd": str(qtd_pos * len(res['vaos_internos'])), "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Função": "Flexão Positiva"},
+                {"Pos": "N2", "Tipo": "Negativo (Apoios)", "Bitola": bitola_neg, "Qtd": str(qtd_neg_total), "Comp. Unit (m)": f"{L_padrao_neg:.2f}", "Função": "Flexão Negativa"},
                 {"Pos": "N3", "Tipo": "Estribos", "Bitola": "ø5.0 mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{(2*b_val + 2*h_val - 8)/100:.2f}", "Função": "Força Cortante"}
             ]
-            if res['tem_pele']:
-                data_tabela.append({"Pos": "N4", "Tipo": "Armadura Pele", "Bitola": "ø6.3 mm", "Qtd": "4", "Comp. Unit (m)": f"{comp_padrao:.2f}", "Função": "Pele Lateral"})
             st.table(data_tabela)
+
+            # --- NOVA TABELA PEDIDA: LISTA DE COMPRA COM MARGEM DE +10% ---
+            st.subheader("🛒 Lista Comercial para Compra de Aço (Inclui +10% de Perda)")
+            
+            # Cálculos de compra aplicando 10% e arredondando para cima
+            qtd_compra_pos = int(np.ceil(float(qtd_pos * len(res['vaos_internos'])) * 1.10))
+            qtd_compra_neg = int(np.ceil(float(qtd_neg_total) * 1.10))
+            qtd_compra_estribos = int(np.ceil(float(res['num_estribos']) * 1.10))
+
+            tabela_compra = [
+                {"Bitola": bitola_pos, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_pos * len(res['vaos_internos'])), "Qtd p/ Compra (+10%)": f"**{qtd_compra_pos} barras**", "Sugestão de Uso": "Armadura de Fundo (Positivos)"},
+                {"Bitola": bitola_neg, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_neg_total), "Qtd p/ Compra (+10%)": f"**{qtd_compra_neg} barras**", "Sugestão de Uso": "Armadura de Topo (Negativos)"},
+                {"Bitola": "ø5.0 mm", "Especificação": "CA-60 (Pronto p/ Estribo)", "Qtd Original": str(res['num_estribos']), "Qtd p/ Compra (+10%)": f"**{qtd_compra_estribos} estribos**", "Sugestão de Uso": "Estribagem de Fechamento"}
+            ]
+            st.table(tabela_compra)
 
             # Relatório Técnico Original em Texto
             st.subheader("Relação de Especificações Técnicas")
