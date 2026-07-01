@@ -1,4 +1,4 @@
-import streamlit as st
+import streamlit st
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -441,12 +441,12 @@ if len(st.session_state.lista_vaos) > 0:
             if res['falha_cortante']:
                 st.markdown(f'<div style="background-color:#DC2626; color:white; padding:25px; border-radius:10px; font-weight:bold; font-size:22px; text-align:center;">⚠️ AS DIMENSÕES DA VIGA ({b_val}x{h_val} cm) SÃO INSUFICIENTES!</div>', unsafe_allow_html=True)
                 
-            fig, ax = plt.subplots(figsize=(8, 4.5))
+            fig, ax = plt.subplots(figsize=(8, 5.0))  # Aumentado levemente para acomodar as novas cotas inferiores
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            ax.set_ylim(-2.8, 2.2)
+            ax.set_ylim(-3.3, 2.5)
             ax.axis('off')
             
-            # Desenho da viga
+            # Desenho da viga longitudinal
             ax.fill_between([-0.5, len(res['Reacoes'])-0.5], 0.4, -0.4, color='#E5E7EB')
             
             # Pilares e reações
@@ -454,11 +454,34 @@ if len(st.session_state.lista_vaos) > 0:
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=10, fontweight='bold')
             
-            # Linhas de armaduras longitudinais
+            # Linhas de armaduras longitudinais (Superior Vermelha, Inferior Verde)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
-            # Armaduras nos apoios
+            # --- INTEGRAÇÃO DE COTAS DE COMPRIMENTO ENTRE APOIOS (EIXOS) ---
+            for i in range(len(res['Reacoes']) - 1):
+                # Linha de cota horizontal ligando um pilar ao outro
+                ax.plot([i, i+1], [-1.4, -1.4], color='#64748B', linewidth=1.0, linestyle='-')
+                # Ticks verticais limitadores nas pontas da linha de cota
+                ax.plot([i, i], [-1.45, -1.35], color='#64748B', linewidth=1.0)
+                ax.plot([i+1, i+1], [-1.45, -1.35], color='#64748B', linewidth=1.0)
+                # Texto centralizado indicando o vão entre eixos
+                comp_vao = res['vaos_internos'][i]['L']
+                ax.text(i + 0.5, -1.35, f"{comp_vao:.2f} m", color='#475569', fontsize=9, ha='center', va='bottom', fontweight='bold')
+            
+            # --- INTEGRAÇÃO DAS SETAS DE CARGAS CONCENTRADAS E SUAS LOCALIZAÇÕES ---
+            for i, v_inst in enumerate(res['vaos_internos']):
+                if v_inst['P'] > 0:
+                    # Calcula a posição X proporcional dentro do vão correspondente
+                    pos_x_carga = i + (v_inst['a'] / v_inst['L'])
+                    # Desenha a seta apontando para baixo sobre a viga
+                    ax.annotate('', xy=(pos_x_carga, 0.4), xytext=(pos_x_carga, 1.2),
+                                arrowprops=dict(facecolor='#DC2626', shrink=0.05, width=1.5, headwidth=6))
+                    # Texto indicando o valor da carga concentrada P e a cota a
+                    ax.text(pos_x_carga, 1.25, f"P = {v_inst['P']:.1f} kN\na = {v_inst['a']:.2f} m", 
+                            color='#DC2626', fontsize=8, ha='center', va='bottom', fontweight='bold')
+            
+            # Armaduras nos apoios (Negativos)
             if res['bal_esq']:
                 ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(C1)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
@@ -466,10 +489,11 @@ if len(st.session_state.lista_vaos) > 0:
             if res['bal_dir']:
                 ax.text(len(res['Reacoes'])-0.7, 0.55, f"{sugerir_barras(res['As_apoios'][-1])}\n(C1)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
                 
+            # Detalhamento de Positivos e Estribos (rebaixados para abrir espaço para a linha de eixos)
             for i in range(len(res['vaos_internos'])):
                 ax.text(i + 0.5, -0.18, f"{sugerir_barras(res['As_positivos'][i])} (C1)", color='#16A34A', fontsize=9, ha='center', fontweight='bold')
                 texto_estribo_vao = res['estribos_lista'][i] if not res['falha_cortante'] else "Incompatível"
-                ax.text(i + 0.5, -1.30, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=9, ha='center', va='top', fontweight='bold', style='italic')
+                ax.text(i + 0.5, -2.10, f"Estribos:\n{texto_estribo_vao}", color='#78350F', fontsize=9, ha='center', va='top', fontweight='bold', style='italic')
             
             # Caixa indicadora de seção transversal no gráfico
             posX_corte = len(res['Reacoes']) - 0.1
@@ -506,15 +530,12 @@ if len(st.session_state.lista_vaos) > 0:
             col_esq, col_centro, col_dir = st.columns([1.4, 1.0, 1.4])
             
             with col_centro:
-                # Usamos coordenadas fixas de 0 a 10 no matplotlib para a proporção nunca quebrar
                 fig_ct, ax_ct = plt.subplots(figsize=(0.9, 1.3))
                 ax_ct.set_xlim(-3, 13)  
                 ax_ct.set_ylim(-3, 13)
                 ax_ct.set_aspect('equal')
                 
-                # Desenho fixo da seção (retângulo de largura 4 e altura 9)
                 ax_ct.add_patch(plt.Rectangle((2, 0), 4, 9, edgecolor='#1E3A8A', facecolor='#E5E7EB', linewidth=1.5))
-                # Estribo interno
                 ax_ct.add_patch(plt.Rectangle((2.4, 0.4), 3.2, 8.2, edgecolor='#78350F', facecolor='none', linewidth=0.8))
                 
                 # Barras superiores fixas nos cantos do estribo
@@ -526,7 +547,6 @@ if len(st.session_state.lista_vaos) > 0:
                 ax_ct.plot(4.0, 0.8, 'o', color='red', markersize=4.5)
                 ax_ct.plot(5.3, 0.8, 'o', color='red', markersize=4.5)
                 
-                # Armadura de pele opcional
                 if res['tem_pele']:
                     ax_ct.plot(2.7, 4.5, 'o', color='green', markersize=3)
                     ax_ct.plot(5.3, 4.5, 'o', color='green', markersize=3)
