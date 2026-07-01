@@ -139,6 +139,15 @@ def sugerir_barras(as_req):
         if qtd >= 2: return f"{qtd} {nome}"
     return f"2 ø 10.0mm"
 
+# --- OBTENÇÃO DO PESO LINEAR DAS BITOLAS (Norma ABNT) ---
+def obter_peso_linear(bitola_txt):
+    if "5.0" in bitola_txt or "5" in bitola_txt: return 0.154
+    if "8.0" in bitola_txt or "8" in bitola_txt: return 0.395
+    if "10.0" in bitola_txt or "10" in bitola_txt: return 0.617
+    if "12.5" in bitola_txt: return 0.963
+    if "16.0" in bitola_txt or "16" in bitola_txt: return 1.578
+    return 0.617
+
 # --- MOTOR MATEMÁTICO ADAPTADO NBR 6118 ---
 def calcular_viga_dinamica(dados_gerais, lista_vaos):
     try:
@@ -454,8 +463,9 @@ if len(st.session_state.lista_vaos) > 0:
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=10, fontweight='bold')
             
-            # Linhas de armaduras longitudinais (Superior Vermelha, Inferior Verde)
-            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=3.5)
+            # --- PORTA-ESTRIBOS EXTENDIDO DE PONTA A PONTA ---
+            ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=2.0, label="Porta-Estribo")
+            # Reforço Inferior (Positivo)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
             # --- COTAS DE COMPRIMENTO ENTRE APOIOS ---
@@ -466,7 +476,7 @@ if len(st.session_state.lista_vaos) > 0:
                 comp_vao = res['vaos_internos'][i]['L']
                 ax.text(i + 0.5, -1.35, f"{comp_vao:.2f} m", color='#475569', fontsize=9, ha='center', va='bottom', fontweight='bold')
             
-            # --- SETAS DE CARGAS CONCENTRADAS E SUAS LOCALIZAÇÕES ---
+            # --- SETAS DE CARGAS CONCENTRADAS ---
             for i, v_inst in enumerate(res['vaos_internos']):
                 if v_inst['P'] > 0:
                     pos_x_carga = i + (v_inst['a'] / v_inst['L'])
@@ -475,13 +485,16 @@ if len(st.session_state.lista_vaos) > 0:
                     ax.text(pos_x_carga, 1.25, f"P = {v_inst['P']:.1f} kN\na = {v_inst['a']:.2f} m", 
                             color='#DC2626', fontsize=8, ha='center', va='bottom', fontweight='bold')
             
-            # --- ARMA_DURAS NOS APOIOS (NEGATIVOS) + COMPRIMENTO (c = x metros) ---
-            L_padrao_neg = 1.80  # Valor base estimado de corte da barra
+            # --- FRASE "Armadura Negativa" ACIMA DOS REFORÇOS ---
+            L_padrao_neg = 1.80  
             if res['bal_esq']:
+                ax.text(-0.3, 0.85, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
                 ax.text(-0.3, 0.55, f"{sugerir_barras(res['As_apoios'][0])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
+                ax.text(i+1, 0.85, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
                 ax.text(i+1, 0.55, f"{sugerir_barras(res['As_apoios'][i+1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
             if res['bal_dir']:
+                ax.text(len(res['Reacoes'])-0.7, 0.85, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
                 ax.text(len(res['Reacoes'])-0.7, 0.55, f"{sugerir_barras(res['As_apoios'][-1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=9, ha='center', fontweight='bold')
                 
             # Detalhamento de Positivos e Estribos
@@ -542,39 +555,62 @@ if len(st.session_state.lista_vaos) > 0:
                 ax_ct.axis('off')
                 st.pyplot(fig_ct)
 
-            # --- NOVO BLOCO 3: QUANTITATIVO / TABELA DE FERROS NOMINAL ---
+            # --- NOVO BLOCO 3: QUANTITATIVO / TABELA DE FERROS NOMINAL COM COLUNA DE PESOS ---
             st.subheader("📊 Quantitativo e Listagem Nominal de Aço")
-            comp_padrao_pos = res['vaos_internos'][0]['L'] + 0.60
+            comp_padrao_pos = sum(v['L'] for v in res['vaos_internos']) + 0.60
             
-            # Capturando dinamicamente as bitolas sugeridas
             txt_pos = sugerir_barras(res['As_positivos'][0])
-            bitola_pos = "ø10.0 mm" if "ø10.0mm" in txt_pos else "ø12.5 mm" if "ø12.5mm" in txt_pos else "ø16.0 mm"
-            qtd_pos = int(txt_pos.split()[0]) if txt_pos[0].isdigit() else 2
+            bitola_pos = "ø10.0mm" if "10.0mm" in txt_pos else "ø12.5mm" if "12.5mm" in txt_pos else "ø16.0mm"
+            qtd_pos_base = int(txt_pos.split()[0]) if txt_pos[0].isdigit() else 2
             
             txt_neg = sugerir_barras(res['As_apoios'][0])
-            bitola_neg = "ø10.0 mm" if "ø10.0mm" in txt_neg else "ø12.5 mm" if "ø12.5mm" in txt_neg else "ø16.0 mm"
-            qtd_neg_por_apoio = int(txt_neg.split()[0]) if txt_neg[0].isdigit() else 2
-            qtd_neg_total = qtd_neg_por_apoio * len(res['M_apoios'])
+            bitola_neg = "ø10.0mm" if "10.0mm" in txt_neg else "ø12.5mm" if "12.5mm" in txt_neg else "ø16.0mm"
+            qtd_neg_base = int(txt_neg.split()[0]) if txt_neg[0].isdigit() else 2
+            qtd_neg_total = qtd_neg_base * len(res['M_apoios'])
+
+            # Multiplicadores de peso linear
+            w_pos = obter_peso_linear(bitola_pos)
+            w_neg = obter_peso_linear(bitola_neg)
+            w_est = obter_peso_linear("ø5.0mm")
+            
+            peso_N1 = qtd_pos_base * comp_padrao_pos * w_pos
+            peso_N2 = 2 * comp_padrao_pos * obter_peso_linear("ø8.0mm")
+            peso_N3 = qtd_neg_total * L_padrao_neg * w_neg
+            comp_estribo = (2 * b_val + 2 * h_val - 8) / 100
+            peso_N4 = res['num_estribos'] * comp_estribo * w_est
+            
+            peso_nominal_total = peso_N1 + peso_N2 + peso_N3 + peso_N4
 
             data_tabela = [
-                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": bitola_pos, "Qtd": str(qtd_pos * len(res['vaos_internos'])), "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Função": "Flexão Positiva"},
-                {"Pos": "N2", "Tipo": "Negativo (Apoios)", "Bitola": bitola_neg, "Qtd": str(qtd_neg_total), "Comp. Unit (m)": f"{L_padrao_neg:.2f}", "Função": "Flexão Negativa"},
-                {"Pos": "N3", "Tipo": "Estribos", "Bitola": "ø5.0 mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{(2*b_val + 2*h_val - 8)/100:.2f}", "Função": "Força Cortante"}
+                {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": bitola_pos, "Qtd": str(qtd_pos_base), "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total (kg)": f"{peso_N1:.2f}", "Função": "Flexão Positiva"},
+                {"Pos": "N2", "Tipo": "Porta-Estribo", "Bitola": "ø8.0mm", "Qtd": "2", "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total (kg)": f"{peso_N2:.2f}", "Função": "Montagem Superior"},
+                {"Pos": "N3", "Tipo": "Negativo (Apoios)", "Bitola": bitola_neg, "Qtd": str(qtd_neg_total), "Comp. Unit (m)": f"{L_padrao_neg:.2f}", "Peso Total (kg)": f"{peso_N3:.2f}", "Função": "Flexão Negativa"},
+                {"Pos": "N4", "Tipo": "Estribos", "Bitola": "ø5.0mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{comp_estribo:.2f}", "Peso Total (kg)": f"{peso_N4:.2f}", "Função": "Força Cortante"},
+                {"Pos": "-", "Tipo": "TOTAL GERAL VIGA", "Bitola": "-", "Qtd": "-", "Comp. Unit (m)": "-", "Peso Total (kg)": f"**{peso_nominal_total:.2f} kg**", "Função": "Resumo Nominal"}
             ]
             st.table(data_tabela)
 
-            # --- NOVA TABELA PEDIDA: LISTA DE COMPRA COM MARGEM DE +10% ---
+            # --- NOVA TABELA PEDIDA: LISTA DE COMPRA COM MARGEM DE +10% E PESOS TOTAIS ---
             st.subheader("🛒 Lista Comercial para Compra de Aço (Inclui +10% de Perda)")
             
-            # Cálculos de compra aplicando 10% e arredondando para cima
-            qtd_compra_pos = int(np.ceil(float(qtd_pos * len(res['vaos_internos'])) * 1.10))
+            qtd_compra_pos = int(np.ceil(float(qtd_pos_base) * 1.10))
+            qtd_compra_pe = 2 # Mantém fixo porta estribos
             qtd_compra_neg = int(np.ceil(float(qtd_neg_total) * 1.10))
             qtd_compra_estribos = int(np.ceil(float(res['num_estribos']) * 1.10))
 
+            peso_c_pos = qtd_compra_pos * comp_padrao_pos * w_pos
+            peso_c_pe = qtd_compra_pe * comp_padrao_pos * obter_peso_linear("ø8.0mm")
+            peso_c_neg = qtd_compra_neg * L_padrao_neg * w_neg
+            peso_c_est = qtd_compra_estribos * comp_estribo * w_est
+            
+            peso_compra_total = peso_c_pos + peso_c_pe + peso_c_neg + peso_c_est
+
             tabela_compra = [
-                {"Bitola": bitola_pos, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_pos * len(res['vaos_internos'])), "Qtd p/ Compra (+10%)": f"**{qtd_compra_pos} barras**", "Sugestão de Uso": "Armadura de Fundo (Positivos)"},
-                {"Bitola": bitola_neg, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_neg_total), "Qtd p/ Compra (+10%)": f"**{qtd_compra_neg} barras**", "Sugestão de Uso": "Armadura de Topo (Negativos)"},
-                {"Bitola": "ø5.0 mm", "Especificação": "CA-60 (Pronto p/ Estribo)", "Qtd Original": str(res['num_estribos']), "Qtd p/ Compra (+10%)": f"**{qtd_compra_estribos} estribos**", "Sugestão de Uso": "Estribagem de Fechamento"}
+                {"Bitola": bitola_pos, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_pos_base), "Qtd p/ Compra (+10%)": f"{qtd_compra_pos} brs", "Peso Compra": f"{peso_c_pos:.2f} kg", "Uso": "Positivos"},
+                {"Bitola": "ø8.0mm", "Especificação": "CA-50 (Montagem)", "Qtd Original": "2", "Qtd p/ Compra (+10%)": f"{qtd_compra_pe} brs", "Peso Compra": f"{peso_c_pe:.2f} kg", "Uso": "Porta-Estribos"},
+                {"Bitola": bitola_neg, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_neg_total), "Qtd p/ Compra (+10%)": f"{qtd_compra_neg} brs", "Peso Compra": f"{peso_c_neg:.2f} kg", "Uso": "Negativos"},
+                {"Bitola": "ø5.0mm", "Especificação": "CA-60 (Pronto)", "Qtd Original": str(res['num_estribos']), "Qtd p/ Compra (+10%)": f"{qtd_compra_estribos} est", "Peso Compra": f"{peso_c_est:.2f} kg", "Uso": "Estribos"},
+                {"Bitola": "TOTAL", "Especificação": "PESO DE COMPRA CONSOLIDADO", "Qtd Original": "-", "Qtd p/ Compra (+10%)": "-", "Peso Compra": f"**{peso_compra_total:.2f} kg**", "Uso": "-"}
             ]
             st.table(tabela_compra)
 
