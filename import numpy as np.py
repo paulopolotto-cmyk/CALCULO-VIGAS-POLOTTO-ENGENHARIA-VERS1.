@@ -585,4 +585,61 @@ if len(st.session_state.lista_vaos) > 0:
                 {"Pos": "N1", "Tipo": "Positivo (Fundo)", "Bitola": bitola_pos, "Qtd": str(qtd_pos_base), "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total (kg)": f"{peso_N1:.2f}", "Função": "Flexão Positiva"},
                 {"Pos": "N2", "Tipo": "Porta-Estribo", "Bitola": "ø8.0mm", "Qtd": "2", "Comp. Unit (m)": f"{comp_padrao_pos:.2f}", "Peso Total (kg)": f"{peso_N2:.2f}", "Função": "Montagem Superior"},
                 {"Pos": "N3", "Tipo": "Negativo (Apoios)", "Bitola": bitola_neg, "Qtd": str(qtd_neg_total), "Comp. Unit (m)": f"{L_padrao_neg:.2f}", "Peso Total (kg)": f"{peso_N3:.2f}", "Função": "Flexão Negativa"},
-                {"Pos": "N4", "Tipo": "Estribos", "Bitola": "ø5.0mm", "Qtd": str(res['num_estribos']), "Comp.
+                {"Pos": "N4", "Tipo": "Estribos", "Bitola": "ø5.0mm", "Qtd": str(res['num_estribos']), "Comp. Unit (m)": f"{comp_estribo:.2f}", "Peso Total (kg)": f"{peso_N4:.2f}", "Função": "Força Cortante"},
+                {"Pos": "-", "Tipo": "TOTAL GERAL VIGA", "Bitola": "-", "Qtd": "-", "Comp. Unit (m)": "-", "Peso Total (kg)": f"**{peso_nominal_total:.2f} kg**", "Função": "Resumo Nominal"}
+            ]
+            st.table(data_tabela)
+
+            # --- LISTA COMERCIAL PARA COMPRA DE AÇO (Inclui +10% de Perda) ---
+            st.subheader("🛒 Lista Comercial para Compra de Aço (Inclui +10% de Perda)")
+            
+            qtd_compra_pos = int(np.ceil(float(qtd_pos_base) * 1.10))
+            qtd_compra_pe = 2 
+            qtd_compra_neg = int(np.ceil(float(qtd_neg_total) * 1.10))
+            qtd_compra_estribos = int(np.ceil(float(res['num_estribos']) * 1.10))
+
+            peso_c_pos = qtd_compra_pos * comp_padrao_pos * w_pos
+            peso_c_pe = qtd_compra_pe * comp_padrao_pos * obter_peso_linear("ø8.0mm")
+            peso_c_neg = qtd_compra_neg * L_padrao_neg * w_neg
+            peso_c_est = qtd_compra_estribos * comp_estribo * w_est
+            
+            peso_compra_total = peso_c_pos + peso_c_pe + peso_c_neg + peso_c_est
+
+            tabela_compra = [
+                {"Bitola": bitola_pos, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_pos_base), "Qtd p/ Compra (+10%)": f"{qtd_compra_pos} brs", "Peso Compra": f"{peso_c_pos:.2f} kg", "Uso": "Positivos"},
+                {"Bitola": "ø8.0mm", "Especificação": "CA-50 (Montagem)", "Qtd Original": "2", "Qtd p/ Compra (+10%)": f"{qtd_compra_pe} brs", "Peso Compra": f"{peso_c_pe:.2f} kg", "Uso": "Porta-Estribos"},
+                {"Bitola": bitola_neg, "Especificação": "CA-50 (Cortado/Dobrado)", "Qtd Original": str(qtd_neg_total), "Qtd p/ Compra (+10%)": f"{qtd_compra_neg} brs", "Peso Compra": f"{peso_c_neg:.2f} kg", "Uso": "Negativos"},
+                {"Bitola": "ø5.0mm", "Especificação": "CA-60 (Pronto)", "Qtd Original": str(res['num_estribos']), "Qtd p/ Compra (+10%)": f"{qtd_compra_estribos} est", "Peso Compra": f"{peso_c_est:.2f} kg", "Uso": "Estribos"},
+                {"Bitola": "TOTAL", "Especificação": "PESO DE COMPRA CONSOLIDADO", "Qtd Original": "-", "Qtd p/ Compra (+10%)": "-", "Peso Compra": f"**{peso_compra_total:.2f} kg**", "Uso": "-"}
+            ]
+            st.table(tabela_compra)
+
+            # Relatório Técnico Original em Texto
+            st.subheader("Relação de Especificações Técnicas")
+            status_norma = "⚠️ REPROVADO (Seção Insuficiente!)" if res['falha_cortante'] else "✅ APROVADO CONFORME NBR 6118"
+            
+            linhas_relatorio = [
+                f"SEÇÃO TRANSVERSAL: {b_val}x{h_val} cm  |  CONCRETO: fck = {fck_val} MPa  |  AÇO: {tipo_aco}",
+                "--------------------------------------------------------------------------------",
+                f"STATUS DA FORÇA CORTANTE: {status_norma}",
+                f"ARMADURA TRANSVERSAL (ESTRIBOS GERAIS): {res['estribos']}",
+                f"ARMADURA DE PELE TRANSVERSAL: {res['pele']}",
+                "--------------------------------------------------------------------------------"
+            ]
+            for idx, r in enumerate(res['Reacoes']):
+                linhas_relatorio.append(f"PILAR {chr(65+idx)}: Reação Atuante = {r:.1f} kN")
+            
+            linhas_relatorio.append("--------------------------------------------------------------------------------")
+            linhas_relatorio.append("📊 PARÂMETROS DE CONTROLE DE DUCTILIDADE DA LINHA NEUTRA:")
+            for i, v in enumerate(res['vaos_internos']):
+                linhas_relatorio.append(f"  Vão {i+1}: Posição LN (x) = {res['x_pos'][i]:.2f} cm | Relação LN (x/d) = {res['xi_pos'][i]:.3f} (Limite NBR = 0.450)")
+                
+            st.code("\n".join(linhas_relatorio), language="text")
+
+st.write("")
+if st.button("🔄 Limpar Tudo e Reiniciar", key="btn_reiniciar_viga"):
+    st.session_state.lista_vaos = []
+    st.session_state.contador = 1
+    st.session_state.edit_index = None
+    st.session_state.res_calculo = None
+    st.rerun()
