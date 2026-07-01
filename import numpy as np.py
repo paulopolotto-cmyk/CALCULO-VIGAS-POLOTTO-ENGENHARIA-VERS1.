@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 # Configuração da página para o celular
 st.set_page_config(page_title="Polotto Engenharia", layout="centered")
 
-# ESTILIZAÇÃO AGRESSIVA REINSTALADA + CONTORNO SEGURO PARA TABELAS (IMPRESSÃO)
+# ESTILIZAÇÃO AGRESSIVA REINSTALADA + BORDAS SEGURAS (CORREÇÃO DE LABELS OCULTOS)
 st.markdown("""
     <style>
     .titulo { text-align: center; color: white; background-color: #1E3A8A; padding: 12px; font-weight: bold; font-size: 20px; border-radius: 5px; }
@@ -82,7 +82,7 @@ st.markdown("""
         background-color: #FFF9C4 !important;
     }
     
-    /* ESCONDE OS LABELS PADRÕES DO STREAMLIT */
+    /* LABELS PADRÕES SÃO MANTIDOS COMO INVISÍVEIS POIS USAMOS OS CUSTOMIZADOS ABAIXO */
     div[data-testid="stNumberInput"] label,
     div[data-testid="stTextInput"] label,
     div[data-testid="stSelectbox"] label {
@@ -139,7 +139,7 @@ def sugerir_barras(as_req):
         if qtd >= 2: return f"{qtd} {nome}"
     return f"2 ø 10.0mm"
 
-# --- OBTENÇÃO DO PESO LINEAR DAS BITOLAS (Norma ABNT) ---
+# --- OBTENÇÃO DO PESO LINEAR DESSE GRUPO (Norma ABNT) ---
 def obter_peso_linear(bitola_txt):
     if "5.0" in bitola_txt or "5" in bitola_txt: return 0.154
     if "8.0" in bitola_txt or "8" in bitola_txt: return 0.395
@@ -374,19 +374,17 @@ if st.session_state.edit_index is not None:
     st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
     tipo_ed = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], index=["Normal", "Balanço Esquerdo", "Balanço Direito"].index(st.session_state.lista_vaos[idx]['tipo']), key="ed_tipo")
     
-    colL, colQ, colP, colA = st.columns(4)
-    with colL:
-        st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
-        L_ed = st.text_input("Comprimento [m]", value=str(st.session_state.lista_vaos[idx]['L']), key="ed_L")
-    with colQ:
-        st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
-        q_ed = st.text_input("Carga Distr. [kN/m]", value=str(st.session_state.lista_vaos[idx]['q']), key="ed_q")
-    with colP:
-        st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
-        P_ed = st.text_input("Carga Conc. [kN]", value=str(st.session_state.lista_vaos[idx]['P']), key="ed_p")
-    with colA:
-        st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
-        a_ed = st.text_input("Dist. Carga (a) [m]", value=str(st.session_state.lista_vaos[idx]['a']), key="ed_a")
+    st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
+    L_ed = st.text_input("Comprimento [m]", value=str(st.session_state.lista_vaos[idx]['L']), key="ed_L")
+    
+    st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
+    q_ed = st.text_input("Carga Distr. [kN/m]", value=str(st.session_state.lista_vaos[idx]['q']), key="ed_q")
+    
+    st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
+    P_ed = st.text_input("Carga Conc. [kN]", value=str(st.session_state.lista_vaos[idx]['P']), key="ed_p")
+    
+    st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
+    a_ed = st.text_input("Dist. Carga (a) [m]", value=str(st.session_state.lista_vaos[idx]['a']), key="ed_a")
     
     col_b1, col_b2 = st.columns(2)
     if col_b1.button("💾 SALVAR ALTERAÇÃO", key="btn_salvar_ed"):
@@ -403,11 +401,17 @@ else:
         st.markdown('<span class="label-blindado">Tipo do Tramo</span>', unsafe_allow_html=True)
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], key="form_tipo")
         
-        colL, colQ, colP, colA = st.columns(4)
-        L = colL.text_input("Comprimento [m]", placeholder="Digitar...", value="", key="inp_L")
-        q = colQ.text_input("Carga Distr. [kN/m]", placeholder="Digitar...", value="", key="inp_q")
-        P = colP.text_input("Carga Conc. [kN]", placeholder="Digitar...", value="", key="inp_P")
-        a = colA.text_input("Dist. Carga (a) [m]", placeholder="Digitar...", value="", key="inp_a")
+        st.markdown('<span class="label-blindado">Comprimento [m]</span>', unsafe_allow_html=True)
+        L = st.text_input("Comprimento [m]", placeholder="Ex: 4.50", value="", key="inp_L")
+        
+        st.markdown('<span class="label-blindado">Carga Distr. [kN/m]</span>', unsafe_allow_html=True)
+        q = st.text_input("Carga Distr. [kN/m]", placeholder="Ex: 12.5", value="", key="inp_q")
+        
+        st.markdown('<span class="label-blindado">Carga Conc. [kN]</span>', unsafe_allow_html=True)
+        P = st.text_input("Carga Conc. [kN]", placeholder="Ex: 0.0 se não houver", value="", key="inp_P")
+        
+        st.markdown('<span class="label-blindado">Dist. Carga (a) [m]</span>', unsafe_allow_html=True)
+        a = st.text_input("Dist. Carga (a) [m]", placeholder="Ex: 0.0 se não houver", value="", key="inp_a")
         
         btn_inserir = st.form_submit_button("➕ INSERIR TRAMO NA VIGA")
 
@@ -452,7 +456,6 @@ if len(st.session_state.lista_vaos) > 0:
                 
             fig, ax = plt.subplots(figsize=(8, 5.5))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            # CAIXA EXPANDIDA PARA GARANTIR ESPAÇAMENTO MÁXIMO E FONTES MAIORES
             ax.set_ylim(-3.3, 5.8)
             ax.axis('off')
             
@@ -486,21 +489,17 @@ if len(st.session_state.lista_vaos) > 0:
                     ax.text(pos_x_carga, 1.25, f"P = {v_inst['P']:.1f} kN\na = {v_inst['a']:.2f} m", 
                             color='#DC2626', fontsize=8, ha='center', va='bottom', fontweight='bold')
             
-            # --- CORREÇÃO DA DUPLICIDADE E EXTENSÃO DE ESPAÇO (APENAS 1 TEXTO POR PILAR) ---
-            # Subi a frase "Armadura Negativa" para y=3.70 e afastei o detalhamento para y=2.40.
-            # Com mais de 1.3 de distância vertical real entre elas e fontes levemente ampliadas (8.5), fica perfeito!
+            # --- DETALHAMENTO DE NEGATIVOS ABREVIADOS ---
             L_padrao_neg = 1.80  
             for idx_apoio in range(len(res['M_apoios'])):
                 pos_x_apoio = idx_apoio
-                
-                # Se for o último pilar e houver balanço direito, ou primeiro pilar com balanço esquerdo, tratamos o recuo visual
                 if idx_apoio == 0 and res['bal_esq']:
                     pos_x_apoio = -0.3
                 elif idx_apoio == (len(res['M_apoios']) - 1) and res['bal_dir']:
                     pos_x_apoio = len(res['Reacoes']) - 0.7
                 
-                # Desenha exatamente uma única chamada centralizada por apoio existente
-                ax.text(pos_x_apoio, 3.70, "Armadura Negativa", color='#CC0000', fontsize=8.5, ha='center', fontweight='bold', style='italic')
+                # ABREVIADO PARA "Arm. Negativa" EVITANDO ENCAVALAMENTOS VISUAIS NO CELULAR
+                ax.text(pos_x_apoio, 3.70, "Arm. Negativa", color='#CC0000', fontsize=8.5, ha='center', fontweight='bold', style='italic')
                 ax.text(pos_x_apoio, 2.40, f"{sugerir_barras(res['As_apoios'][idx_apoio])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=8.5, ha='center', fontweight='bold')
                 
             # Detalhamento de Positivos e Estribos
