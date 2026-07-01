@@ -349,8 +349,6 @@ else:
     st.markdown(f'<div class="tramo-header">Tramo {len(st.session_state.lista_vaos) + 1} - Vão {num_normais + 1}</div>', unsafe_allow_html=True)
     with st.form(key="form_insercao_limpo", clear_on_submit=True):
         tipo = st.selectbox("Tipo do Tramo", ["Normal", "Balanço Esquerdo", "Balanço Direito"], key="form_tipo")
-        
-        # RESTAURADAS TODAS AS ENTRADAS ORIGINAIS COM SEUS RESPECTIVOS LABELS NO FORMULÁRIO
         L = st.text_input("Comprimento do vão que tem que digitar", placeholder="Ex: 4.50", value="", key="inp_L")
         q = st.text_input("Carga que tem que digitar", placeholder="Ex: 12.5", value="", key="inp_q")
         P = st.text_input("Carga concentrada que tem que digitar", placeholder="Ex: 0.0 se não houver", value="", key="inp_P")
@@ -372,7 +370,13 @@ if len(st.session_state.lista_vaos) > 0:
     st.write("### 📋 Tramos Inseridos no Projeto:")
     for i, v in enumerate(st.session_state.lista_vaos):
         col_text, col_edit, col_del = st.columns([3, 0.6, 0.6])
-        col_text.markdown(f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m**")
+        
+        # --- EXIBIÇÃO EM LINHA ÚNICA CONFORME SOLICITADO ---
+        texto_linha = f"**{v['nome']}** | L = **{v['L']}m** | q = **{v['q']} kN/m**"
+        if v['P'] > 0:
+            texto_linha += f" | P = **{v['P']} kN** em a = **{v['a']}m**"
+            
+        col_text.markdown(texto_linha)
         if col_edit.button("✏️", key=f"edit_{i}"): st.session_state.edit_index = i; st.rerun()
         if col_del.button("❌", key=f"del_{i}"):
             if v['tipo'] == "Normal": st.session_state.contador -= 1
@@ -394,7 +398,7 @@ if len(st.session_state.lista_vaos) > 0:
             st.write("---")
             st.header("🏁 Layout de Detalhamento Estrutural")
             
-            fig, ax = plt.subplots(figsize=(8, 5.2))
+            fig, ax = plt.subplots(figsize=(8, 5.5))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
             ax.set_ylim(-3.3, 5.8)
             ax.axis('off')
@@ -405,7 +409,6 @@ if len(st.session_state.lista_vaos) > 0:
                 ax.plot(idx, -0.4, '^', color='#1E3A8A', markersize=15)
                 ax.text(idx, -0.7, f"Pilar {chr(65+idx)}\n{r:.1f} kN", ha='center', va='top', color='#1E3A8A', fontsize=10, fontweight='bold')
             
-            # Porta-Estribos e Positivos estruturais
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [0.25, 0.25], color='#DC2626', linewidth=2.0)
             ax.plot([-0.4, len(res['Reacoes'])-0.6], [-0.25, -0.25], color='#16A34A', linewidth=3.5)
             
@@ -418,8 +421,8 @@ if len(st.session_state.lista_vaos) > 0:
                 if v_inst['P'] > 0:
                     pos_x_carga = i + (v_inst['a'] / v_inst['L'])
                     ax.annotate('', xy=(pos_x_carga, 0.4), xytext=(pos_x_carga, 1.2), arrowprops=dict(facecolor='#DC2626', shrink=0.05, width=1.5, headwidth=6))
+                    ax.text(pos_x_carga, 1.25, f"P = {v_inst['P']:.1f} kN\na = {v_inst['a']:.2f} m", color='#DC2626', fontsize=8, ha='center', va='bottom', fontweight='bold')
             
-            # TEXTO "Arm. Negativa" DE FORMA CENTRALIZADA E ABREVIADA CONTRA ENCAVALAMENTOS
             L_padrao_neg = 1.80  
             for idx_apoio in range(len(res['M_apoios'])):
                 pos_x_apoio = idx_apoio
@@ -468,7 +471,7 @@ if len(st.session_state.lista_vaos) > 0:
             ]
             st.table(data_tabela)
 
-            # --- RESTAURADA A TABELA 2: LISTA COMERCIAL PARA COMPRA (+10%) ---
+            # --- TABELA 2: LISTA COMERCIAL PARA COMPRA DE AÇO ---
             st.subheader("🛒 Lista Comercial para Compra de Aço (Inclui +10% de Perda)")
             
             qtd_compra_pos = int(np.ceil(float(qtd_pos_base) * 1.10))
