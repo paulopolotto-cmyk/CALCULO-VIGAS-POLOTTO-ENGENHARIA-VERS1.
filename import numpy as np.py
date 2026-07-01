@@ -452,8 +452,8 @@ if len(st.session_state.lista_vaos) > 0:
                 
             fig, ax = plt.subplots(figsize=(8, 5.5))
             ax.set_xlim(-1, len(res['Reacoes']) + 0.5)
-            # AMPLIADO DE VERDADE O LIMITE VERTICAL SUPERIOR PARA DAR TETO MÁXIMO
-            ax.set_ylim(-3.3, 4.0)
+            # TETO ADICIONAL AMPLIADO PARA 5.0 PARA QUE OS TEXTOS DE CIMA NUNCA CORTEM
+            ax.set_ylim(-3.3, 5.0)
             ax.axis('off')
             
             # Desenho da viga longitudinal
@@ -486,17 +486,17 @@ if len(st.session_state.lista_vaos) > 0:
                     ax.text(pos_x_carga, 1.25, f"P = {v_inst['P']:.1f} kN\na = {v_inst['a']:.2f} m", 
                             color='#DC2626', fontsize=8, ha='center', va='bottom', fontweight='bold')
             
-            # --- AS LINHAS DOS NEGATIVOS FORAM SUBIDAS RADICALMENTE PARA ELIMINAR O ENCAVALAMENTO ---
+            # --- COORDENADAS RECALIBRADAS E SUBIDAS PARA ISOLAR COMPLETAMENTE OS TEXTOS ---
             L_padrao_neg = 1.80  
             if res['bal_esq']:
-                ax.text(-0.3, 2.00, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
-                ax.text(-0.3, 1.20, f"{sugerir_barras(res['As_apoios'][0])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=7.5, ha='center', fontweight='bold')
+                ax.text(-0.3, 2.70, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(-0.3, 1.80, f"{sugerir_barras(res['As_apoios'][0])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=7.5, ha='center', fontweight='bold')
             for i in range(len(res['M_apoios'])-2):
-                ax.text(i+1, 2.00, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
-                ax.text(i+1, 1.20, f"{sugerir_barras(res['As_apoios'][i+1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=7.5, ha='center', fontweight='bold')
+                ax.text(i+1, 2.70, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(i+1, 1.80, f"{sugerir_barras(res['As_apoios'][i+1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=7.5, ha='center', fontweight='bold')
             if res['bal_dir']:
-                ax.text(len(res['Reacoes'])-0.7, 2.00, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
-                ax.text(len(res['Reacoes'])-0.7, 1.20, f"{sugerir_barras(res['As_apoios'][-1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=7.5, ha='center', fontweight='bold')
+                ax.text(len(res['Reacoes'])-0.7, 2.70, "Armadura Negativa", color='#CC0000', fontsize=8, ha='center', fontweight='bold', style='italic')
+                ax.text(len(res['Reacoes'])-0.7, 1.80, f"{sugerir_barras(res['As_apoios'][-1])}\n(c = {L_padrao_neg:.2f} m)", color='#DC2626', fontsize=7.5, ha='center', fontweight='bold')
                 
             # Detalhamento de Positivos e Estribos
             for i in range(len(res['vaos_internos'])):
