@@ -162,3 +162,25 @@ def sec(num, titulo):
 
 def rodape(texto):
     st.caption(texto)
+
+
+# 1 kN = 101,9716 kgf  (1 kgf = 9,80665 N)
+KGF_POR_KN = 101.9716
+
+
+def seletor_unidade(key="unidade_forca"):
+    """Seletor de sistema de unidades de força.
+
+    Retorna (fu, un_f, un_fm):
+      fu    = fator para converter kN -> unidade escolhida (mostrar = valor_kN * fu)
+      un_f  = rótulo da força ('kN' ou 'kgf')
+      un_fm = rótulo da carga distribuída ('kN/m' ou 'kgf/m')
+    O cálculo interno é sempre em kN; a conversão é só na tela.
+    """
+    op = st.radio("Unidade de força", ["kN · kN/m", "kgf · kgf/m"],
+                  horizontal=True, key=key,
+                  help="Escolha o sistema de unidades das cargas e dos "
+                       "esforços. O cálculo é o mesmo; muda só a exibição.")
+    if op.startswith("kgf"):
+        return KGF_POR_KN, "kgf", "kgf/m"
+    return 1.0, "kN", "kN/m"

@@ -16,11 +16,23 @@ import streamlit as st
 
 import motor_viga as mv
 from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
-                      aplicar_estilo, header, sec)
+                      aplicar_estilo, header, sec, seletor_unidade)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas",
        "Concreto armado · NBR 6118 · CA-50 · ELU flexão e cortante")
+
+# unidade de força (kN ou kgf) — o cálculo interno é sempre em kN
+fu, un_f, un_fm = seletor_unidade()
+
+
+def _cf(casas=1):
+    return 0 if fu > 1 else casas
+
+
+def fmt_f(x_kN, casas=1):
+    """Formata uma força (kN interno) na unidade escolhida, com rótulo."""
+    return f"{x_kN * fu:.{_cf(casas)}f} {un_f}"
 
 # ------------------------------------------------------------ estado
 ss = st.session_state
@@ -61,8 +73,9 @@ fck = c3.number_input("Concreto fck [MPa]", min_value=20, max_value=50,
 cob = c4.number_input("Cobrimento c [cm]", min_value=2.0, max_value=5.0,
                       value=2.5, step=0.5, format="%.1f",
                       help="CAA I: 2,5 · CAA II: 3,0 · CAA III: 4,0 (Tab. 7.2)")
+g_pp_disp = 25.0 * b * h / 1e4 * fu
 pp = st.checkbox("Incluir peso próprio automaticamente "
-                 f"(g = {25.0 * b * h / 1e4:.2f} kN/m)", value=True)
+                 f"(g = {g_pp_disp:.{_cf(2)}f} {un_fm})", value=True)
 st.caption("Aço: CA-50 (longitudinal e estribos) · γf=1,4 · γc=1,4 · γs=1,15")
 
 dados_g = {'b': b, 'h': h, 'fck': fck, 'cob': cob, 'peso_proprio': pp}
@@ -85,18 +98,22 @@ if not editando:
         L_in = cL.number_input("Comprimento L [m]", min_value=0.1,
                                max_value=30.0, value=4.0, step=0.1,
                                format="%.2f")
-        q_in = cQ.number_input("Carga distribuída q [kN/m]", min_value=0.0,
-                               max_value=500.0, value=15.0, step=0.5,
-                               format="%.2f")
+        q_disp = cQ.number_input(f"Carga distribuída q [{un_fm}]",
+                                 min_value=0.0, max_value=500.0 * fu,
+                                 value=15.0 * fu, step=0.5 * fu,
+                                 format=f"%.{_cf(2)}f")
         cP, cA = st.columns(2)
-        P_in = cP.number_input("Carga concentrada P [kN]", min_value=0.0,
-                               max_value=2000.0, value=0.0, step=1.0,
-                               format="%.2f")
+        P_disp = cP.number_input(f"Carga concentrada P [{un_f}]",
+                                 min_value=0.0, max_value=2000.0 * fu,
+                                 value=0.0, step=1.0 * fu,
+                                 format=f"%.{_cf(2)}f")
         a_in = cA.number_input("Posição de P: a [m] (da esquerda do tramo)",
                                min_value=0.0, max_value=30.0, value=0.0,
                                step=0.05, format="%.2f")
         inserir = st.form_submit_button("➕ Inserir tramo", width="stretch")
     if inserir:
+        q_in = q_disp / fu          # -> kN (interno)
+        P_in = P_disp / fu
         erros_t = []
         if P_in > 0 and not (0 <= a_in <= L_in):
             erros_t.append(f"A posição da carga (a = {a_in:.2f} m) precisa "
@@ -127,13 +144,15 @@ else:
         L_e = cL.number_input("Comprimento L [m]", min_value=0.1,
                               max_value=30.0, value=float(t['L']), step=0.1,
                               format="%.2f")
-        q_e = cQ.number_input("Carga distribuída q [kN/m]", min_value=0.0,
-                              max_value=500.0, value=float(t['q']), step=0.5,
-                              format="%.2f")
+        q_e_disp = cQ.number_input(f"Carga distribuída q [{un_fm}]",
+                                   min_value=0.0, max_value=500.0 * fu,
+                                   value=float(t['q']) * fu, step=0.5 * fu,
+                                   format=f"%.{_cf(2)}f")
         cP, cA = st.columns(2)
-        P_e = cP.number_input("Carga concentrada P [kN]", min_value=0.0,
-                              max_value=2000.0, value=float(t['P']), step=1.0,
-                              format="%.2f")
+        P_e_disp = cP.number_input(f"Carga concentrada P [{un_f}]",
+                                   min_value=0.0, max_value=2000.0 * fu,
+                                   value=float(t['P']) * fu, step=1.0 * fu,
+                                   format=f"%.{_cf(2)}f")
         a_e = cA.number_input("Posição de P: a [m] (da esquerda do tramo)",
                               min_value=0.0, max_value=30.0,
                               value=float(t['a']), step=0.05, format="%.2f")
@@ -141,6 +160,8 @@ else:
         salvar = cs.form_submit_button("💾 Salvar", width="stretch")
         cancelar = cc.form_submit_button("✖ Cancelar", width="stretch")
     if salvar:
+        q_e = q_e_disp / fu
+        P_e = P_e_disp / fu
         erros_t = []
         if P_e > 0 and not (0 <= a_e <= L_e):
             erros_t.append(f"A posição da carga (a = {a_e:.2f} m) precisa "
@@ -171,9 +192,10 @@ if ss.lista_vaos:
     nomes = nomes_tramos(ss.lista_vaos)
     for i, t in enumerate(ss.lista_vaos):
         linha = (f"**{nomes[i]}** · L = {t['L']:.2f} m · "
-                 f"q = {t['q']:.2f} kN/m")
+                 f"q = {t['q'] * fu:.{_cf(2)}f} {un_fm}")
         if t['P'] > 0:
-            linha += f" · P = {t['P']:.1f} kN em a = {t['a']:.2f} m"
+            linha += (f" · P = {t['P'] * fu:.{_cf(1)}f} {un_f} "
+                      f"em a = {t['a']:.2f} m")
         if editando:
             st.markdown(f'<div class="pol-tramo">{linha}</div>',
                         unsafe_allow_html=True)
@@ -220,7 +242,8 @@ def _posicoes_apoios(est):
     return xs
 
 
-def fig_esquema(res):
+def fig_esquema(res, fu=1.0, un_f="kN"):
+    cf = 0 if fu > 1 else 1
     est = res['estatica']
     xs_ap = _posicoes_apoios(est)
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
@@ -238,7 +261,8 @@ def fig_esquema(res):
     # apoios + reações
     for j, xa in enumerate(xs_ap):
         ax.plot(xa, -0.22, marker='^', color=NAVY, ms=16, zorder=3)
-        ax.text(xa, -1.05, f"{chr(65 + j)}\n{est['Reacoes'][j]:.1f} kN",
+        ax.text(xa, -1.05,
+                f"{chr(65 + j)}\n{est['Reacoes'][j] * fu:.{cf}f} {un_f}",
                 ha='center', va='top', color=NAVY, fontsize=11,
                 fontweight='bold')
 
@@ -261,7 +285,8 @@ def fig_esquema(res):
                 ax.annotate('', xy=(xa, 0.26), xytext=(xa, 0.92),
                             arrowprops=dict(arrowstyle='->', color=NAVY,
                                             lw=0.9))
-            ax.text((xi + xf) / 2, 1.05, f"q = {tr['q']:.2f} kN/m",
+            ax.text((xi + xf) / 2, 1.05,
+                    f"q = {tr['q'] * fu:.{cf}f} {un_f}/m",
                     ha='center', va='bottom', color=NAVY, fontsize=10,
                     fontweight='bold')
         if tr['P'] > 0:
@@ -269,7 +294,7 @@ def fig_esquema(res):
             ax.annotate('', xy=(xp, 0.26), xytext=(xp, 2.35),
                         arrowprops=dict(arrowstyle='-|>', color=VERMELHO,
                                         lw=2.2))
-            ax.text(xp, 2.42, f"P = {tr['P']:.1f} kN",
+            ax.text(xp, 2.42, f"P = {tr['P'] * fu:.{cf}f} {un_f}",
                     ha='center', va='bottom', color=VERMELHO, fontsize=10.5,
                     fontweight='bold')
 
@@ -285,7 +310,8 @@ def fig_esquema(res):
     return fig
 
 
-def fig_diagramas(res):
+def fig_diagramas(res, fu=1.0, un_f="kN"):
+    cf = 0 if fu > 1 else 1
     est = res['estatica']
     xs_ap = _posicoes_apoios(est)
     fig, (axm, axv) = plt.subplots(2, 1, figsize=(7.2, 5.6), dpi=150,
@@ -321,21 +347,21 @@ def fig_diagramas(res):
     for j, xa in enumerate(xs_ap):
         m = est['M_apoios'][j]
         if abs(m) > 0.05:
-            axm.annotate(f"{m:.1f}", xy=(xa, m), fontsize=10,
+            axm.annotate(f"{m * fu:.{cf}f}", xy=(xa, m), fontsize=10,
                          fontweight='bold', color=VERMELHO,
                          ha='center', va='bottom')
     x0 = xs_ap[0]
     for v in est['vaos']:
         if v['M_pos'] > 0.05:
-            axm.annotate(f"{v['M_pos']:.1f}", xy=(x0 + v['x_pos'],
-                                                  v['M_pos']),
+            axm.annotate(f"{v['M_pos'] * fu:.{cf}f}",
+                         xy=(x0 + v['x_pos'], v['M_pos']),
                          fontsize=10, fontweight='bold', color=VERDE,
                          ha='center', va='top')
         x0 += v['L']
 
     axm.invert_yaxis()  # convenção: momento positivo para baixo
-    axm.set_ylabel("M [kN·m]", fontsize=11)
-    axv.set_ylabel("V [kN]", fontsize=11)
+    axm.set_ylabel(f"M [{un_f}·m]", fontsize=11)
+    axv.set_ylabel(f"V [{un_f}]", fontsize=11)
     axv.set_xlabel("x [m]", fontsize=11)
     fig.tight_layout()
     return fig
@@ -683,24 +709,29 @@ def gerar_memorial(res, nomes_lista):
     ln.append(f"Seção: {d['b']:.0f} x {d['h']:.0f} cm | fck = {d['fck']:.0f} "
               f"MPa | Aço CA-50 | c = {d['cob']:.1f} cm | d = {d['d']:.1f} cm")
     if d['g_pp'] > 0:
-        ln.append(f"Peso próprio incluído: g = {d['g_pp']:.2f} kN/m")
+        ln.append(f"Peso próprio incluído: g = {d['g_pp'] * fu:.{_cf(2)}f} "
+                  f"{un_fm}")
+    ln.append(f"Unidade de força: {un_f}")
     ln.append("")
     ln.append("TRAMOS:")
     for n, v in zip(nomes_lista, ss.lista_vaos):
-        s = (f"  {n}: L = {v['L']:.2f} m | q = {v['q']:.2f} kN/m")
+        s = (f"  {n}: L = {v['L']:.2f} m | "
+             f"q = {v['q'] * fu:.{_cf(2)}f} {un_fm}")
         if v['P'] > 0:
-            s += f" | P = {v['P']:.1f} kN em a = {v['a']:.2f} m"
+            s += (f" | P = {v['P'] * fu:.{_cf(1)}f} {un_f} "
+                  f"em a = {v['a']:.2f} m")
         ln.append(s)
     ln.append("")
-    ln.append("MOMENTOS NOS APOIOS (kN·m):")
+    ln.append(f"MOMENTOS NOS APOIOS ({un_f}·m):")
     for j, m in enumerate(est['M_apoios']):
-        ln.append(f"  Apoio {chr(65 + j)}: {m:8.2f}")
-    ln.append("MOMENTOS POSITIVOS MÁXIMOS (kN·m):")
+        ln.append(f"  Apoio {chr(65 + j)}: {m * fu:10.{_cf(2)}f}")
+    ln.append(f"MOMENTOS POSITIVOS MÁXIMOS ({un_f}·m):")
     for i, v in enumerate(est['vaos']):
-        ln.append(f"  Vão {i + 1}: {v['M_pos']:8.2f}  (x = {v['x_pos']:.2f} m)")
-    ln.append("REAÇÕES (kN):")
+        ln.append(f"  Vão {i + 1}: {v['M_pos'] * fu:10.{_cf(2)}f}  "
+                  f"(x = {v['x_pos']:.2f} m)")
+    ln.append(f"REAÇÕES ({un_f}):")
     for j, r in enumerate(est['Reacoes']):
-        ln.append(f"  Apoio {chr(65 + j)}: {r:8.2f}")
+        ln.append(f"  Apoio {chr(65 + j)}: {r * fu:10.{_cf(2)}f}")
     ln.append("")
     ln.append("ARMADURA LONGITUDINAL:")
     for j, fx in enumerate(res['flex_apoios']):
@@ -714,7 +745,8 @@ def gerar_memorial(res, nomes_lista):
     ln.append("")
     ln.append("ESTRIBOS (2 ramos, CA-50):")
     for i, e in enumerate(res['estribos']):
-        ln.append(f"  Vão {i + 1}: {e['texto']}  (Vsd = {e['Vsd']:.1f} kN)")
+        ln.append(f"  Vão {i + 1}: {e['texto']}  "
+                  f"(Vsd = {e['Vsd'] * fu:.{_cf(1)}f} {un_f})")
     if res['estribo_be']:
         ln.append(f"  Balanço esq.: {res['estribo_be']['texto']}")
     if res['estribo_bd']:
@@ -791,13 +823,13 @@ if ss.res is not None:
 
         # ---- esquema estrutural
         sec(3, "Esquema estrutural e reações")
-        f1 = fig_esquema(res)
+        f1 = fig_esquema(res, fu, un_f)
         st.pyplot(f1, width="stretch")
         plt.close(f1)
 
         # ---- diagramas
         sec(4, "Diagramas de esforços")
-        f2 = fig_diagramas(res)
+        f2 = fig_diagramas(res, fu, un_f)
         st.pyplot(f2, width="stretch")
         plt.close(f2)
 
@@ -814,7 +846,7 @@ if ss.res is not None:
                 as_txt = f"{fx['As']:.2f}" if fx['As'] else "—"
             if abs(mk) > 0.05 or fx.get('falha'):
                 rows.append({"Posição": f"Apoio {chr(65 + j)} (neg.)",
-                             "Mk [kN·m]": f"{mk:.2f}",
+                             f"Mk [{un_f}·m]": f"{mk * fu:.{_cf(2)}f}",
                              "As [cm²]": as_txt, "Barras": barras})
         for i, fx in enumerate(res['flex_vaos']):
             if fx.get('falha'):
@@ -824,7 +856,8 @@ if ss.res is not None:
                 barras = fx['sel']['texto']
                 as_txt = f"{fx['As']:.2f}" if fx['As'] else "—"
             rows.append({"Posição": f"Vão {i + 1} (pos.)",
-                         "Mk [kN·m]": f"{est['vaos'][i]['M_pos']:.2f}",
+                         f"Mk [{un_f}·m]":
+                             f"{est['vaos'][i]['M_pos'] * fu:.{_cf(2)}f}",
                          "As [cm²]": as_txt, "Barras": barras})
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
         if res['pele']:
@@ -840,11 +873,12 @@ if ss.res is not None:
         if res['estribo_bd']:
             tramos_e.append(("Balanço dir.", res['estribo_bd']))
         for nome, e in tramos_e:
+            vsd_txt = f"{e['Vsd'] * fu:.{_cf(1)}f}"
             if e.get('falha_biela'):
-                rows.append({"Tramo": nome, "Vsd [kN]": f"{e['Vsd']:.1f}",
+                rows.append({"Tramo": nome, f"Vsd [{un_f}]": vsd_txt,
                              "Estribo": "❌ Vsd > VRd2", "Obs.": ""})
             else:
-                rows.append({"Tramo": nome, "Vsd [kN]": f"{e['Vsd']:.1f}",
+                rows.append({"Tramo": nome, f"Vsd [{un_f}]": vsd_txt,
                              "Estribo": e['texto'],
                              "Obs.": e['aviso'] or ""})
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")

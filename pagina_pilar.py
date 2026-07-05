@@ -14,12 +14,16 @@ import streamlit as st
 
 import motor_pilar as mp
 from ui_comum import (NAVY, AMBAR, CINZA_TXT, CONCRETO,
-                      aplicar_estilo, header, sec)
+                      aplicar_estilo, header, sec, seletor_unidade)
 
 aplicar_estilo()
 header("Cálculo de Pilares",
        "Concreto armado · NBR 6118 · esbeltez + 2ª ordem (pilar-padrão) "
        "· flexo-compressão")
+
+# unidade de força (kN ou kgf) — cálculo interno sempre em kN
+fu, un_f, un_fm = seletor_unidade()
+_cfp = 0 if fu > 1 else 1
 
 ss = st.session_state
 if 'res_pilar' not in ss:
@@ -46,11 +50,13 @@ caa = c5.selectbox("Classe de agressividade (CAA)",
                    ["I", "II", "III", "IV"], index=1,
                    help="Define o cobrimento: I=2,5 · II=3,0 · III=4,0 · "
                         "IV=5,0 cm (Tabela 7.2)")
-Nk = c6.number_input("Força normal CARACTERÍSTICA Nk [kN]", min_value=1.0,
-                     max_value=20000.0, value=500.0, step=10.0,
-                     format="%.0f",
-                     help="O programa aplica γf = 1,4 e γn automaticamente. "
-                          "NÃO digite o valor já majorado.")
+Nk_disp = c6.number_input(f"Força normal CARACTERÍSTICA Nk [{un_f}]",
+                          min_value=1.0, max_value=20000.0 * fu,
+                          value=500.0 * fu, step=10.0 * fu, format="%.0f",
+                          help="O programa aplica γf = 1,4 e γn "
+                               "automaticamente. NÃO digite o valor já "
+                               "majorado.")
+Nk = Nk_disp / fu          # -> kN (interno)
 st.caption("Aço CA-50 · γf=1,4 · γc=1,4 · γs=1,15 · "
            "pilar interno de estrutura contraventada")
 
@@ -111,9 +117,9 @@ def gerar_memorial(res, opt):
     ln.append("=" * 62)
     ln.append(f"Seção: {d['b']:.0f} x {d['h']:.0f} cm | fck = {d['fck']:.0f} "
               f"MPa | CAA {d['caa']} (c = {d['cob']:.1f} cm)")
-    ln.append(f"l0 = {d['l0']:.2f} m | Nk = {d['Nk']:.0f} kN | "
-              f"γn = {res['gamma_n']:.2f} | Nd = {res['Nd']:.1f} kN | "
-              f"ν = {res['ni']:.3f}")
+    ln.append(f"l0 = {d['l0']:.2f} m | Nk = {d['Nk'] * fu:.0f} {un_f} | "
+              f"γn = {res['gamma_n']:.2f} | Nd = {res['Nd'] * fu:.0f} "
+              f"{un_f} | ν = {res['ni']:.3f}")
     ln.append("")
     ln.append("ESBELTEZ E 2ª ORDEM (por direção):")
     for nome, dd in res['direcoes'].items():
@@ -121,7 +127,7 @@ def gerar_memorial(res, opt):
         ln.append(f"  Direção {nome} (h_i={dd['h_i']:.0f} cm): "
                   f"λ = {dd['lambda']:.1f} | λ1 = {dd['lambda1']:.1f} | "
                   f"2ª ordem: {so} | e2 = {dd['e2']:.2f} cm | "
-                  f"Md,tot = {dd['Md_tot'] / 100:.2f} kN·m")
+                  f"Md,tot = {dd['Md_tot'] / 100 * fu:.{_cfp}f} {un_f}·m")
     ln.append("")
     ln.append(f"ARMADURA ADOTADA: {opt['texto']} "
               f"(As = {opt['As_ef']:.2f} cm² | mín = {res['As_min']:.2f} | "
@@ -155,7 +161,7 @@ if ss.res_pilar is not None:
     else:
         sec(2, "Esforços e esbeltez")
         m1, m2, m3 = st.columns(3)
-        m1.metric("Nd de cálculo", f"{res['Nd']:.0f} kN",
+        m1.metric("Nd de cálculo", f"{res['Nd'] * fu:.0f} {un_f}",
                   help=f"Nk × γf(1,4) × γn({res['gamma_n']:.2f})")
         m2.metric("λ direção x", f"{res['direcoes']['x']['lambda']:.0f}")
         m3.metric("λ direção y", f"{res['direcoes']['y']['lambda']:.0f}")
@@ -167,7 +173,8 @@ if ss.res_pilar is not None:
                 "λ1": f"{dd['lambda1']:.1f}",
                 "2ª ordem": "SIM" if dd['segunda_ordem'] else "não",
                 "e2 [cm]": f"{dd['e2']:.2f}",
-                "Md,tot [kN·m]": f"{dd['Md_tot'] / 100:.2f}"})
+                f"Md,tot [{un_f}·m]":
+                    f"{dd['Md_tot'] / 100 * fu:.{_cfp}f}"})
         st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
         with st.expander("⚠️ Avisos e hipóteses de cálculo"):
@@ -176,9 +183,10 @@ if ss.res_pilar is not None:
 
         if not res['opcoes']:
             st.error("🚫 **SEÇÃO INSUFICIENTE** para Nd = "
-                     f"{res['Nd']:.0f} kN com os momentos de 2ª ordem da "
-                     "norma — nenhum arranjo de armadura atende dentro do "
-                     "limite de 4% de aço. **Aumente b, h ou o fck.**")
+                     f"{res['Nd'] * fu:.0f} {un_f} com os momentos de 2ª "
+                     "ordem da norma — nenhum arranjo de armadura atende "
+                     "dentro do limite de 4% de aço. **Aumente b, h ou o "
+                     "fck.**")
         else:
             sec(3, "Escolha do arranjo de armadura")
             economica = res['opcoes'][0]
