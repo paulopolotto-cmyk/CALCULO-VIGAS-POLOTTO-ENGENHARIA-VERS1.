@@ -22,6 +22,10 @@ venv/
 # === Streamlit (segredos/API keys nunca vao para o repo) ===
 .streamlit/secrets.toml
 
+# === Ferramentas / IDE ===
+.claude/
+.vscode/
+
 # === Sistema ===
 Thumbs.db
 .DS_Store
