@@ -546,6 +546,131 @@ def fig_corte_estribo(res, tipo, idx, titulo):
     return fig
 
 
+# ========================================== zona segura para furos na viga
+def zonas_furos(res):
+    """Janelas horizontais seguras para furo pequeno (por vão interno).
+
+    Critério (guia prático, NBR 6118 §21.3 — furos que atravessam a largura):
+    - horizontal: a ≥ 2h da face de cada apoio (região de baixo cortante);
+    - vertical: terço médio da altura (em torno da linha neutra), longe da
+      armadura de tração (fundo) e da zona comprimida (topo);
+    - diâmetro do furo ≤ h/3 e ≤ 12 cm; distância entre furos ≥ 2h.
+    Balanços e regiões próximas aos apoios ficam de fora (cortante alto).
+    """
+    est = res['estatica']
+    h_cm = res['dados']['h']
+    dois_h = 2.0 * h_cm / 100.0                     # m
+    xs_ap = _posicoes_apoios(est)
+    janelas = []
+    for i in range(len(est['vaos'])):
+        xa, xb = xs_ap[i], xs_ap[i + 1]
+        xi, xf = xa + dois_h, xb - dois_h
+        if xf - xi > 0.10:                          # janela útil ≥ 10 cm
+            janelas.append({'vao': i + 1, 'x_ini': xi, 'x_fim': xf,
+                            'larg': xf - xi})
+    return {'janelas': janelas, 'dois_h': dois_h, 'xs_ap': xs_ap,
+            'diam_max': min(h_cm / 3.0, 12.0)}
+
+
+def fig_furos(res):
+    est = res['estatica']
+    h_cm = res['dados']['h']
+    z = zonas_furos(res)
+    xs_ap = z['xs_ap']
+    off_e = est['bal_esq']['L'] if est['bal_esq'] else 0.0
+    L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
+
+    fig, ax = plt.subplots(figsize=(7.2, 3.8), dpi=150)
+    fig.patch.set_facecolor('white')
+    ax.set_xlim(-0.05 * L_tot, 1.13 * L_tot)
+    ax.set_ylim(-0.55, 1.55)
+    ax.axis('off')
+
+    # corpo da viga
+    ax.add_patch(plt.Rectangle((0, 0), L_tot, 1.0, facecolor='#EEF1F6',
+                               edgecolor=CINZA_TXT, lw=1.5, zorder=1))
+    # terços superior e inferior = evitar (armaduras / zona comprimida)
+    for y0 in (0.0, 2.0 / 3.0):
+        ax.add_patch(plt.Rectangle((0, y0), L_tot, 1.0 / 3.0,
+                                   facecolor='none', edgecolor=VERMELHO,
+                                   hatch='///', lw=0.0, alpha=0.30, zorder=2))
+    # terço médio (faixa candidata, em torno da linha neutra)
+    ax.add_patch(plt.Rectangle((0, 1.0 / 3.0), L_tot, 1.0 / 3.0,
+                               facecolor=VERDE, alpha=0.08, zorder=2))
+    ax.text(-0.01 * L_tot, 1.0 / 6.0, "fundo: armadura de tração",
+            ha='left', va='center', fontsize=7.5, color=VERMELHO,
+            rotation=0, alpha=0.9)
+    ax.text(-0.01 * L_tot, 5.0 / 6.0, "topo: zona comprimida",
+            ha='left', va='center', fontsize=7.5, color=VERMELHO, alpha=0.9)
+
+    # zonas de alto cortante (perto dos apoios) e balanços = evitar (altura toda)
+    evitar = []
+    if off_e > 0:
+        evitar.append((0.0, off_e))
+    if est['bal_dir']:
+        evitar.append((xs_ap[-1], L_tot))
+    for xa in xs_ap:
+        evitar.append((max(0.0, xa - z['dois_h']),
+                       min(L_tot, xa + z['dois_h'])))
+    for xi, xf in evitar:
+        if xf > xi:
+            ax.add_patch(plt.Rectangle((xi, 0), xf - xi, 1.0,
+                                       facecolor='none', edgecolor=VERMELHO,
+                                       hatch='xxx', lw=0.0, alpha=0.22,
+                                       zorder=3))
+
+    # janelas seguras (terço médio, longe dos apoios) = pode furar
+    for j in z['janelas']:
+        ax.add_patch(plt.Rectangle((j['x_ini'], 1.0 / 3.0), j['larg'],
+                                   1.0 / 3.0, facecolor=VERDE, alpha=0.45,
+                                   edgecolor=VERDE, lw=2.2, zorder=4))
+        xm = 0.5 * (j['x_ini'] + j['x_fim'])
+        ax.plot(xm, 0.5, marker='o', ms=12, markerfacecolor='white',
+                markeredgecolor='#0f5132', markeredgewidth=1.8, zorder=6)
+        ax.text(xm, 0.20, "furo OK", ha='center', va='center',
+                color='#0f5132', fontsize=8.5, fontweight='bold', zorder=6)
+
+    # linha neutra
+    ax.plot([0, L_tot], [0.5, 0.5], color=NAVY, lw=1.7,
+            ls=(0, (6, 3)), zorder=5)
+    ax.annotate("linha neutra", xy=(L_tot, 0.5),
+                xytext=(L_tot * 1.015, 0.5), ha='left', va='center',
+                fontsize=9, fontweight='bold', color=NAVY,
+                arrowprops=dict(arrowstyle='-', color=NAVY, lw=0.8))
+
+    # apoios
+    for jdx, xa in enumerate(xs_ap):
+        ax.plot(xa, 0.0, marker='^', color=NAVY, ms=13, zorder=7,
+                clip_on=False)
+        ax.text(xa, -0.13, chr(65 + jdx), ha='center', va='top',
+                fontsize=9, fontweight='bold', color=NAVY)
+
+    # cota do 2h no primeiro vão
+    if xs_ap:
+        x0 = xs_ap[0]
+        ax.annotate('', xy=(x0 + z['dois_h'], -0.34), xytext=(x0, -0.34),
+                    arrowprops=dict(arrowstyle='<->', color=CINZA_TXT,
+                                    lw=1.0))
+        ax.text(x0 + z['dois_h'] / 2, -0.40,
+                f"≥ 2h = {z['dois_h']:.2f} m", ha='center', va='top',
+                fontsize=8.5, color=CINZA_TXT, fontweight='bold')
+
+    # título / limite de diâmetro
+    ax.text(L_tot / 2, 1.42,
+            f"Furo pequeno (tubulação): Ø ≤ {z['diam_max']:.0f} cm "
+            f"(h/3 e ≤ 12 cm) · distância entre furos ≥ 2h",
+            ha='center', va='top', fontsize=9, fontweight='bold',
+            color=NAVY)
+    if not z['janelas']:
+        ax.text(L_tot / 2, 0.5,
+                "Sem zona dispensada de verificação\n"
+                "(vãos < 4h) — consultar projetista",
+                ha='center', va='center', fontsize=9, color=VERMELHO,
+                fontweight='bold', zorder=8)
+    fig.tight_layout()
+    return fig
+
+
 # ================================================================ memorial
 def gerar_memorial(res, nomes_lista):
     d = res['dados']
@@ -607,6 +732,18 @@ def gerar_memorial(res, nomes_lista):
                       f"= {p['peso']:7.2f} kg")
         ln.append(f"  PESO TOTAL: {q['peso_total']:.2f} kg | "
                   f"COMPRA (+10%): {q['peso_compra']:.2f} kg")
+    z = zonas_furos(res)
+    ln.append("")
+    ln.append("ZONAS PARA FUROS DE TUBULAÇÃO (orientativo, NBR 6118 §21.3):")
+    ln.append(f"  Diâmetro máx.: {z['diam_max']:.0f} cm (h/3 e ≤ 12 cm) | "
+              f"terço médio da altura | distância entre furos ≥ 2h")
+    if z['janelas']:
+        for j in z['janelas']:
+            ln.append(f"  Vão {j['vao']}: furar entre x = {j['x_ini']:.2f} m "
+                      f"e x = {j['x_fim']:.2f} m (largura {j['larg']:.2f} m, "
+                      f"medido da ponta esquerda da viga)")
+    else:
+        ln.append("  Nenhuma zona dispensada de verificação (vãos < 4h).")
     ln.append("")
     ln.append("AVISOS / LIMITAÇÕES:")
     for a in res['avisos']:
@@ -739,7 +876,36 @@ if ss.res is not None:
                        bbox_inches='tight')
             plt.close(f4)
 
-            sec(8, "Quantitativo de aço")
+            # ---- zona segura para furos
+            sec(8, "Onde furar a viga (passagem de tubulação)")
+            st.caption("Verde = pode furar · Vermelho = evitar. A **linha "
+                       "neutra** tem tensão de flexão nula, mas o cortante é "
+                       "máximo nela — por isso o furo deve ficar no **terço "
+                       "médio** da altura e **longe dos apoios (≥ 2h)**.")
+            f5 = fig_furos(res)
+            st.pyplot(f5, width="stretch")
+            png_furos = io.BytesIO()
+            f5.savefig(png_furos, format='png', dpi=200,
+                       bbox_inches='tight')
+            plt.close(f5)
+            zf = zonas_furos(res)
+            if zf['janelas']:
+                linhas = [f"Vão {j['vao']}: entre **{j['x_ini']:.2f} m** e "
+                          f"**{j['x_fim']:.2f} m** (medido da ponta esquerda "
+                          f"da viga)" for j in zf['janelas']]
+                st.success("**Furo pequeno permitido** (Ø ≤ "
+                           f"{zf['diam_max']:.0f} cm), no terço médio da "
+                           "altura, em:\n\n- " + "\n- ".join(linhas))
+            else:
+                st.warning("Nenhuma zona dispensada de verificação nesta viga "
+                           "(vãos curtos, < 4h). Qualquer furo exige análise "
+                           "específica do projetista.")
+            st.caption("Guia simplificado para furos pequenos de tubulação "
+                       "(NBR 6118 §21.3). **Nunca corte armaduras.** Aberturas "
+                       "maiores exigem dimensionamento específico com armadura "
+                       "de reforço.")
+
+            sec(9, "Quantitativo de aço")
             dfq = pd.DataFrame([{
                 "Pos": p['pos'], "Descrição": p['descr'],
                 "ø [mm]": p['phi'], "Qtd": p['qtd'],
@@ -764,7 +930,7 @@ if ss.res is not None:
                 st.warning(av)
 
             # ---- exportação
-            sec(9, "Exportar")
+            sec(10, "Exportar")
             ce1, ce2 = st.columns(2)
             ce1.download_button(
                 "📄 Memorial (.txt)",
@@ -775,10 +941,15 @@ if ss.res is not None:
                 "🖼️ Detalhamento (.png)", png.getvalue(),
                 file_name=f"Viga_{b:.0f}x{h:.0f}_detalhamento.png",
                 mime="image/png", width="stretch")
-            st.download_button(
-                "🖼️ Corte transversal + estribo (.png)",
+            ce3, ce4 = st.columns(2)
+            ce3.download_button(
+                "🖼️ Corte + estribo (.png)",
                 png_corte.getvalue(),
                 file_name=f"Viga_{b:.0f}x{h:.0f}_corte_{titulo_c}.png",
+                mime="image/png", width="stretch")
+            ce4.download_button(
+                "🖼️ Zona de furos (.png)", png_furos.getvalue(),
+                file_name=f"Viga_{b:.0f}x{h:.0f}_furos.png",
                 mime="image/png", width="stretch")
 
 # ------------------------------------------------------------ limpar tudo
