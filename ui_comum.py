@@ -20,15 +20,38 @@ _CSS = """
 /* cabeçalho da marca */
 .pol-header {
     background: linear-gradient(135deg, #16265B, #1E3A8A 55%, #24479E);
-    color: #fff; border-radius: 14px; padding: 20px 22px 18px;
+    color: #fff; border-radius: 14px; padding: 22px 22px 18px;
     margin-bottom: 4px;
 }
-.pol-header .eyebrow {
-    text-transform: uppercase; letter-spacing: .14em; font-size: .72rem;
-    color: #F0C879; font-weight: 700; margin-bottom: 2px;
+a.pol-marca-link { text-decoration: none !important; }
+a.pol-marca-link:hover .marca-txt { color: #F0C879; }
+.pol-header .marca {
+    display: flex; align-items: center; gap: 12px;
 }
-.pol-header h1 { font-size: 1.35rem; line-height: 1.3; margin: 0; color: #fff; }
-.pol-header .sub { color: #C9D6F5; font-size: .85rem; margin-top: 4px; }
+.pol-header .logo-badge {
+    background: linear-gradient(160deg, #F6C86B, #E8A33D);
+    color: #16265B; font-weight: 900; border-radius: 10px;
+    min-width: 46px; height: 46px; display: inline-flex;
+    align-items: center; justify-content: center;
+    font-size: 1.7rem; box-shadow: 0 2px 10px rgba(0,0,0,.28);
+}
+.pol-header .marca-txt {
+    font-size: clamp(1.45rem, 6vw, 1.9rem); font-weight: 800;
+    letter-spacing: .05em; line-height: 1.1; color: #fff;
+    text-transform: uppercase;
+}
+.pol-header .marca-txt em {
+    font-style: normal; color: #F0C879;
+}
+.pol-header .divisor {
+    height: 3px; width: 72px; border-radius: 99px;
+    background: #F0C879; margin: 10px 0 10px;
+}
+.pol-header h1 {
+    font-size: 1.08rem; line-height: 1.3; margin: 0;
+    color: #DDE7FB; font-weight: 700;
+}
+.pol-header .sub { color: #A9BCE8; font-size: .82rem; margin-top: 3px; }
 
 /* título de seção */
 .pol-sec {
@@ -66,7 +89,14 @@ def aplicar_estilo():
 def header(titulo, subtitulo):
     st.markdown(f"""
 <div class="pol-header">
-  <div class="eyebrow">Polotto Engenharia</div>
+  <a class="pol-marca-link" href="https://polottoengenharia.com.br"
+     target="_blank" rel="noopener" title="Visitar polottoengenharia.com.br">
+    <div class="marca">
+      <span class="logo-badge">P</span>
+      <span class="marca-txt">Polotto <em>Engenharia</em></span>
+    </div>
+  </a>
+  <div class="divisor"></div>
   <h1>{titulo}</h1>
   <div class="sub">{subtitulo}</div>
 </div>

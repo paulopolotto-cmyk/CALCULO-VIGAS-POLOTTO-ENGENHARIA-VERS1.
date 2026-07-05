@@ -5,10 +5,12 @@ Dimensionamento conforme NBR 6118 (ELU flexão e cortante).
 """
 import io
 import json
+import math
 
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -408,6 +410,142 @@ def fig_detalhamento(res):
     return fig
 
 
+# ============================================== corte transversal + estribo
+def _dados_corte(res, tipo, idx):
+    """Barras inferior/superior e estribo da seção escolhida."""
+    n_vaos = len(res['estatica']['vaos'])
+    if tipo == 'vao':
+        sel_inf = res['flex_vaos'][idx]['sel']
+        sel_sup = None                       # meio do vão: porta-estribos
+        e = res['estribos'][idx]
+    else:                                    # corte no apoio
+        i_adj = idx if idx < n_vaos else idx - 1
+        sel_inf = res['flex_vaos'][i_adj]['sel']
+        sel_sup = res['flex_apoios'][idx]['sel']
+        e = res['estribos'][i_adj]
+    return sel_inf, sel_sup, e
+
+
+def _desenha_fileiras(ax, sel, b, h, cob, phi_t, lado, cor):
+    """Desenha as barras (círculos em escala) na parte inferior/superior."""
+    n = sel['n']
+    phi = sel['phi'] / 10.0
+    camadas = sel.get('camadas', 1)
+    por_camada = int(math.ceil(n / camadas))
+    ev = max(2.0, phi)
+    x0 = cob + phi_t + phi / 2.0
+    x1 = b - x0
+    desenhadas = 0
+    for cam in range(camadas):
+        cnt = min(por_camada, n - desenhadas)
+        if cnt <= 0:
+            break
+        y = cob + phi_t + phi / 2.0 + cam * (phi + ev)
+        if lado == 'sup':
+            y = h - y
+        xs = [(x0 + x1) / 2.0] if cnt == 1 else np.linspace(x0, x1, cnt)
+        for x in xs:
+            ax.add_patch(plt.Circle((x, y), phi / 2.0, color=cor,
+                                    ec='white', lw=0.6, zorder=6))
+        desenhadas += cnt
+
+
+def fig_corte_estribo(res, tipo, idx, titulo):
+    """Figura dupla: corte transversal (esq.) + detalhe do estribo (dir.)."""
+    d = res['dados']
+    b, h, cob = d['b'], d['h'], d['cob']
+    q = res['quantitativo']
+    sel_inf, sel_sup, e = _dados_corte(res, tipo, idx)
+    phi_t = e['phi_t'] / 10.0
+
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(7.2, 4.6), dpi=150)
+    fig.patch.set_facecolor('white')
+
+    # ------------------- corte transversal
+    ax.add_patch(plt.Rectangle((0, 0), b, h, facecolor=CONCRETO,
+                               edgecolor=CINZA_TXT, lw=2.0))
+    ax.add_patch(plt.Rectangle((cob, cob), b - 2 * cob, h - 2 * cob,
+                               facecolor='none', edgecolor=AMBAR,
+                               lw=1.8, zorder=4))
+    _desenha_fileiras(ax, sel_inf, b, h, cob, phi_t, 'inf', VERDE)
+    if sel_sup is not None:
+        _desenha_fileiras(ax, sel_sup, b, h, cob, phi_t, 'sup', VERMELHO)
+        txt_sup = f"{sel_sup['n']} ø{sel_sup['phi']:.1f} (neg.)"
+        cor_sup = VERMELHO
+    else:
+        # porta-estribos 2 ø8 nos cantos superiores
+        for x in (cob + phi_t + 0.4, b - cob - phi_t - 0.4):
+            ax.add_patch(plt.Circle((x, h - cob - phi_t - 0.4), 0.4,
+                                    color=CINZA_TXT, ec='white', lw=0.6,
+                                    zorder=6))
+        txt_sup = "2 ø8.0 (porta-estribos)"
+        cor_sup = CINZA_TXT
+    ax.text(b / 2, h + 1.0, txt_sup, ha='center', va='bottom',
+            color=cor_sup, fontsize=10, fontweight='bold')
+    ax.text(b / 2, -1.0,
+            f"{sel_inf['n']} ø{sel_inf['phi']:.1f} (pos.)"
+            + (" · 2 camadas" if sel_inf.get('camadas', 1) == 2 else ""),
+            ha='center', va='top', color=VERDE, fontsize=10,
+            fontweight='bold')
+    # cotas
+    ax.annotate('', xy=(b, -3.2), xytext=(0, -3.2),
+                arrowprops=dict(arrowstyle='<->', color=CINZA_TXT, lw=1.0))
+    ax.text(b / 2, -3.8, f"bw = {b:.0f} cm", ha='center', va='top',
+            fontsize=10, fontweight='bold', color=CINZA_TXT)
+    ax.annotate('', xy=(-2.4, h), xytext=(-2.4, 0),
+                arrowprops=dict(arrowstyle='<->', color=CINZA_TXT, lw=1.0))
+    ax.text(-3.1, h / 2, f"h = {h:.0f} cm", ha='right', va='center',
+            fontsize=10, fontweight='bold', color=CINZA_TXT, rotation=90)
+    ax.set_title(f"Corte — {titulo}", fontsize=11, fontweight='bold',
+                 color=NAVY)
+    ax.set_xlim(-9, b + 4)
+    ax.set_ylim(-7, h + 4)
+    ax.set_aspect('equal')
+    ax.axis('off')
+
+    # ------------------- detalhe do estribo
+    be, he = b - 2 * cob, h - 2 * cob
+    gancho = max(5 * phi_t, 5.0)
+    ax2.add_patch(plt.Rectangle((0, 0), be, he, facecolor='none',
+                                edgecolor=AMBAR, lw=2.6,
+                                joinstyle='round'))
+    # ganchos a 45° no canto superior esquerdo
+    g = gancho / math.sqrt(2)
+    ax2.plot([0, g], [he, he - g], color=AMBAR, lw=2.6,
+             solid_capstyle='round')
+    ax2.plot([0, g * 0.85], [he - 1.1, he - 1.1 - g * 0.85], color=AMBAR,
+             lw=2.6, solid_capstyle='round')
+    # cotas
+    ax2.annotate('', xy=(be, -2.0), xytext=(0, -2.0),
+                 arrowprops=dict(arrowstyle='<->', color=CINZA_TXT, lw=1.0))
+    ax2.text(be / 2, -2.6, f"{be:.0f} cm", ha='center', va='top',
+             fontsize=10, fontweight='bold', color=CINZA_TXT)
+    ax2.annotate('', xy=(be + 2.0, 0), xytext=(be + 2.0, he),
+                 arrowprops=dict(arrowstyle='<->', color=CINZA_TXT, lw=1.0))
+    ax2.text(be + 2.7, he / 2, f"{he:.0f} cm", ha='left', va='center',
+             fontsize=10, fontweight='bold', color=CINZA_TXT, rotation=90)
+    ax2.annotate(f"ganchos 45°\n≥ {gancho:.0f} cm", xy=(g, he - g),
+                 xytext=(be * 0.45, he * 0.86), fontsize=9,
+                 color=CINZA_TXT,
+                 arrowprops=dict(arrowstyle='->', color=CINZA_TXT, lw=0.8))
+    comp_corte = q['comp_estribo'] if q else None
+    linhas = [f"Estribo {e['texto']}"]
+    if comp_corte:
+        linhas.append(f"corte unit. ≈ {comp_corte:.2f} m")
+    linhas.append(f"cobrimento {cob:.1f} cm")
+    ax2.text(be / 2, -5.2, "\n".join(linhas), ha='center', va='top',
+             fontsize=10, fontweight='bold', color=NAVY)
+    ax2.set_title("Detalhe do estribo", fontsize=11, fontweight='bold',
+                  color=NAVY)
+    ax2.set_xlim(-4, be + 8)
+    ax2.set_ylim(-11, he + 4)
+    ax2.set_aspect('equal')
+    ax2.axis('off')
+
+    fig.tight_layout()
+    return fig
+
+
 # ================================================================ memorial
 def gerar_memorial(res, nomes_lista):
     d = res['dados']
@@ -584,6 +722,23 @@ if ss.res is not None:
             f3.savefig(png, format='png', dpi=200, bbox_inches='tight')
             plt.close(f3)
 
+            # ---- corte transversal + detalhe do estribo
+            opcoes_corte = [('vao', i, f"Vão {i + 1} (meio do vão)")
+                            for i in range(len(est['vaos']))]
+            for j, fx in enumerate(res['flex_apoios']):
+                if fx.get('sel') and not fx['sel'].get('construtiva'):
+                    opcoes_corte.append(('apoio', j, f"Apoio {chr(65 + j)}"))
+            k = st.selectbox("Posição do corte transversal:",
+                             range(len(opcoes_corte)),
+                             format_func=lambda k: opcoes_corte[k][2])
+            tipo_c, idx_c, titulo_c = opcoes_corte[k]
+            f4 = fig_corte_estribo(res, tipo_c, idx_c, titulo_c)
+            st.pyplot(f4, width="stretch")
+            png_corte = io.BytesIO()
+            f4.savefig(png_corte, format='png', dpi=200,
+                       bbox_inches='tight')
+            plt.close(f4)
+
             sec(8, "Quantitativo de aço")
             dfq = pd.DataFrame([{
                 "Pos": p['pos'], "Descrição": p['descr'],
@@ -619,6 +774,11 @@ if ss.res is not None:
             ce2.download_button(
                 "🖼️ Detalhamento (.png)", png.getvalue(),
                 file_name=f"Viga_{b:.0f}x{h:.0f}_detalhamento.png",
+                mime="image/png", width="stretch")
+            st.download_button(
+                "🖼️ Corte transversal + estribo (.png)",
+                png_corte.getvalue(),
+                file_name=f"Viga_{b:.0f}x{h:.0f}_corte_{titulo_c}.png",
                 mime="image/png", width="stretch")
 
 # ------------------------------------------------------------ limpar tudo
