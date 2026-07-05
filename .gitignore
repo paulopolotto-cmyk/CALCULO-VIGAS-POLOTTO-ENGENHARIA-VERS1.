@@ -1,0 +1,27 @@
+# === Instaladores e binarios grandes (nao devem ir para o GitHub) ===
+*.exe
+
+# === Backups locais ===
+*.bak
+
+# === Pagina do GitHub salva (backup offline) ===
+NOVO*/
+
+# === PyInstaller ===
+build/
+dist/
+*.spec.log
+
+# === Python ===
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# === Streamlit (segredos/API keys nunca vao para o repo) ===
+.streamlit/secrets.toml
+
+# === Sistema ===
+Thumbs.db
+.DS_Store
