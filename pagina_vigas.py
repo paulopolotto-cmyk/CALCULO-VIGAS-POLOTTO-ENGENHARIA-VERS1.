@@ -839,14 +839,15 @@ if ss.res is not None:
 
         # ---- esquema estrutural
         sec(3, "Esquema estrutural e reações")
-        mostrar_figura(fig_esquema(res, fu, un_f))
+        png_esq = mostrar_figura(fig_esquema(res, fu, un_f))
 
         # ---- diagramas
         sec(4, "Diagramas de esforços")
-        mostrar_figura(fig_diagramas(res, fu, un_f))
-        if len(est['vaos']) >= 3:
-            st.caption("👉 Viga com muitos vãos: deslize a figura para o lado "
-                       "e use o zoom de pinça para ver os detalhes.")
+        png_diag = mostrar_figura(fig_diagramas(res, fu, un_f))
+        st.caption("🔎 Para ampliar: use o zoom de pinça; se não funcionar no "
+                   "seu celular, deslize a figura para o lado ou baixe a "
+                   "imagem em **Exportar** e abra na galeria (lá o zoom "
+                   "sempre funciona).")
 
         # ---- armaduras
         sec(5, "Armadura longitudinal")
@@ -965,6 +966,8 @@ if ss.res is not None:
 
             # ---- exportação
             sec(10, "Exportar")
+            st.caption("Baixe as imagens para abrir na galeria (com zoom) ou "
+                       "mandar pro cliente/obra.")
             ce1, ce2 = st.columns(2)
             ce1.download_button(
                 "📄 Memorial (.txt)",
@@ -972,15 +975,24 @@ if ss.res is not None:
                 file_name=f"Viga_{b:.0f}x{h:.0f}_memorial.txt",
                 mime="text/plain", width="stretch")
             ce2.download_button(
-                "🖼️ Detalhamento (.png)", png,
-                file_name=f"Viga_{b:.0f}x{h:.0f}_detalhamento.png",
+                "🖼️ Esquema e reações (.png)", png_esq,
+                file_name=f"Viga_{b:.0f}x{h:.0f}_esquema.png",
                 mime="image/png", width="stretch")
             ce3, ce4 = st.columns(2)
             ce3.download_button(
+                "🖼️ Diagramas M e V (.png)", png_diag,
+                file_name=f"Viga_{b:.0f}x{h:.0f}_diagramas.png",
+                mime="image/png", width="stretch")
+            ce4.download_button(
+                "🖼️ Detalhamento (.png)", png,
+                file_name=f"Viga_{b:.0f}x{h:.0f}_detalhamento.png",
+                mime="image/png", width="stretch")
+            ce5, ce6 = st.columns(2)
+            ce5.download_button(
                 "🖼️ Corte + estribo (.png)", png_corte,
                 file_name=f"Viga_{b:.0f}x{h:.0f}_corte_{titulo_c}.png",
                 mime="image/png", width="stretch")
-            ce4.download_button(
+            ce6.download_button(
                 "🖼️ Zona de furos (.png)", png_furos,
                 file_name=f"Viga_{b:.0f}x{h:.0f}_furos.png",
                 mime="image/png", width="stretch")

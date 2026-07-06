@@ -216,20 +216,31 @@ div.stButton > button[kind="primary"] {
 _ZOOM_JS = """
 <script>
 (function () {
+  var ALVO = 'width=device-width, initial-scale=1, minimum-scale=1, ' +
+             'maximum-scale=5, user-scalable=yes';
   function libera() {
     try {
       var doc = (window.parent || window).document;
       var vp = doc.querySelector('meta[name="viewport"]');
-      if (!vp) { vp = doc.createElement('meta'); vp.name = 'viewport';
-                 doc.head.appendChild(vp); }
-      vp.setAttribute('content',
-        'width=device-width, initial-scale=1, maximum-scale=5, ' +
-        'user-scalable=yes');
+      if (!vp) { vp = doc.createElement('meta'); vp.setAttribute('name',
+                 'viewport'); doc.getElementsByTagName('head')[0]
+                 .appendChild(vp); }
+      if (vp.getAttribute('content') !== ALVO) {
+        vp.setAttribute('content', ALVO);
+      }
+      doc.documentElement.style.touchAction = 'pan-x pan-y pinch-zoom';
+      doc.body.style.touchAction = 'pan-x pan-y pinch-zoom';
     } catch (e) {}
   }
   libera();
-  setTimeout(libera, 400);
-  setTimeout(libera, 1500);
+  try {
+    var d = (window.parent || window).document;
+    new MutationObserver(libera).observe(d.head,
+      { childList: true, subtree: true, attributes: true });
+  } catch (e) {}
+  var n = 0, iv = setInterval(function () {
+    libera(); if (++n > 12) clearInterval(iv);
+  }, 500);
 })();
 </script>
 """

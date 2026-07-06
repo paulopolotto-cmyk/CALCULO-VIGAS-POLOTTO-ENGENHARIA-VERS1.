@@ -44,7 +44,7 @@ l0 = c3.number_input("Altura livre l0 [m]", min_value=0.5, max_value=10.0,
                      help="Adotado le = l0. Se a vinculação real levar a le "
                           "maior, informe aqui o le.")
 fck = c4.number_input("Concreto fck [MPa]", min_value=20, max_value=50,
-                      value=30, step=5)
+                      value=25, step=5)
 c5, c6 = st.columns(2)
 caa = c5.selectbox("Classe de agressividade (CAA)",
                    ["I", "II", "III", "IV"], index=0,
