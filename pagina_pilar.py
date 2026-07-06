@@ -32,7 +32,7 @@ if 'res_pilar_fp' not in ss:
     ss.res_pilar_fp = None
 
 # ------------------------------------------------------------ entrada
-sec(1, "Dados do pilar")
+sec(1, "Inserir os dados do pilar", destaque=True)
 c1, c2 = st.columns(2)
 b = c1.number_input("Base b [cm] (menor dimensão)", min_value=14.0,
                     max_value=120.0, value=20.0, step=1.0, format="%.0f")
@@ -47,9 +47,10 @@ fck = c4.number_input("Concreto fck [MPa]", min_value=20, max_value=50,
                       value=30, step=5)
 c5, c6 = st.columns(2)
 caa = c5.selectbox("Classe de agressividade (CAA)",
-                   ["I", "II", "III", "IV"], index=1,
-                   help="Define o cobrimento: I=2,5 · II=3,0 · III=4,0 · "
-                        "IV=5,0 cm (Tabela 7.2)")
+                   ["I", "II", "III", "IV"], index=0,
+                   help="Define o cobrimento nominal: I=2,5 · II=3,0 · "
+                        "III=4,0 · IV=5,0 cm (Tabela 7.2). Veja abaixo qual "
+                        "escolher.")
 Nk_disp = c6.number_input(f"Força normal CARACTERÍSTICA Nk [{un_f}]",
                           min_value=1.0, max_value=20000.0 * fu,
                           value=None, step=10.0 * fu, format="%.0f",
@@ -60,6 +61,21 @@ Nk_disp = c6.number_input(f"Força normal CARACTERÍSTICA Nk [{un_f}]",
 Nk = (Nk_disp or 0.0) / fu          # -> kN (interno)
 st.caption("Aço CA-50 · γf=1,4 · γc=1,4 · γs=1,15 · "
            "pilar interno de estrutura contraventada")
+
+with st.expander("ℹ️ Classe de agressividade (CAA) — qual escolher?"):
+    st.markdown(
+        "A CAA define o **cobrimento** do aço conforme o ambiente "
+        "(NBR 6118, Tabelas 6.1 e 7.2). Escolha pelo local da obra:\n\n"
+        "- **I — Fraca** (cobrimento 2,5 cm): rural ou interno seco. "
+        "Ambiente protegido, baixa umidade. *Ex.: interior de residências.*\n"
+        "- **II — Moderada** (3,0 cm): **urbana** — o caso mais comum em "
+        "cidade. *Ex.: a maioria das obras residenciais urbanas.*\n"
+        "- **III — Forte** (4,0 cm): **marinha** (orla) ou **industrial**. "
+        "Perto do mar ou de indústria; risco grande de corrosão.\n"
+        "- **IV — Muito forte** (5,0 cm): respingos de maré ou ambiente "
+        "quimicamente agressivo. Risco elevado.\n\n"
+        "👉 Na dúvida em obra **urbana**, use **II**. Em local seco e "
+        "protegido, **I**. Perto do **mar/indústria**, **III** ou **IV**.")
 
 dados = {'b': b, 'h': h, 'l0': l0, 'fck': fck, 'Nk': Nk, 'caa': caa}
 fp = json.dumps(dados, sort_keys=True)

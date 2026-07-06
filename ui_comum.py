@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Identidade visual compartilhada dos apps Polotto (vigas e pilares)."""
+import base64 as _b64
 import html as _html
+import io as _io
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -105,14 +107,25 @@ a.pol-marca-link:hover .pol-site-hint {
 
 /* título de seção */
 .pol-sec {
-    display: flex; align-items: center; gap: 8px;
-    font-weight: 700; color: #1E3A8A; font-size: 1.02rem;
-    margin: 6px 0 2px;
+    display: flex; align-items: center; gap: 9px;
+    font-weight: 800; color: #1E3A8A;
+    font-size: clamp(1.08rem, 4.2vw, 1.22rem); white-space: nowrap;
+    margin: 10px 0 4px;
 }
 .pol-sec .num {
     background: #1E3A8A; color: #fff; border-radius: 999px;
-    width: 24px; height: 24px; display: inline-flex;
-    align-items: center; justify-content: center; font-size: .8rem;
+    min-width: 26px; height: 26px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: .85rem;
+    flex: 0 0 auto;
+}
+/* seção de ENTRADA em destaque (barra âmbar/azul) */
+.pol-sec.destaque {
+    background: linear-gradient(135deg, #16265B, #1E3A8A 60%, #24479E);
+    color: #fff; padding: 10px 14px; border-radius: 11px;
+    margin: 14px 0 8px; box-shadow: 0 2px 8px rgba(30,58,138,.22);
+}
+.pol-sec.destaque .num {
+    background: #F0C879; color: #16265B;
 }
 
 /* linha de tramo na lista */
@@ -187,6 +200,15 @@ div.stButton > button[kind="primary"] {
     font-weight: 700; color: #14213D; font-size: .98rem; white-space: nowrap;
 }
 .pol-tab tbody tr:nth-child(even) td { background: #F4F6FA; }
+
+/* ===== FIGURAS DE RESULTADO (rolagem horizontal p/ vigas com muitos vãos) */
+.pol-fig-wrap {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    border: 1px solid #DDE3EC; border-radius: 10px; background: #fff;
+    margin: 4px 0 8px;
+}
+.pol-fig-wrap img { display: block; height: auto; }
+.pol-fig-wrap.wide img { margin: 0 auto; }
 </style>
 """
 
@@ -194,15 +216,20 @@ div.stButton > button[kind="primary"] {
 _ZOOM_JS = """
 <script>
 (function () {
-  try {
-    var doc = window.parent.document;
-    var vp = doc.querySelector('meta[name="viewport"]');
-    if (!vp) { vp = doc.createElement('meta'); vp.name = 'viewport';
-               doc.head.appendChild(vp); }
-    vp.setAttribute('content',
-      'width=device-width, initial-scale=1.0, maximum-scale=5.0, '
-      + 'user-scalable=yes');
-  } catch (e) {}
+  function libera() {
+    try {
+      var doc = (window.parent || window).document;
+      var vp = doc.querySelector('meta[name="viewport"]');
+      if (!vp) { vp = doc.createElement('meta'); vp.name = 'viewport';
+                 doc.head.appendChild(vp); }
+      vp.setAttribute('content',
+        'width=device-width, initial-scale=1, maximum-scale=5, ' +
+        'user-scalable=yes');
+    } catch (e) {}
+  }
+  libera();
+  setTimeout(libera, 400);
+  setTimeout(libera, 1500);
 })();
 </script>
 """
@@ -211,7 +238,35 @@ _ZOOM_JS = """
 def aplicar_estilo():
     st.markdown(_CSS, unsafe_allow_html=True)
     # libera o zoom de pinça no celular (Streamlit bloqueia por padrão)
-    components.html(_ZOOM_JS, height=0, width=0)
+    components.html(_ZOOM_JS, height=0)
+
+
+def mostrar_figura(fig, dpi=170):
+    """Mostra uma figura matplotlib com rolagem horizontal.
+
+    Se a figura for larga (> 7,6 pol — viga com muitos vãos), é exibida no
+    tamanho natural dentro de um contêiner rolável, para ficar legível no
+    celular. Caso contrário, ocupa a largura disponível.
+    Retorna os bytes PNG (para reuso em botão de download).
+    """
+    import matplotlib.pyplot as plt
+    buf = _io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+    dados = buf.getvalue()
+    b64 = _b64.b64encode(dados).decode()
+    largura_pol = fig.get_size_inches()[0]
+    if largura_pol > 7.6:
+        style = f"width:{int(largura_pol * 96)}px;max-width:none"
+        cls = "pol-fig-wrap wide"
+    else:
+        style = "width:100%"
+        cls = "pol-fig-wrap"
+    st.markdown(
+        f'<div class="{cls}"><img alt="resultado" '
+        f'src="data:image/png;base64,{b64}" style="{style}"></div>',
+        unsafe_allow_html=True)
+    return dados
 
 
 def tabela(rows):
@@ -257,8 +312,9 @@ def header(titulo, subtitulo):
 """, unsafe_allow_html=True)
 
 
-def sec(num, titulo):
-    st.markdown(f'<div class="pol-sec"><span class="num">{num}</span>'
+def sec(num, titulo, destaque=False):
+    cls = "pol-sec destaque" if destaque else "pol-sec"
+    st.markdown(f'<div class="{cls}"><span class="num">{num}</span>'
                 f'{titulo}</div>', unsafe_allow_html=True)
 
 

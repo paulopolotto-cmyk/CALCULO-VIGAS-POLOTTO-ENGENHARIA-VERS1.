@@ -16,7 +16,8 @@ import streamlit as st
 
 import motor_viga as mv
 from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
-                      aplicar_estilo, header, sec, seletor_unidade, tabela)
+                      aplicar_estilo, header, sec, seletor_unidade, tabela,
+                      mostrar_figura)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas",
@@ -61,7 +62,7 @@ def nomes_tramos(lista):
 
 
 # ------------------------------------------------------------ seção 1
-sec(1, "Seção, concreto e aço")
+sec(1, "Inserir seção, concreto e aço", destaque=True)
 c1, c2 = st.columns(2)
 b = c1.number_input("Base bw [cm]", min_value=10.0, max_value=100.0,
                     value=15.0, step=1.0, format="%.0f")
@@ -81,7 +82,7 @@ st.caption("Aço: CA-50 (longitudinal e estribos) · γf=1,4 · γc=1,4 · γs=1
 dados_g = {'b': b, 'h': h, 'fck': fck, 'cob': cob, 'peso_proprio': pp}
 
 # ------------------------------------------------------------ seção 2
-sec(2, "Tramos da viga")
+sec(2, "Inserir os tramos da viga", destaque=True)
 
 nomes = nomes_tramos(ss.lista_vaos)
 editando = ss.edit_index is not None
@@ -250,12 +251,18 @@ def _posicoes_apoios(est):
     return xs
 
 
+def _larg_fig(est, base=7.2, por_tramo=1.9):
+    n = (len(est['vaos']) + (1 if est['bal_esq'] else 0)
+         + (1 if est['bal_dir'] else 0))
+    return max(base, por_tramo * n)
+
+
 def fig_esquema(res, fu=1.0, un_f="kN"):
     cf = 0 if fu > 1 else 1
     est = res['estatica']
     xs_ap = _posicoes_apoios(est)
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
-    fig, ax = plt.subplots(figsize=(7.2, 3.4), dpi=150)
+    fig, ax = plt.subplots(figsize=(_larg_fig(est), 3.4), dpi=150)
     fig.patch.set_facecolor('white')
     ax.set_xlim(-0.05 * L_tot, 1.05 * L_tot)
     ax.set_ylim(-2.6, 3.2)
@@ -322,8 +329,8 @@ def fig_diagramas(res, fu=1.0, un_f="kN"):
     cf = 0 if fu > 1 else 1
     est = res['estatica']
     xs_ap = _posicoes_apoios(est)
-    fig, (axm, axv) = plt.subplots(2, 1, figsize=(7.2, 5.6), dpi=150,
-                                   sharex=True)
+    fig, (axm, axv) = plt.subplots(2, 1, figsize=(_larg_fig(est), 5.6),
+                                   dpi=150, sharex=True)
     fig.patch.set_facecolor('white')
 
     # monta diagrama global
@@ -380,7 +387,7 @@ def fig_detalhamento(res):
     q = res['quantitativo']
     xs_ap = _posicoes_apoios(est)
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
-    fig, ax = plt.subplots(figsize=(7.2, 3.6), dpi=150)
+    fig, ax = plt.subplots(figsize=(_larg_fig(est), 3.6), dpi=150)
     fig.patch.set_facecolor('white')
     ax.set_xlim(-0.05 * L_tot, 1.05 * L_tot)
     ax.set_ylim(-2.5, 2.3)
@@ -614,7 +621,8 @@ def fig_furos(res):
     off_e = est['bal_esq']['L'] if est['bal_esq'] else 0.0
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
 
-    fig, ax = plt.subplots(figsize=(7.2, 3.8), dpi=150)
+    fig, ax = plt.subplots(figsize=(max(7.2, 2.0 * (len(est['vaos']) + 2)),
+                                    3.8), dpi=150)
     fig.patch.set_facecolor('white')
     ax.set_xlim(-0.05 * L_tot, 1.13 * L_tot)
     ax.set_ylim(-0.55, 1.55)
@@ -831,15 +839,14 @@ if ss.res is not None:
 
         # ---- esquema estrutural
         sec(3, "Esquema estrutural e reações")
-        f1 = fig_esquema(res, fu, un_f)
-        st.pyplot(f1, width="stretch")
-        plt.close(f1)
+        mostrar_figura(fig_esquema(res, fu, un_f))
 
         # ---- diagramas
         sec(4, "Diagramas de esforços")
-        f2 = fig_diagramas(res, fu, un_f)
-        st.pyplot(f2, width="stretch")
-        plt.close(f2)
+        mostrar_figura(fig_diagramas(res, fu, un_f))
+        if len(est['vaos']) >= 3:
+            st.caption("👉 Viga com muitos vãos: deslize a figura para o lado "
+                       "e use o zoom de pinça para ver os detalhes.")
 
         # ---- armaduras
         sec(5, "Armadura longitudinal")
@@ -895,11 +902,7 @@ if ss.res is not None:
         q = res['quantitativo']
         if q:
             sec(7, "Detalhamento")
-            f3 = fig_detalhamento(res)
-            st.pyplot(f3, width="stretch")
-            png = io.BytesIO()
-            f3.savefig(png, format='png', dpi=200, bbox_inches='tight')
-            plt.close(f3)
+            png = mostrar_figura(fig_detalhamento(res))
 
             # ---- corte transversal + detalhe do estribo
             opcoes_corte = [('vao', i, f"Vão {i + 1} (meio do vão)")
@@ -911,12 +914,8 @@ if ss.res is not None:
                              range(len(opcoes_corte)),
                              format_func=lambda k: opcoes_corte[k][2])
             tipo_c, idx_c, titulo_c = opcoes_corte[k]
-            f4 = fig_corte_estribo(res, tipo_c, idx_c, titulo_c)
-            st.pyplot(f4, width="stretch")
-            png_corte = io.BytesIO()
-            f4.savefig(png_corte, format='png', dpi=200,
-                       bbox_inches='tight')
-            plt.close(f4)
+            png_corte = mostrar_figura(
+                fig_corte_estribo(res, tipo_c, idx_c, titulo_c))
 
             # ---- zona segura para furos
             sec(8, "Onde furar a viga (passagem de tubulação)")
@@ -924,12 +923,7 @@ if ss.res is not None:
                        "neutra** tem tensão de flexão nula, mas o cortante é "
                        "máximo nela — por isso o furo deve ficar no **terço "
                        "médio** da altura e **longe dos apoios (≥ 2h)**.")
-            f5 = fig_furos(res)
-            st.pyplot(f5, width="stretch")
-            png_furos = io.BytesIO()
-            f5.savefig(png_furos, format='png', dpi=200,
-                       bbox_inches='tight')
-            plt.close(f5)
+            png_furos = mostrar_figura(fig_furos(res))
             zf = zonas_furos(res)
             if zf['janelas']:
                 linhas = [f"Vão {j['vao']}: entre **{j['x_ini']:.2f} m** e "
@@ -978,17 +972,16 @@ if ss.res is not None:
                 file_name=f"Viga_{b:.0f}x{h:.0f}_memorial.txt",
                 mime="text/plain", width="stretch")
             ce2.download_button(
-                "🖼️ Detalhamento (.png)", png.getvalue(),
+                "🖼️ Detalhamento (.png)", png,
                 file_name=f"Viga_{b:.0f}x{h:.0f}_detalhamento.png",
                 mime="image/png", width="stretch")
             ce3, ce4 = st.columns(2)
             ce3.download_button(
-                "🖼️ Corte + estribo (.png)",
-                png_corte.getvalue(),
+                "🖼️ Corte + estribo (.png)", png_corte,
                 file_name=f"Viga_{b:.0f}x{h:.0f}_corte_{titulo_c}.png",
                 mime="image/png", width="stretch")
             ce4.download_button(
-                "🖼️ Zona de furos (.png)", png_furos.getvalue(),
+                "🖼️ Zona de furos (.png)", png_furos,
                 file_name=f"Viga_{b:.0f}x{h:.0f}_furos.png",
                 mime="image/png", width="stretch")
 
