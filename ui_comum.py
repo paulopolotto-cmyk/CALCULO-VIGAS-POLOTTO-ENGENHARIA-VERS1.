@@ -472,6 +472,11 @@ EXEMPLOS_VIGA = [
      "secao": {"b": 20.0, "h": 60.0, "fck": 30, "cob": 3.0},
      "tramos": [{"tipo": "Normal", "L": 6.0, "q": 15.0, "P": 80.0,
                  "a": 3.0}]},
+    {"nome": "Viga alta (com armadura de pele)",
+     "descr": "h = 70 cm > 60 → exige armadura de pele (NBR 6118).",
+     "secao": {"b": 20.0, "h": 70.0, "fck": 30, "cob": 3.0},
+     "tramos": [{"tipo": "Normal", "L": 6.0, "q": 25.0, "P": 0.0,
+                 "a": 0.0}]},
 ]
 
 EXEMPLOS_PILAR = [

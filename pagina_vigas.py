@@ -598,6 +598,23 @@ def fig_corte_estribo(res, tipo, idx, titulo):
             + (" · 2 camadas" if sel_inf.get('camadas', 1) == 2 else ""),
             ha='center', va='top', color=VERDE, fontsize=10,
             fontweight='bold')
+    # armadura de pele (h > 60) — barras nas 2 faces laterais
+    pl = res.get('pele')
+    if pl:
+        cor_pl = "#7C3AED"
+        phi_pl = pl['phi'] / 10.0
+        xL = cob + phi_t + phi_pl / 2.0
+        xR = b - xL
+        y0 = cob + phi_t + phi_pl / 2.0
+        ys = np.linspace(y0, h - y0, pl['n_face'] + 2)[1:-1]
+        for yy in ys:
+            for xx in (xL, xR):
+                ax.add_patch(plt.Circle((xx, yy), phi_pl / 2.0, color=cor_pl,
+                                        ec='white', lw=0.5, zorder=6))
+        ax.text(b + 3.5, h / 2,
+                f"pele\n{pl['n_face']} ø{pl['phi']:.1f}\nc/{pl['s']:.0f} cm",
+                ha='center', va='center', fontsize=8, color=cor_pl,
+                fontweight='bold')
     # cotas
     ax.annotate('', xy=(b, -3.2), xytext=(0, -3.2),
                 arrowprops=dict(arrowstyle='<->', color=CINZA_TXT, lw=1.0))
@@ -609,7 +626,7 @@ def fig_corte_estribo(res, tipo, idx, titulo):
             fontsize=10, fontweight='bold', color=CINZA_TXT, rotation=90)
     ax.set_title(f"Corte — {titulo}", fontsize=11, fontweight='bold',
                  color=NAVY)
-    ax.set_xlim(-9, b + 4)
+    ax.set_xlim(-9, b + (9 if res.get('pele') else 4))
     ax.set_ylim(-7, h + 4)
     ax.set_aspect('equal')
     ax.axis('off')
@@ -1124,7 +1141,10 @@ if ss.res is not None:
                          "As [cm²]": as_txt, "Barras": barras})
         tabela(rows)
         if res['pele']:
-            st.info(f"**Armadura de pele (h > 60 cm):** {res['pele']['texto']}")
+            st.info("🧵 **Armadura de pele (h > 60 cm — NBR 6118 "
+                    f"17.3.5.2.3):** {res['pele']['texto']}. Já desenhada no "
+                    "corte transversal e incluída no quantitativo e na "
+                    "compra de aço.")
 
         # ---- estribos
         sec(6, "Estribos (2 ramos)")

@@ -576,14 +576,33 @@ def calcular_viga(dados, tramos):
         if estribo_bd.get('falha_biela'):
             falha_biela = True
 
-    # ---- armadura de pele (17.3.5.2.3) — 0,10% POR FACE
+    # ---- armadura de pele (17.3.5.2.3) — obrigatória p/ h > 60 cm
+    #      0,10% da área da alma POR FACE; espaçamento ≤ 20 cm e ≤ d/3
     pele = None
     if h > 60.0:
-        as_face = 0.0010 * b * h
-        pele = {'As_face': as_face, 'As_total': 2 * as_face,
-                'texto': ("%.2f cm² POR FACE (total %.2f cm²), "
-                          "espaçamento ≤ 20 cm e ≤ d/3"
-                          % (as_face, 2 * as_face))}
+        as_face = 0.0010 * b * h                       # cm² por face
+        s_max = min(20.0, d / 3.0)                     # espaçamento máximo
+        h_dist = max(1.0, h - 2.0 * cob)               # altura de distribuição
+        phi_p = 8.0                                    # bitola usual da pele
+        n_esp = max(1, int(math.ceil(h_dist / s_max)) - 1)
+        n_area = int(math.ceil(as_face / AREA_BITOLA[phi_p]))
+        n_face = max(2, n_esp, n_area)
+        if n_face > 12:                                # muitas ø8 → usa ø10
+            phi_p = 10.0
+            n_area = int(math.ceil(as_face / AREA_BITOLA[phi_p]))
+            n_face = max(2, n_esp, n_area)
+        s_real = h_dist / (n_face + 1)                 # espaçamento adotado
+        L_total = (sum(v['L'] for v in vaos)
+                   + (bal_e[0]['L'] if bal_e else 0.0)
+                   + (bal_d[0]['L'] if bal_d else 0.0))
+        comp = L_total + 0.30                           # m (por barra)
+        peso = 2 * n_face * comp * PESO_LINEAR[phi_p]   # kg (2 faces)
+        pele = {'as_face': as_face, 'as_total': 2 * as_face,
+                'n_face': n_face, 'phi': phi_p, 's': s_real,
+                'comp': comp, 'peso': peso,
+                'texto': ("%d ø%.1f mm por face, c/ %.0f cm "
+                          "(%.2f cm²/face — mín. 0,10%%·Ac)"
+                          % (n_face, phi_p, s_real, as_face))}
 
     # ---- avisos de escopo (limitações declaradas)
     avisos.append("Análise com caso ÚNICO de carga — alternância de "
@@ -692,6 +711,16 @@ def _quantitativo(res, vaos, bal_e, bal_d):
                          'comp_unit': comp_estribo,
                          'peso': n_est * comp_estribo
                                  * PESO_LINEAR[e['phi_t']]})
+
+    # N: armadura de pele (h > 60) — barras longitudinais nas 2 faces
+    pl = res.get('pele')
+    if pl:
+        npos += 1
+        posicoes.append({'pos': 'N%d' % npos,
+                         'descr': 'Armadura de pele (%d por face, c/%.0f cm)'
+                                  % (pl['n_face'], pl['s']),
+                         'phi': pl['phi'], 'qtd': 2 * pl['n_face'],
+                         'comp_unit': pl['comp'], 'peso': pl['peso']})
 
     peso_total = sum(p['peso'] for p in posicoes)
 
