@@ -780,6 +780,22 @@ def gerar_memorial(res, nomes_lista):
                       f"= {p['peso']:7.2f} kg")
         ln.append(f"  PESO TOTAL: {q['peso_total']:.2f} kg | "
                   f"COMPRA (+10%): {q['peso_compra']:.2f} kg")
+    fl = mv.verificar_flecha(res)
+    ln.append("")
+    ln.append("FLECHA (ELS-DEF, NBR 6118 17.3.2 — carga total quase-perm.):")
+    ln.append(f"  Ecs = {fl['Ecs_MPa']:.0f} MPa | Mr = {fl['Mr_kNm']:.1f} kN·m "
+              f"| αf = {fl['alfa_f']:.2f}")
+    for it in (fl['vaos'] + fl['balancos']):
+        situ = "OK" if it['ok'] else "EXCEDE"
+        s = (f"  {it['nome']}: {it['estadio']} | imediata "
+             f"{it['flecha_imediata_mm']:.1f} mm | total "
+             f"{it['flecha_total_mm']:.1f} mm | limite "
+             f"{it['limite_mm']:.1f} mm -> {situ}")
+        if not it['ok']:
+            s += (f" | contra-flecha {it['contra_flecha_mm']:.0f} mm "
+                  f"(resíduo {it['residual_mm']:.1f} mm)")
+        ln.append(s)
+
     z = zonas_furos(res)
     ln.append("")
     ln.append("ZONAS PARA FUROS DE TUBULAÇÃO (orientativo, NBR 6118 §21.3):")
@@ -942,7 +958,45 @@ if ss.res is not None:
                        "maiores exigem dimensionamento específico com armadura "
                        "de reforço.")
 
-            sec(9, "Quantitativo de aço")
+            # ---- flecha (ELS)
+            sec(9, "Flecha (ELS)")
+            fl = mv.verificar_flecha(res)
+            itens = fl['vaos'] + fl['balancos']
+            tabela([{
+                "Local": it['nome'],
+                "Estádio": it['estadio'],
+                "Imediata": f"{it['flecha_imediata_mm']:.1f} mm",
+                "Total (c/ fluência)": f"{it['flecha_total_mm']:.1f} mm",
+                "Limite L/250": f"{it['limite_mm']:.1f} mm",
+                "Situação": "✅ OK" if it['ok'] else "❌ Excede"}
+                for it in itens])
+            st.caption("Flecha total = imediata × (1 + αf, αf=1,32 fluência). "
+                       "Carga total tratada como quase-permanente "
+                       "(conservador). Limite L/250 (visual, Tab. 13.3); "
+                       "balanço usa 2×L. Contra-flecha ≤ L/350.")
+            for it in itens:
+                if it['ok']:
+                    continue
+                cf = it['contra_flecha_mm']
+                if it['resolve_com_cf']:
+                    st.warning(
+                        f"**{it['nome']}:** flecha total {it['flecha_total_mm']:.1f} "
+                        f"mm passa do limite {it['limite_mm']:.1f} mm. "
+                        f"➡️ Execute **contra-flecha ≈ {cf:.0f} mm** "
+                        f"(arredonde p/ múltiplo de 5 mm). Resíduo visível "
+                        f"{it['residual_mm']:.1f} mm fica dentro do limite. ✅")
+                else:
+                    st.error(
+                        f"**{it['nome']}:** flecha total {it['flecha_total_mm']:.1f} "
+                        f"mm excede muito o limite {it['limite_mm']:.1f} mm. A "
+                        f"contra-flecha máxima (L/350 = {cf:.0f} mm) **não "
+                        f"resolve** (resíduo {it['residual_mm']:.1f} mm). "
+                        f"➡️ **Aumente a altura h** da viga.")
+            if all(it['ok'] for it in itens):
+                st.success("✅ Todas as flechas estão dentro do limite "
+                           "L/250 — sem necessidade de contra-flecha.")
+
+            sec(10, "Quantitativo de aço")
             tabela([{
                 "Pos": p['pos'], "Descrição": p['descr'],
                 "ø [mm]": p['phi'], "Qtd": p['qtd'],
@@ -965,7 +1019,7 @@ if ss.res is not None:
                 st.warning(av)
 
             # ---- exportação
-            sec(10, "Exportar")
+            sec(11, "Exportar")
             st.caption("Baixe as imagens para abrir na galeria (com zoom) ou "
                        "mandar pro cliente/obra.")
             ce1, ce2 = st.columns(2)

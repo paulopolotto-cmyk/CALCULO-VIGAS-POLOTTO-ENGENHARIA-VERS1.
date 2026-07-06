@@ -36,6 +36,7 @@ GAMMA_S = 1.15  # minoração do aço
 FYK = 50.0            # kN/cm² — CA-50
 FYD = FYK / GAMMA_S   # 43,48 kN/cm²
 FYWK = 50.0           # kN/cm² — estribos CA-50
+ES = 21000.0          # kN/cm² — módulo do aço (Es = 210 GPa, item 8.3.5)
 
 PESO_LINEAR = {5.0: 0.154, 6.3: 0.245, 8.0: 0.395, 10.0: 0.617,
                12.5: 0.963, 16.0: 1.578, 20.0: 2.466, 25.0: 3.853}   # kg/m
@@ -351,6 +352,130 @@ def comprimento_ancoragem(phi_mm, fck, boa_aderencia=True):
     return lb_cm / 100.0                                  # m
 
 
+# --------------------------------------------------------- flecha (ELS)
+def modulo_secante(fck, alfa_e_agreg=1.0):
+    """Módulo de elasticidade secante Ecs (kN/cm²) — NBR 6118, item 8.2.8.
+
+    alfa_e_agreg: 1,2 basalto · 1,0 granito/gnaisse (padrão) · 0,9 calcário
+    · 0,7 arenito.
+    """
+    eci = alfa_e_agreg * 5600.0 * math.sqrt(fck)     # MPa
+    alfa_i = min(0.8 + 0.2 * fck / 80.0, 1.0)
+    ecs = alfa_i * eci                               # MPa
+    return ecs / 10.0                                # kN/cm²
+
+
+def _cumint(f, x):
+    """Integral cumulativa por trapézios (F[0] = 0)."""
+    incr = (f[:-1] + f[1:]) / 2.0 * np.diff(x)
+    return np.concatenate(([0.0], np.cumsum(incr)))
+
+
+def inercia_estadio2(b, d, As, alfa_e):
+    """Inércia da seção fissurada (Estádio II), retangular armadura simples."""
+    ae_as = alfa_e * As
+    x2 = (-ae_as + math.sqrt(ae_as ** 2 + 2.0 * b * ae_as * d)) / b
+    i2 = b * x2 ** 3 / 3.0 + ae_as * (d - x2) ** 2
+    return i2, x2
+
+
+def verificar_flecha(res, alfa_f=1.32, alfa_e_agreg=1.0):
+    """Verificação de flecha (ELS-DEF) — NBR 6118, item 17.3.2.
+
+    - Rigidez equivalente pela fórmula de Branson (17.3.2.1.1).
+    - Flecha imediata por integração do diagrama M(x) (relativa à corda do
+      vão); balanços pela flecha da ponta (base engastada, estimativa).
+    - Flecha diferida pelo fator alfa_f (padrão 1,32, sem armadura de
+      compressão, carga aos ~30 dias).
+    - Limite L/250 (aceitabilidade visual, Tabela 13.3); contra-flecha
+      limitada a L/350.
+    Carga de serviço = carga total característica (conservador — trata tudo
+    como quase-permanente, pois o app não separa g de q).
+    Retorna dict com resultados por vão e por balanço.
+    """
+    d = res['dados']
+    b, h, fck, dd = d['b'], d['h'], d['fck'], d['d']
+    est = res['estatica']
+
+    Ecs = modulo_secante(fck, alfa_e_agreg)          # kN/cm²
+    alfa_e = ES / Ecs
+    Ic = b * h ** 3 / 12.0                            # cm⁴
+    yt = h / 2.0
+    fctm = 0.3 * fck ** (2.0 / 3.0)                   # MPa
+    Mr = 1.5 * (fctm / 10.0) * Ic / yt               # kN·cm (α=1,5; fct=fctm)
+    EIc = Ecs * Ic
+
+    def ei_equivalente(Ma_kNcm, As):
+        """(EI)eq (kN·cm²) e estádio, dado o momento de serviço e As."""
+        if Ma_kNcm <= Mr or As <= 0:
+            return EIc, 'I (não fissura)'
+        i2, _ = inercia_estadio2(b, dd, As, alfa_e)
+        r = (Mr / Ma_kNcm) ** 3
+        ieq = min(r * Ic + (1.0 - r) * i2, Ic)
+        return Ecs * ieq, 'II (fissurado)'
+
+    def resultado(nome, L_m, Lref_m, fi_cm, EI, estadio, Ma_kNcm):
+        fi = fi_cm * 10.0                            # mm (imediata)
+        ft = fi * (1.0 + alfa_f)                     # mm (total c/ fluência)
+        lim = Lref_m * 1000.0 / 250.0               # mm (L/250)
+        ok = ft <= lim
+        cf = 0.0
+        residual = ft
+        resolve = True
+        if not ok:
+            cf_max = Lref_m * 1000.0 / 350.0
+            cf = min(ft, cf_max)
+            residual = ft - cf
+            resolve = residual <= lim
+        return {'nome': nome, 'L': L_m, 'estadio': estadio,
+                'Ma': Ma_kNcm / 100.0, 'Mr': Mr / 100.0,
+                'flecha_imediata_mm': fi, 'flecha_total_mm': ft,
+                'limite_mm': lim, 'ok': ok,
+                'contra_flecha_mm': cf, 'residual_mm': residual,
+                'resolve_com_cf': resolve}
+
+    vaos_out = []
+    for i, v in enumerate(est['vaos']):
+        sel = res['flex_vaos'][i].get('sel')
+        As = sel['As_ef'] if sel else 0.0
+        Ma = v['M_pos'] * 100.0                      # kN·cm
+        EI, estadio = ei_equivalente(Ma, As)
+        # flecha imediata: dupla integração de y'' = -M/EI (relativa à corda)
+        x = v['xs'] * 100.0                          # cm
+        ypp = -(v['Mx'] * 100.0) / EI
+        y = _cumint(_cumint(ypp, x), x)
+        y = y - (y[-1] / x[-1]) * x                  # impõe y(0)=y(L)=0
+        fi_cm = float(max(0.0, y.max()))             # flecha p/ baixo (cm)
+        vaos_out.append(resultado(f"Vão {i + 1}", v['L'], v['L'], fi_cm,
+                                  EI, estadio, Ma))
+
+    bal_out = []
+    for lado, info, ap_idx in (('Balanço esq.', est['bal_esq'], 0),
+                               ('Balanço dir.', est['bal_dir'], -1)):
+        if not info:
+            continue
+        sel = res['flex_apoios'][ap_idx].get('sel')
+        As = sel['As_ef'] if (sel and not sel.get('construtiva')) else 0.0
+        Ma = abs(est['M_apoios'][ap_idx]) * 100.0    # kN·cm (momento no apoio)
+        EI, estadio = ei_equivalente(Ma, As)
+        # flecha da ponta por trabalho virtual (base engastada no apoio)
+        x = info['xs'] * 100.0
+        L = info['L'] * 100.0
+        # distância de cada seção até a PONTA livre
+        if lado == 'Balanço esq.':                   # ponta em x=0
+            braco = x
+        else:                                        # ponta em x=L
+            braco = L - x
+        integrando = np.abs(info['Mx'] * 100.0) * braco / EI
+        fi_cm = float(np.sum((integrando[:-1] + integrando[1:]) / 2.0
+                             * np.diff(x)))          # cm (trabalho virtual)
+        bal_out.append(resultado(lado, info['L'], 2.0 * info['L'], fi_cm,
+                                 EI, estadio, Ma))
+
+    return {'Ecs_MPa': Ecs * 10.0, 'alfa_e': alfa_e, 'alfa_f': alfa_f,
+            'Mr_kNm': Mr / 100.0, 'vaos': vaos_out, 'balancos': bal_out}
+
+
 # --------------------------------------------------------------- principal
 def calcular_viga(dados, tramos):
     """Pipeline completo. dados: {'b','h','fck','cob','peso_proprio'(bool)}.
@@ -460,8 +585,8 @@ def calcular_viga(dados, tramos):
     # ---- avisos de escopo (limitações declaradas)
     avisos.append("Análise com caso ÚNICO de carga — alternância de "
                   "sobrecarga entre vãos (envoltória) não considerada.")
-    avisos.append("ELS NÃO verificado (flecha e fissuração) — verificar "
-                  "manualmente conforme itens 17.3.2 e 17.3.3 da NBR 6118.")
+    avisos.append("Flecha (ELS-DEF) verificada na seção 'Flecha'. Abertura "
+                  "de fissuras (ELS-W, item 17.3.3) NÃO verificada.")
 
     resultado = {
         'dados': {'b': b, 'h': h, 'fck': fck, 'cob': cob, 'd': d,
