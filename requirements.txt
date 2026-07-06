@@ -1,3 +1,4 @@
+# Polotto Engenharia - Calculo Estrutural (rebuild v2)
 streamlit>=1.40
 numpy>=1.26
 pandas>=2.0
