@@ -27,8 +27,7 @@ _CSS = """
 
 /* rótulos "CALCULAR" e perguntas em destaque */
 .pol-calc-label {
-    text-transform: uppercase; letter-spacing: .16em; font-weight: 800;
-    color: #1E3A8A; font-size: .82rem; margin: 2px 0 5px;
+    font-weight: 800; color: #1E3A8A; font-size: 1.08rem; margin: 4px 0 6px;
 }
 .pol-pergunta {
     font-weight: 800; color: #1E3A8A; font-size: 1.06rem; margin: 12px 0 3px;
@@ -57,6 +56,16 @@ _CSS = """
 [data-testid="stPageLink"] a * {
     color: #1E3A8A !important; font-size: 1.2rem !important;
     font-weight: 800 !important;
+}
+/* mantém os 2 botões (Vigas | Pilares) LADO A LADO mesmo no celular.
+   Escopo: só a linha que contém um stPageLink (o seletor CALCULAR),
+   sem afetar as colunas dos campos de entrada. */
+[data-testid="stHorizontalBlock"]:has([data-testid="stPageLink"]) {
+    flex-wrap: nowrap !important; gap: 10px !important;
+}
+[data-testid="stHorizontalBlock"]:has([data-testid="stPageLink"])
+    > [data-testid="stColumn"] {
+    min-width: 0 !important; flex: 1 1 0 !important; width: 50% !important;
 }
 
 /* cabeçalho da marca */
@@ -358,8 +367,8 @@ def seletor_pagina(atual):
 
     atual: 'vigas' ou 'pilar' — define qual botão fica em âmbar (ativo).
     """
-    st.markdown('<div class="pol-calc-label">Calcular</div>',
-                unsafe_allow_html=True)
+    st.markdown('<div class="pol-calc-label">Calcular — Vigas ou Pilares '
+                '— clique abaixo:</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if atual == "vigas":
