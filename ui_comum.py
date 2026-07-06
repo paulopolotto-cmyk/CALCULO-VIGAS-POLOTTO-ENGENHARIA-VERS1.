@@ -366,76 +366,102 @@ def rodape(texto):
 
 # ---- Sobrecargas de uso (cargas acidentais) — NBR 6120:2019 [kN/m²] ----
 SOBRECARGAS_USO = {
-    "Residência — dormitório/sala (1,5)": 1.5,
-    "Residência — cozinha/serviço (2,0)": 2.0,
-    "Escritório (2,5)": 2.5,
-    "Corredor/escada (3,0)": 3.0,
-    "Loja/comércio (4,0)": 4.0,
-    "Garagem — veículos leves (3,0)": 3.0,
-    "Cobertura — só manutenção (1,0)": 1.0,
+    "Residência — dormitório/sala": 1.5,
+    "Residência — cozinha/área de serviço": 2.0,
+    "Escritório": 2.5,
+    "Corredor/escada": 3.0,
+    "Loja/comércio": 4.0,
+    "Garagem — veículos leves": 3.0,
+    "Cobertura — só manutenção/acesso": 1.0,
 }
 # Paredes — peso por m² de parede (alvenaria + revestimento) [kN/m²]
 PAREDES = {
     "Sem parede": 0.0,
-    "Bloco cerâmico furado 15 cm (~1,8)": 1.8,
-    "Bloco de concreto 14 cm (~2,8)": 2.8,
-    "Tijolo maciço 1 vez (~3,6)": 3.6,
-    "Divisória leve (~1,0)": 1.0,
+    "Bloco cerâmico furado 15 cm": 1.8,
+    "Bloco de concreto 14 cm": 2.8,
+    "Tijolo maciço (1 vez)": 3.6,
+    "Divisória leve / drywall": 1.0,
 }
 
 
 def assistente_carga(fu, un_fm, key="asst"):
     """Assistente que estima a carga distribuída q [kN/m] de uma viga a
     partir de componentes comuns (NBR 6120). Retorna q em kN/m se o usuário
-    confirmar, senão None. fu/un_fm só para exibir na unidade escolhida.
+    confirmar, senão None. As cargas de área e o resultado são exibidos na
+    unidade escolhida (kN ou kgf); o cálculo interno é sempre em kN.
     """
+    un_area = "kgf/m²" if fu > 1 else "kN/m²"
+    ca = 0 if fu > 1 else 2                      # casas decimais p/ área
+
+    def _fa(v_kN):                               # formata carga de área
+        return f"{v_kN * fu:.{ca}f}"
+
     q_kN = None
     with st.expander("🧮 Montar a carga (sobrecargas comuns) — opcional"):
-        st.caption("Estime a carga da viga somando os componentes. Os "
-                   "valores seguem a NBR 6120. O peso próprio da viga é "
-                   "somado depois, automaticamente.")
+        st.caption("Some os componentes que apoiam na viga. Os valores "
+                   "seguem a NBR 6120. O peso próprio da viga é somado "
+                   "depois, automaticamente. Fórmula: q = (laje + "
+                   "revestimento + sobrecarga de uso) × largura de "
+                   "influência + parede.")
         c1, c2 = st.columns(2)
         larg = c1.number_input(
             "Largura de influência da laje [m]", min_value=0.0,
-            max_value=15.0, value=4.0, step=0.1, format="%.2f", key=f"{key}_lg",
-            help="Quanto de laje 'descarrega' nesta viga: em geral metade do "
-                 "vão da laje de cada lado. Ex.: laje de 4 m entre duas "
-                 "vigas → ~2 m para cada viga.")
-        laje = c2.number_input(
-            "Peso da laje [kN/m²]", min_value=0.0, max_value=15.0, value=3.0,
-            step=0.5, format="%.1f", key=f"{key}_lj",
-            help="Peso próprio da laje. Maciça: ~25·espessura (laje de 12 cm "
-                 "≈ 3,0). Treliçada/pré-moldada comum: ~2,5 a 3,0 kN/m².")
+            max_value=15.0, value=4.0, step=0.1, format="%.2f",
+            key=f"{key}_lg",
+            help="É a FAIXA de laje que descarrega nesta viga = soma das "
+                 "metades dos vãos de laje de cada lado. Ex.: viga entre "
+                 "duas lajes de 4 m → 2 m de cada lado = 4 m. Viga de borda "
+                 "(laje só de um lado, vão 4 m) → ~2 m. É esse valor que "
+                 "transforma a carga de área (por m²) em carga por metro de "
+                 "viga.")
+        laje_d = c2.number_input(
+            f"Peso da laje [{un_area}]", min_value=0.0, max_value=15.0 * fu,
+            value=3.0 * fu, step=0.5 * fu, format=f"%.{ca}f", key=f"{key}_lj",
+            help="Peso próprio da laje. Maciça ≈ 25 × espessura (laje de "
+                 "12 cm ≈ 3,0 kN/m² = 306 kgf/m²). Treliçada/pré-moldada "
+                 "comum: ~2,5 a 3,0 kN/m².")
+        laje = laje_d / fu
         c3, c4 = st.columns(2)
-        revest = c3.number_input(
-            "Revestimento/contrapiso [kN/m²]", min_value=0.0, max_value=5.0,
-            value=1.0, step=0.5, format="%.1f", key=f"{key}_rv",
-            help="Contrapiso + piso + forro. Valor usual: 1,0 kN/m².")
+        revest_d = c3.number_input(
+            f"Revestimento/contrapiso [{un_area}]", min_value=0.0,
+            max_value=5.0 * fu, value=1.0 * fu, step=0.5 * fu,
+            format=f"%.{ca}f", key=f"{key}_rv",
+            help="Contrapiso + piso + forro. Usual ≈ 1,0 kN/m² "
+                 "(102 kgf/m²).")
+        revest = revest_d / fu
         uso_lbl = c4.selectbox(
             "Sobrecarga de uso (NBR 6120)", list(SOBRECARGAS_USO.keys()),
             key=f"{key}_uso",
-            help="Carga acidental conforme o uso do ambiente (NBR 6120).")
+            format_func=lambda k: f"{k} ({_fa(SOBRECARGAS_USO[k])} "
+                                  f"{un_area})",
+            help="Carga acidental (de uso) conforme o ambiente — NBR 6120, "
+                 "Tabela 10.")
         uso = SOBRECARGAS_USO[uso_lbl]
         c5, c6 = st.columns(2)
         par_lbl = c5.selectbox(
             "Parede sobre a viga", list(PAREDES.keys()), key=f"{key}_pl",
+            format_func=lambda k: (k if PAREDES[k] == 0 else
+                                   f"{k} ({_fa(PAREDES[k])} {un_area})"),
             help="Tipo de parede que apoia diretamente na viga (se houver).")
         alt_par = c6.number_input(
             "Altura da parede [m]", min_value=0.0, max_value=8.0, value=2.8,
             step=0.1, format="%.2f", key=f"{key}_ap",
             disabled=(PAREDES[par_lbl] == 0.0),
-            help="Pé-direito da parede sobre a viga.")
+            help="Pé-direito da parede sobre a viga (altura da alvenaria).")
         parede = PAREDES[par_lbl] * alt_par                    # kN/m
         q_kN_calc = (laje + revest + uso) * larg + parede      # kN/m
 
         st.markdown(
-            f"**Carga estimada:** ({laje:.1f} laje + {revest:.1f} revest. + "
-            f"{uso:.1f} uso) × {larg:.2f} m"
-            + (f" + {parede:.2f} parede" if parede > 0 else "")
-            + f" = **{q_kN_calc * fu:.{0 if fu > 1 else 2}f} {un_fm}**")
-        if st.button(f"✔ Usar {q_kN_calc * fu:.{0 if fu > 1 else 1}f} "
-                     f"{un_fm} no campo de carga", key=f"{key}_btn",
-                     width="stretch"):
+            f"**Carga estimada** = ({_fa(laje)} laje + {_fa(revest)} revest. "
+            f"+ {_fa(uso)} uso) {un_area} × {larg:.2f} m"
+            + (f" + parede {parede * fu:.{ca}f} {un_fm}" if parede > 0
+               else ""))
+        st.markdown(
+            f"### ➡️ q ≈ {q_kN_calc * KGF_POR_KN:,.0f} kgf/m"
+            .replace(",", ".")
+            + f"  ·  {q_kN_calc:.2f} kN/m")
+        if st.button(f"✔ Usar esta carga ({q_kN_calc * fu:.{0 if fu > 1 else 1}f}"
+                     f" {un_fm})", key=f"{key}_btn", width="stretch"):
             q_kN = q_kN_calc
     return q_kN
 
