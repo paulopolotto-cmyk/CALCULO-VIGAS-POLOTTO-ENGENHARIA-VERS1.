@@ -20,8 +20,8 @@ from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
                       mostrar_figura, seletor_pagina)
 
 aplicar_estilo()
-header("Cálculo de Vigas Contínuas",
-       "Concreto armado · NBR 6118 · CA-50 · ELU flexão e cortante")
+header("Cálculo de Vigas Contínuas e Pilares",
+       "Concreto armado · NBR 6118 · CA-50")
 
 seletor_pagina("vigas")
 

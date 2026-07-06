@@ -34,17 +34,21 @@ _CSS = """
     font-weight: 800; color: #1E3A8A; font-size: 1.06rem; margin: 12px 0 3px;
 }
 
-/* seletor CALCULAR (Vigas / Pilares) */
+/* seletor CALCULAR (Vigas / Pilares) — botões do MESMO tamanho, lado a lado */
 .pol-pg-ativo {
     background: linear-gradient(135deg, #F6C86B, #E8A33D);
     color: #16265B !important; font-weight: 800; font-size: 1.2rem;
-    text-align: center; padding: 14px 10px; border-radius: 12px;
+    padding: 13px 10px; border-radius: 12px;
     box-shadow: 0 3px 10px rgba(180,83,9,.32);
+    min-height: 54px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
 }
 [data-testid="stPageLink"] { width: 100%; }
 [data-testid="stPageLink"] a {
     background: #EEF3FC; border: 2px solid #1E3A8A; border-radius: 12px;
-    padding: 13px 10px !important; justify-content: center; min-height: 52px;
+    padding: 13px 10px !important; min-height: 54px;
+    width: 100%; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
     transition: all .12s ease;
 }
 [data-testid="stPageLink"] a:hover {
@@ -383,7 +387,8 @@ def seletor_unidade(key="unidade_forca"):
     st.markdown('<div class="pol-pergunta">Qual unidade de carga você quer '
                 'usar?</div>', unsafe_allow_html=True)
     op = st.radio("Unidade de força", ["kN · kN/m", "kgf · kgf/m"],
-                  horizontal=True, key=key, label_visibility="collapsed",
+                  index=1, horizontal=True, key=key,
+                  label_visibility="collapsed",
                   help="Escolha o sistema de unidades das cargas e dos "
                        "esforços. O cálculo é o mesmo; muda só a exibição.")
     if op.startswith("kgf"):

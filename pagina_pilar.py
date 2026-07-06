@@ -18,9 +18,8 @@ from ui_comum import (NAVY, AMBAR, CINZA_TXT, CONCRETO,
                       seletor_pagina)
 
 aplicar_estilo()
-header("Cálculo de Pilares",
-       "Concreto armado · NBR 6118 · esbeltez + 2ª ordem (pilar-padrão) "
-       "· flexo-compressão")
+header("Cálculo de Vigas Contínuas e Pilares",
+       "Concreto armado · NBR 6118 · CA-50")
 
 seletor_pagina("pilar")
 
