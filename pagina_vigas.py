@@ -6,6 +6,7 @@ Dimensionamento conforme NBR 6118 (ELU flexão e cortante).
 import io
 import json
 import math
+import zipfile
 
 import matplotlib
 matplotlib.use("Agg")
@@ -589,6 +590,146 @@ def fig_corte_estribo(res, tipo, idx, titulo):
     return fig
 
 
+# ===================================== corte longitudinal (armação) profissional
+def _barra_ferro(ax, x1, x2, y, cor, hook=1, lw=3.0, h=0.11):
+    """Desenha uma barra reta com ganchos (dobras) nas pontas."""
+    ax.plot([x1, x2], [y, y], color=cor, lw=lw, solid_capstyle='round',
+            zorder=6)
+    for xe in (x1, x2):
+        ax.plot([xe, xe], [y, y + hook * h], color=cor, lw=lw,
+                solid_capstyle='round', zorder=6)
+
+
+def _cota(ax, x1, x2, y, texto, cor, dy=0.07):
+    ax.annotate('', xy=(x2, y), xytext=(x1, y),
+                arrowprops=dict(arrowstyle='<->', color=cor, lw=0.9))
+    ax.plot([x1, x1], [y - 0.05, y + 0.05], color=cor, lw=0.8)
+    ax.plot([x2, x2], [y - 0.05, y + 0.05], color=cor, lw=0.8)
+    ax.text((x1 + x2) / 2, y + dy, texto, ha='center', va='bottom',
+            fontsize=8.5, color=cor, fontweight='bold')
+
+
+def fig_corte_longitudinal(res):
+    est = res['estatica']
+    q = res['quantitativo']
+    d = res['dados']
+    xs_ap = _posicoes_apoios(est)
+    off_e = est['bal_esq']['L'] if est['bal_esq'] else 0.0
+    L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
+    n_seg = (len(est['vaos']) + (1 if est['bal_esq'] else 0)
+             + (1 if est['bal_dir'] else 0))
+    W = max(8.5, 2.6 * n_seg)
+    fig, ax = plt.subplots(figsize=(W, 5.2), dpi=150)
+    fig.patch.set_facecolor('white')
+    ax.set_xlim(-0.06 * L_tot, 1.13 * L_tot)
+    ax.set_ylim(-2.35, 2.25)
+    ax.axis('off')
+
+    # ---- concreto (elevação) e apoios
+    ax.add_patch(plt.Rectangle((0, 0), L_tot, 1.0, facecolor='#EEF1F6',
+                               edgecolor=CINZA_TXT, lw=1.6, zorder=1))
+    for j, xa in enumerate(xs_ap):
+        ax.plot(xa, 0.0, marker='^', color=NAVY, ms=15, zorder=4,
+                clip_on=False)
+        ax.text(xa, -0.16, f"{chr(65 + j)}", ha='center', va='top',
+                fontsize=10, fontweight='bold', color=NAVY)
+
+    # ---- estribos (ticks verticais) por trecho + rótulo
+    def _desenha_estribos(xi, xf, e, rotulo_y):
+        if not e or e.get('falha_biela'):
+            return
+        s = e['s'] / 100.0
+        n = 0
+        xk = xi + 0.02
+        while xk <= xf - 0.01 and n < 400:
+            ax.plot([xk, xk], [0.12, 0.88], color=AMBAR, lw=0.8, zorder=3)
+            xk += s
+            n += 1
+        n_est = int(math.ceil((xf - xi) * 100.0 / e['s'])) + 1
+        ax.text((xi + xf) / 2, rotulo_y,
+                f"estribos {e['texto']} ({n_est} un)", ha='center',
+                va='top', fontsize=8.5, color='#78350F', fontweight='bold',
+                style='italic')
+
+    x0 = xs_ap[0]
+    for i, v in enumerate(est['vaos']):
+        _desenha_estribos(x0, x0 + v['L'], res['estribos'][i], -1.28)
+        x0 += v['L']
+    if est['bal_esq']:
+        _desenha_estribos(0.0, off_e, res['estribo_be'], -1.28)
+    if est['bal_dir']:
+        _desenha_estribos(xs_ap[-1], L_tot, res['estribo_bd'], -1.28)
+
+    # ---- porta-estribos (2 ø8) — linha fina no topo
+    pe = next((p for p in q['posicoes'] if 'Porta' in p['descr']), None)
+    if pe:
+        ax.plot([0.05, L_tot - 0.05], [0.9, 0.9], color=CINZA_TXT, lw=1.6,
+                zorder=5)
+
+    # ---- barras NEGATIVAS (topo) com cotas e marcas
+    for p in q['posicoes']:
+        if 'apoio' not in p:
+            continue
+        j = p['apoio']
+        xa = xs_ap[j]
+        Lb = p['comp_unit']
+        xi, xf = max(0.0, xa - Lb / 2), min(L_tot, xa + Lb / 2)
+        if j == 0 and est['bal_esq']:
+            xi, xf = 0.0, min(L_tot, Lb - off_e + xa - off_e * 0)
+            xi, xf = 0.0, min(L_tot, xa + (Lb - off_e))
+        if j == len(xs_ap) - 1 and est['bal_dir']:
+            xi, xf = max(0.0, xa - (Lb - est['bal_dir']['L'])), L_tot
+        _barra_ferro(ax, xi, xf, 0.84, VERMELHO, hook=-1)
+        _cota(ax, xi, xf, 1.28, f"C = {Lb:.2f} m", VERMELHO)
+        ax.text((xi + xf) / 2, 1.55,
+                f"{p['pos']}  {p['qtd']} ø{p['phi']:.1f}", ha='center',
+                va='bottom', fontsize=9, fontweight='bold', color=VERMELHO)
+
+    # ---- barras POSITIVAS (fundo) com cotas e marcas
+    x0 = xs_ap[0]
+    for i, v in enumerate(est['vaos']):
+        p = next((p for p in q['posicoes'] if p.get('vao') == i), None)
+        if p:
+            Lb = p['comp_unit']
+            cx = x0 + v['L'] / 2.0
+            xi, xf = max(0.0, cx - Lb / 2), min(L_tot, cx + Lb / 2)
+            _barra_ferro(ax, xi, xf, 0.16, VERDE, hook=1)
+            _cota(ax, xi, xf, -0.55, f"C = {Lb:.2f} m", VERDE, dy=-0.22)
+            ax.text(cx, -0.92, f"{p['pos']}  {p['qtd']} ø{p['phi']:.1f}",
+                    ha='center', va='top', fontsize=9, fontweight='bold',
+                    color=VERDE)
+        x0 += v['L']
+
+    # ---- cotas dos vãos (base)
+    tramos = []
+    if est['bal_esq']:
+        tramos.append((0.0, off_e))
+    xc = xs_ap[0]
+    for v in est['vaos']:
+        tramos.append((xc, xc + v['L']))
+        xc += v['L']
+    if est['bal_dir']:
+        tramos.append((xs_ap[-1], L_tot))
+    for xi, xf in tramos:
+        _cota(ax, xi, xf, -1.75, f"{xf - xi:.2f} m", CINZA_TXT, dy=-0.24)
+
+    ax.text(0.0, 2.08, "CORTE LONGITUDINAL — ARMAÇÃO", ha='left',
+            va='bottom', fontsize=11, fontweight='bold', color=NAVY)
+    ax.text(L_tot, 2.08,
+            f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CA-50",
+            ha='right', va='bottom', fontsize=9.5, fontweight='bold',
+            color=CINZA_TXT)
+    # legenda
+    ax.plot([0.0, 0.6], [-2.15, -2.15], color=VERMELHO, lw=3)
+    ax.text(0.7, -2.15, "negativo (topo)", va='center', fontsize=8.5,
+            color=VERMELHO, fontweight='bold')
+    ax.plot([0.0, 0.6], [-2.32, -2.32], color=VERDE, lw=3)
+    ax.text(0.7, -2.32, "positivo (fundo)", va='center', fontsize=8.5,
+            color=VERDE, fontweight='bold')
+    fig.tight_layout()
+    return fig
+
+
 # ========================================== zona segura para furos na viga
 def zonas_furos(res):
     """Janelas horizontais seguras para furo pequeno (por vão interno).
@@ -936,6 +1077,10 @@ if ss.res is not None:
             png_corte = mostrar_figura(
                 fig_corte_estribo(res, tipo_c, idx_c, titulo_c))
 
+            st.markdown("**📐 Corte longitudinal — detalhamento da armação "
+                        "(comprimentos, marcas e estribos):**")
+            png_long = mostrar_figura(fig_corte_longitudinal(res))
+
             # ---- zona segura para furos
             sec(8, "Onde furar a viga (passagem de tubulação)")
             st.caption("Verde = pode furar · Vermelho = evitar. A **linha "
@@ -1022,35 +1167,57 @@ if ss.res is not None:
 
             # ---- exportação
             sec(11, "Exportar")
-            st.caption("Baixe as imagens para abrir na galeria (com zoom) ou "
-                       "mandar pro cliente/obra.")
+
+            # pacote ZIP com tudo (memorial + todas as figuras)
+            nome_base = f"Viga_{b:.0f}x{h:.0f}"
+            zbuf = io.BytesIO()
+            with zipfile.ZipFile(zbuf, "w", zipfile.ZIP_DEFLATED) as z:
+                z.writestr(f"{nome_base}_memorial.txt",
+                           gerar_memorial(res, nomes_l))
+                z.writestr("1_esquema_reacoes.png", png_esq)
+                z.writestr("2_diagramas_M_V.png", png_diag)
+                z.writestr("3_detalhamento.png", png)
+                z.writestr("4_corte_longitudinal.png", png_long)
+                z.writestr("5_corte_transversal.png", png_corte)
+                z.writestr("6_zona_furos.png", png_furos)
+            st.download_button(
+                "📦 BAIXAR TUDO (.zip) — memorial + todos os desenhos",
+                zbuf.getvalue(), file_name=f"{nome_base}_completo.zip",
+                mime="application/zip", type="primary", width="stretch")
+            st.caption("Ou baixe um de cada vez para mandar ao cliente/obra "
+                       "só o que precisa (abra as imagens na galeria p/ zoom):")
+
             ce1, ce2 = st.columns(2)
             ce1.download_button(
                 "📄 Memorial (.txt)",
                 gerar_memorial(res, nomes_l).encode('utf-8'),
-                file_name=f"Viga_{b:.0f}x{h:.0f}_memorial.txt",
+                file_name=f"{nome_base}_memorial.txt",
                 mime="text/plain", width="stretch")
             ce2.download_button(
-                "🖼️ Esquema e reações (.png)", png_esq,
-                file_name=f"Viga_{b:.0f}x{h:.0f}_esquema.png",
+                "🖼️ Esquema e reações", png_esq,
+                file_name=f"{nome_base}_esquema.png",
                 mime="image/png", width="stretch")
             ce3, ce4 = st.columns(2)
             ce3.download_button(
-                "🖼️ Diagramas M e V (.png)", png_diag,
-                file_name=f"Viga_{b:.0f}x{h:.0f}_diagramas.png",
+                "🖼️ Diagramas M e V", png_diag,
+                file_name=f"{nome_base}_diagramas.png",
                 mime="image/png", width="stretch")
             ce4.download_button(
-                "🖼️ Detalhamento (.png)", png,
-                file_name=f"Viga_{b:.0f}x{h:.0f}_detalhamento.png",
+                "🖼️ Detalhamento", png,
+                file_name=f"{nome_base}_detalhamento.png",
                 mime="image/png", width="stretch")
             ce5, ce6 = st.columns(2)
             ce5.download_button(
-                "🖼️ Corte + estribo (.png)", png_corte,
-                file_name=f"Viga_{b:.0f}x{h:.0f}_corte_{titulo_c}.png",
+                "🖼️ Corte longitudinal", png_long,
+                file_name=f"{nome_base}_corte_longitudinal.png",
                 mime="image/png", width="stretch")
             ce6.download_button(
-                "🖼️ Zona de furos (.png)", png_furos,
-                file_name=f"Viga_{b:.0f}x{h:.0f}_furos.png",
+                "🖼️ Corte transversal", png_corte,
+                file_name=f"{nome_base}_corte_{titulo_c}.png",
+                mime="image/png", width="stretch")
+            st.download_button(
+                "🖼️ Zona de furos", png_furos,
+                file_name=f"{nome_base}_furos.png",
                 mime="image/png", width="stretch")
 
 # ------------------------------------------------------------ limpar tudo

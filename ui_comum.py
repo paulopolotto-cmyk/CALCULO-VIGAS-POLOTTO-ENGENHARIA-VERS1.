@@ -57,6 +57,12 @@ _CSS = """
     color: #1E3A8A !important; font-size: 1.2rem !important;
     font-weight: 800 !important;
 }
+.pol-pg-inativo {
+    background: #EEF3FC; border: 2px solid #1E3A8A; border-radius: 12px;
+    color: #1E3A8A !important; font-weight: 800; font-size: 1.2rem;
+    padding: 13px 10px; min-height: 54px; box-sizing: border-box;
+    display: flex; align-items: center; justify-content: center;
+}
 /* mantém os 2 botões (Vigas | Pilares) LADO A LADO mesmo no celular.
    Escopo: só a linha que contém um stPageLink (o seletor CALCULAR),
    sem afetar as colunas dos campos de entrada. */
@@ -362,6 +368,18 @@ def rodape(texto):
 KGF_POR_KN = 101.9716
 
 
+def _botao_pagina(alvo, atual, path, label, icon):
+    if atual == alvo:
+        st.markdown(f'<div class="pol-pg-ativo">{icon} {label}</div>',
+                    unsafe_allow_html=True)
+        return
+    try:                       # link real (dentro da navegação st.navigation)
+        st.page_link(path, label=label, icon=icon)
+    except Exception:          # fallback (execução direta / sem navegação)
+        st.markdown(f'<div class="pol-pg-inativo">{icon} {label}</div>',
+                    unsafe_allow_html=True)
+
+
 def seletor_pagina(atual):
     """Seletor destacado CALCULAR → Vigas / Pilares (no corpo da página).
 
@@ -371,17 +389,9 @@ def seletor_pagina(atual):
                 '— clique abaixo:</div>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        if atual == "vigas":
-            st.markdown('<div class="pol-pg-ativo">🏗️ Vigas</div>',
-                        unsafe_allow_html=True)
-        else:
-            st.page_link("pagina_vigas.py", label="Vigas", icon="🏗️")
+        _botao_pagina("vigas", atual, "pagina_vigas.py", "Vigas", "🏗️")
     with c2:
-        if atual == "pilar":
-            st.markdown('<div class="pol-pg-ativo">🏛️ Pilares</div>',
-                        unsafe_allow_html=True)
-        else:
-            st.page_link("pagina_pilar.py", label="Pilares", icon="🏛️")
+        _botao_pagina("pilar", atual, "pagina_pilar.py", "Pilares", "🏛️")
 
 
 def seletor_unidade(key="unidade_forca"):
