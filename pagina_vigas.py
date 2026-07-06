@@ -611,10 +611,12 @@ def fig_corte_estribo(res, tipo, idx, titulo):
             for xx in (xL, xR):
                 ax.add_patch(plt.Circle((xx, yy), phi_pl / 2.0, color=cor_pl,
                                         ec='white', lw=0.5, zorder=6))
-        ax.text(b + 3.5, h / 2,
-                f"pele\n{pl['n_face']} ø{pl['phi']:.1f}\nc/{pl['s']:.0f} cm",
-                ha='center', va='center', fontsize=8, color=cor_pl,
-                fontweight='bold')
+        # rótulo à direita da seção, com linha de chamada (sem sobrepor)
+        ax.annotate(f"pele: {pl['n_face']} ø{pl['phi']:.1f}\nc/ {pl['s']:.0f} cm",
+                    xy=(xR, h / 2), xytext=(b + 4.0, h / 2),
+                    ha='left', va='center', fontsize=8.5, color=cor_pl,
+                    fontweight='bold',
+                    arrowprops=dict(arrowstyle='-', color=cor_pl, lw=0.8))
     # cotas
     ax.annotate('', xy=(b, -3.2), xytext=(0, -3.2),
                 arrowprops=dict(arrowstyle='<->', color=CINZA_TXT, lw=1.0))
@@ -626,7 +628,7 @@ def fig_corte_estribo(res, tipo, idx, titulo):
             fontsize=10, fontweight='bold', color=CINZA_TXT, rotation=90)
     ax.set_title(f"Corte — {titulo}", fontsize=11, fontweight='bold',
                  color=NAVY)
-    ax.set_xlim(-9, b + (9 if res.get('pele') else 4))
+    ax.set_xlim(-9, b + (16 if res.get('pele') else 4))
     ax.set_ylim(-7, h + 4)
     ax.set_aspect('equal')
     ax.axis('off')
