@@ -14,7 +14,7 @@ import streamlit as st
 
 import motor_pilar as mp
 from ui_comum import (NAVY, AMBAR, CINZA_TXT, CONCRETO,
-                      aplicar_estilo, header, sec, seletor_unidade)
+                      aplicar_estilo, header, sec, seletor_unidade, tabela)
 
 aplicar_estilo()
 header("Cálculo de Pilares",
@@ -52,11 +52,12 @@ caa = c5.selectbox("Classe de agressividade (CAA)",
                         "IV=5,0 cm (Tabela 7.2)")
 Nk_disp = c6.number_input(f"Força normal CARACTERÍSTICA Nk [{un_f}]",
                           min_value=1.0, max_value=20000.0 * fu,
-                          value=500.0 * fu, step=10.0 * fu, format="%.0f",
+                          value=None, step=10.0 * fu, format="%.0f",
+                          placeholder="digite a carga",
                           help="O programa aplica γf = 1,4 e γn "
                                "automaticamente. NÃO digite o valor já "
                                "majorado.")
-Nk = Nk_disp / fu          # -> kN (interno)
+Nk = (Nk_disp or 0.0) / fu          # -> kN (interno)
 st.caption("Aço CA-50 · γf=1,4 · γc=1,4 · γs=1,15 · "
            "pilar interno de estrutura contraventada")
 
@@ -175,7 +176,7 @@ if ss.res_pilar is not None:
                 "e2 [cm]": f"{dd['e2']:.2f}",
                 f"Md,tot [{un_f}·m]":
                     f"{dd['Md_tot'] / 100 * fu:.{_cfp}f}"})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        tabela(rows)
 
         with st.expander("⚠️ Avisos e hipóteses de cálculo"):
             for a in res['avisos']:
@@ -217,7 +218,7 @@ if ss.res_pilar is not None:
                           help="M_Rd / Md,tot na direção crítica")
 
             sec(4, "Ferragem e pesos")
-            df = pd.DataFrame([
+            tabela([
                 {"Elemento": "Longitudinal", "Bitola": f"ø{opt['phi']:.1f}",
                  "Qtd": f"{opt['n']} un",
                  "Comp. [m]": f"{opt['comp_barra']:.2f}",
@@ -227,7 +228,6 @@ if ss.res_pilar is not None:
                  "Qtd": f"{opt['n_est']} un",
                  "Comp. [m]": f"{opt['comp_est']:.2f}",
                  "Peso [kg]": f"{opt['peso_est']:.2f}"}])
-            st.dataframe(df, hide_index=True, width="stretch")
             st.metric("Peso total de aço", f"{opt['peso_total']:.2f} kg")
 
             sec(5, "Exportar")

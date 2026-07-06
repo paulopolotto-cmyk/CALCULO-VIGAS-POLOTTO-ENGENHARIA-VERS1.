@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
 """Identidade visual compartilhada dos apps Polotto (vigas e pilares)."""
+import html as _html
+
 import streamlit as st
+import streamlit.components.v1 as components
 
 # paleta "azul engenharia"
 NAVY = "#1E3A8A"
@@ -125,12 +128,111 @@ div.stButton > button, div[data-testid="stFormSubmitButton"] > button {
 
 /* dataframes ocupam a largura toda */
 [data-testid="stDataFrame"] { width: 100%; }
+
+/* ===== LEITURA REFORÇADA (negrito e um pouco maior, bom no celular) ===== */
+[data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
+[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
+[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * {
+    font-weight: 700 !important;
+}
+[data-testid="stWidgetLabel"] p { font-size: 1.02rem !important; }
+[data-testid="stMetricValue"] { font-weight: 800 !important; }
+[data-testid="stMetricLabel"] * { font-weight: 700 !important; }
+/* números digitados: negrito e maiores */
+[data-testid="stNumberInput"] input, [data-testid="stTextInput"] input,
+[data-baseweb="select"] div {
+    font-weight: 800 !important; font-size: 1.08rem !important;
+}
+
+/* ===== SELETOR DE UNIDADE (kN / kgf): maior e negrito ===== */
+[data-testid="stRadio"] [role="radiogroup"] { gap: 10px; }
+[data-testid="stRadio"] [role="radiogroup"] label {
+    background: #EEF3FC; border: 2px solid #C9D6F5; border-radius: 10px;
+    padding: 8px 14px;
+}
+[data-testid="stRadio"] [role="radiogroup"] label p,
+[data-testid="stRadio"] [role="radiogroup"] label div {
+    font-size: 1.12rem !important; font-weight: 800 !important;
+    color: #1E3A8A !important;
+}
+
+/* ===== BOTÕES DE AÇÃO (Inserir / Salvar) grandes e em ÂMBAR ===== */
+[data-testid="stFormSubmitButton"] button {
+    background: linear-gradient(135deg, #E8A33D, #B45309) !important;
+    color: #ffffff !important; border: none !important;
+    font-size: 1.16rem !important; font-weight: 800 !important;
+    min-height: 54px !important; letter-spacing: .01em;
+    box-shadow: 0 3px 10px rgba(180,83,9,.30);
+}
+[data-testid="stFormSubmitButton"] button:hover { filter: brightness(1.07); }
+/* botão primário CALCULAR: maior e mais forte */
+div.stButton > button[kind="primary"] {
+    font-size: 1.2rem !important; font-weight: 800 !important;
+    min-height: 56px !important;
+}
+
+/* ===== TABELAS DE RESULTADO (HTML, negrito + rolagem horizontal) ===== */
+.pol-tab-wrap {
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    margin: 4px 0 10px; border: 1px solid #DDE3EC; border-radius: 10px;
+}
+.pol-tab { border-collapse: collapse; width: 100%; }
+.pol-tab th {
+    background: #1E3A8A; color: #fff !important; font-weight: 800;
+    font-size: .95rem; padding: 9px 11px; text-align: left;
+    white-space: nowrap;
+}
+.pol-tab td {
+    border-top: 1px solid #E4E9F1; padding: 8px 11px;
+    font-weight: 700; color: #14213D; font-size: .98rem; white-space: nowrap;
+}
+.pol-tab tbody tr:nth-child(even) td { background: #F4F6FA; }
 </style>
+"""
+
+
+_ZOOM_JS = """
+<script>
+(function () {
+  try {
+    var doc = window.parent.document;
+    var vp = doc.querySelector('meta[name="viewport"]');
+    if (!vp) { vp = doc.createElement('meta'); vp.name = 'viewport';
+               doc.head.appendChild(vp); }
+    vp.setAttribute('content',
+      'width=device-width, initial-scale=1.0, maximum-scale=5.0, '
+      + 'user-scalable=yes');
+  } catch (e) {}
+})();
+</script>
 """
 
 
 def aplicar_estilo():
     st.markdown(_CSS, unsafe_allow_html=True)
+    # libera o zoom de pinça no celular (Streamlit bloqueia por padrão)
+    components.html(_ZOOM_JS, height=0, width=0)
+
+
+def tabela(rows):
+    """Renderiza uma tabela HTML (negrito, cabeçalho azul, rolagem horizontal).
+
+    rows: lista de dicts {coluna: valor}. Substitui st.dataframe para permitir
+    negrito e melhor leitura no celular.
+    """
+    if not rows:
+        return
+    cols = list(rows[0].keys())
+    th = "".join(f"<th>{_html.escape(str(c))}</th>" for c in cols)
+    corpo = ""
+    for r in rows:
+        tds = "".join(f"<td>{_html.escape(str(r.get(c, '')))}</td>"
+                      for c in cols)
+        corpo += f"<tr>{tds}</tr>"
+    st.markdown(
+        f'<div class="pol-tab-wrap"><table class="pol-tab"><thead><tr>{th}'
+        f'</tr></thead><tbody>{corpo}</tbody></table></div>',
+        unsafe_allow_html=True)
 
 
 def header(titulo, subtitulo):

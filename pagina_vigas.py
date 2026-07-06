@@ -16,7 +16,7 @@ import streamlit as st
 
 import motor_viga as mv
 from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
-                      aplicar_estilo, header, sec, seletor_unidade)
+                      aplicar_estilo, header, sec, seletor_unidade, tabela)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas",
@@ -91,32 +91,40 @@ if editando and ss.edit_index >= len(ss.lista_vaos):
     editando = False
 
 if not editando:
-    with st.form("form_tramo", clear_on_submit=False):
+    st.caption("💡 Toque em cada campo de carga e digite — eles já começam "
+               "vazios (comprimento, carga, posição).")
+    with st.form("form_tramo", clear_on_submit=True):
         tipo = st.selectbox("Tipo do tramo",
                             ["Normal", "Balanço Esquerdo", "Balanço Direito"])
         cL, cQ = st.columns(2)
         L_in = cL.number_input("Comprimento L [m]", min_value=0.1,
-                               max_value=30.0, value=4.0, step=0.1,
-                               format="%.2f")
+                               max_value=30.0, value=None, step=0.1,
+                               format="%.2f", placeholder="ex: 4,50")
         q_disp = cQ.number_input(f"Carga distribuída q [{un_fm}]",
                                  min_value=0.0, max_value=500.0 * fu,
-                                 value=15.0 * fu, step=0.5 * fu,
-                                 format=f"%.{_cf(2)}f")
+                                 value=None, step=0.5 * fu,
+                                 format=f"%.{_cf(2)}f", placeholder="ex: 15")
         cP, cA = st.columns(2)
         P_disp = cP.number_input(f"Carga concentrada P [{un_f}]",
                                  min_value=0.0, max_value=2000.0 * fu,
-                                 value=0.0, step=1.0 * fu,
-                                 format=f"%.{_cf(2)}f")
+                                 value=None, step=1.0 * fu,
+                                 format=f"%.{_cf(2)}f",
+                                 placeholder="0 se não houver")
         a_in = cA.number_input("Posição de P: a [m] (da esquerda do tramo)",
-                               min_value=0.0, max_value=30.0, value=0.0,
-                               step=0.05, format="%.2f")
-        inserir = st.form_submit_button("➕ Inserir tramo", width="stretch")
+                               min_value=0.0, max_value=30.0, value=None,
+                               step=0.05, format="%.2f",
+                               placeholder="0 se não houver")
+        inserir = st.form_submit_button("➕ INSERIR TRAMO", width="stretch")
     if inserir:
-        q_in = q_disp / fu          # -> kN (interno)
-        P_in = P_disp / fu
+        q_in = (q_disp or 0.0) / fu          # -> kN (interno)
+        P_in = (P_disp or 0.0) / fu
+        a_val = a_in or 0.0
         erros_t = []
-        if P_in > 0 and not (0 <= a_in <= L_in):
-            erros_t.append(f"A posição da carga (a = {a_in:.2f} m) precisa "
+        if L_in is None or L_in <= 0:
+            erros_t.append("Informe o comprimento L do tramo "
+                           "(maior que zero).")
+        if L_in and P_in > 0 and not (0 <= a_val <= L_in):
+            erros_t.append(f"A posição da carga (a = {a_val:.2f} m) precisa "
                            f"estar dentro do tramo (0 ≤ a ≤ {L_in:.2f} m).")
         if tipo == "Balanço Esquerdo" and any(
                 t['tipo'] == tipo for t in ss.lista_vaos):
@@ -129,7 +137,7 @@ if not editando:
                 st.error(e)
         else:
             ss.lista_vaos.append({'tipo': tipo, 'L': L_in, 'q': q_in,
-                                  'P': P_in, 'a': a_in})
+                                  'P': P_in, 'a': a_val})
             ss.res = None
             st.rerun()
 else:
@@ -859,7 +867,7 @@ if ss.res is not None:
                          f"Mk [{un_f}·m]":
                              f"{est['vaos'][i]['M_pos'] * fu:.{_cf(2)}f}",
                          "As [cm²]": as_txt, "Barras": barras})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        tabela(rows)
         if res['pele']:
             st.info(f"**Armadura de pele (h > 60 cm):** {res['pele']['texto']}")
 
@@ -881,7 +889,7 @@ if ss.res is not None:
                 rows.append({"Tramo": nome, f"Vsd [{un_f}]": vsd_txt,
                              "Estribo": e['texto'],
                              "Obs.": e['aviso'] or ""})
-        st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
+        tabela(rows)
 
         # ---- quantitativo
         q = res['quantitativo']
@@ -940,26 +948,24 @@ if ss.res is not None:
                        "de reforço.")
 
             sec(9, "Quantitativo de aço")
-            dfq = pd.DataFrame([{
+            tabela([{
                 "Pos": p['pos'], "Descrição": p['descr'],
                 "ø [mm]": p['phi'], "Qtd": p['qtd'],
-                "Comp. [m]": round(p['comp_unit'], 2),
-                "Peso [kg]": round(p['peso'], 2)} for p in q['posicoes']])
-            st.dataframe(dfq, hide_index=True, width="stretch")
+                "Comp. [m]": f"{p['comp_unit']:.2f}",
+                "Peso [kg]": f"{p['peso']:.2f}"} for p in q['posicoes']])
 
             m1, m2 = st.columns(2)
             m1.metric("Peso total de aço", f"{q['peso_total']:.1f} kg")
             m2.metric("Compra (+10%)", f"{q['peso_compra']:.1f} kg")
 
-            dfc = pd.DataFrame([{
-                "ø [mm]": c['phi'],
-                "Comp. total [m]": round(c['comp_total'], 1),
-                "c/ 10% [m]": round(c['comp_compra'], 1),
-                "Barras 12 m": c['barras_12m'],
-                "Peso compra [kg]": round(c['peso_compra'], 2)}
-                for c in q['lista_compra']])
             st.markdown("**🛒 Lista de compra (barras comerciais de 12 m):**")
-            st.dataframe(dfc, hide_index=True, width="stretch")
+            tabela([{
+                "ø [mm]": c['phi'],
+                "Comp. total [m]": f"{c['comp_total']:.1f}",
+                "c/ 10% [m]": f"{c['comp_compra']:.1f}",
+                "Barras 12 m": c['barras_12m'],
+                "Peso compra [kg]": f"{c['peso_compra']:.2f}"}
+                for c in q['lista_compra']])
             for av in q['avisos']:
                 st.warning(av)
 
