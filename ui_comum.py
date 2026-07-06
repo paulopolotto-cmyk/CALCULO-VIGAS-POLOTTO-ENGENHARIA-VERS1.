@@ -382,6 +382,15 @@ PAREDES = {
     "Tijolo maciço (1 vez)": 3.6,
     "Divisória leve / drywall": 1.0,
 }
+# Tipos de laje: 'macica' calcula 25·espessura; 'direto' pede o valor;
+# número = peso próprio típico em kN/m² (NBR 6120)
+TIPOS_LAJE = {
+    "Maciça (informar espessura)": "macica",
+    "Nervurada / treliçada com EPS": 2.0,
+    "Lajota cerâmica pré-fabricada": 2.5,
+    "Pré-moldada comum": 2.2,
+    "Informar o peso direto": "direto",
+}
 
 
 def assistente_carga(fu, un_fm, key="asst"):
@@ -414,13 +423,32 @@ def assistente_carga(fu, un_fm, key="asst"):
                  "(laje só de um lado, vão 4 m) → ~2 m. É esse valor que "
                  "transforma a carga de área (por m²) em carga por metro de "
                  "viga.")
-        laje_d = c2.number_input(
-            f"Peso da laje [{un_area}]", min_value=0.0, max_value=15.0 * fu,
-            value=3.0 * fu, step=0.5 * fu, format=f"%.{ca}f", key=f"{key}_lj",
-            help="Peso próprio da laje. Maciça ≈ 25 × espessura (laje de "
-                 "12 cm ≈ 3,0 kN/m² = 306 kgf/m²). Treliçada/pré-moldada "
-                 "comum: ~2,5 a 3,0 kN/m².")
-        laje = laje_d / fu
+        tipo_laje = c2.selectbox(
+            "Tipo de laje", list(TIPOS_LAJE.keys()), key=f"{key}_tl",
+            help="A laje maciça calcula o peso pela espessura "
+                 "(25 kN/m³ × espessura — NBR 6120). As demais usam pesos "
+                 "próprios típicos.")
+        _tl = TIPOS_LAJE[tipo_laje]
+        if _tl == "macica":
+            esp = st.number_input(
+                "Espessura da laje maciça [cm]", min_value=5.0,
+                max_value=30.0, value=10.0, step=1.0, format="%.0f",
+                key=f"{key}_esp",
+                help="Espessura da laje maciça. Residências: 8 a 12 cm. "
+                     "Peso = 25 kN/m³ × espessura → laje de 10 cm = "
+                     "2,5 kN/m² (255 kgf/m²); de 12 cm = 3,0 (306 kgf/m²).")
+            laje = 25.0 * esp / 100.0
+        elif _tl == "direto":
+            laje_d = st.number_input(
+                f"Peso próprio da laje [{un_area}]", min_value=0.0,
+                max_value=15.0 * fu, value=2.5 * fu, step=0.5 * fu,
+                format=f"%.{ca}f", key=f"{key}_lj",
+                help="Informe o peso próprio da laje por m².")
+            laje = laje_d / fu
+        else:
+            laje = _tl
+        st.caption(f"➡️ Peso próprio da laje adotado: **{_fa(laje)} "
+                   f"{un_area}** (= {laje:.2f} kN/m²).")
         c3, c4 = st.columns(2)
         revest_d = c3.number_input(
             f"Revestimento/contrapiso [{un_area}]", min_value=0.0,

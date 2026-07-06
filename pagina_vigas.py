@@ -704,7 +704,9 @@ def fig_corte_longitudinal(res):
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
     n_seg = (len(est['vaos']) + (1 if est['bal_esq'] else 0)
              + (1 if est['bal_dir'] else 0))
-    W = min(28.0, max(8.5, 2.6 * n_seg))
+    # base 7.2" faz vigas de 1-2 vãos caberem na tela (sem rolagem/corte);
+    # 3+ vãos crescem e rolam horizontalmente.
+    W = min(28.0, max(7.2, 2.6 * n_seg))
     fig, ax = plt.subplots(figsize=(W, 5.2), dpi=150)
     fig.patch.set_facecolor('white')
     ax.set_xlim(-0.06 * L_tot, 1.13 * L_tot)
