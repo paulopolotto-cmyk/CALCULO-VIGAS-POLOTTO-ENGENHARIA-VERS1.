@@ -17,11 +17,13 @@ import streamlit as st
 import motor_viga as mv
 from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
                       aplicar_estilo, header, sec, seletor_unidade, tabela,
-                      mostrar_figura)
+                      mostrar_figura, seletor_pagina)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas",
        "Concreto armado · NBR 6118 · CA-50 · ELU flexão e cortante")
+
+seletor_pagina("vigas")
 
 # unidade de força (kN ou kgf) — o cálculo interno é sempre em kN
 fu, un_f, un_fm = seletor_unidade()

@@ -22,35 +22,37 @@ _CSS = """
 [data-testid="stNumberInput"] button { display: none; }
 [data-testid="stNumberInput"] input { font-weight: 600; }
 
-/* ===== NAVEGAÇÃO DO TOPO (Vigas / Pilares) EM DESTAQUE ===== */
-[data-testid="stNavLink"] {
-    padding: 10px 22px !important;
-    margin: 4px 6px !important;
-    border-radius: 12px !important;
-    border: 2px solid #C9D6F5 !important;
-    background: #EEF3FC !important;
+/* ===== NAVEGAÇÃO: esconde a barra padrão (usamos o seletor CALCULAR) ===== */
+[data-testid="stNavLink"] { display: none !important; }
+
+/* rótulos "CALCULAR" e perguntas em destaque */
+.pol-calc-label {
+    text-transform: uppercase; letter-spacing: .16em; font-weight: 800;
+    color: #1E3A8A; font-size: .82rem; margin: 2px 0 5px;
+}
+.pol-pergunta {
+    font-weight: 800; color: #1E3A8A; font-size: 1.06rem; margin: 12px 0 3px;
+}
+
+/* seletor CALCULAR (Vigas / Pilares) */
+.pol-pg-ativo {
+    background: linear-gradient(135deg, #F6C86B, #E8A33D);
+    color: #16265B !important; font-weight: 800; font-size: 1.2rem;
+    text-align: center; padding: 14px 10px; border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(180,83,9,.32);
+}
+[data-testid="stPageLink"] { width: 100%; }
+[data-testid="stPageLink"] a {
+    background: #EEF3FC; border: 2px solid #1E3A8A; border-radius: 12px;
+    padding: 13px 10px !important; justify-content: center; min-height: 52px;
     transition: all .12s ease;
 }
-[data-testid="stNavLink"] * {
-    font-size: 1.12rem !important;
+[data-testid="stPageLink"] a:hover {
+    background: #DCE6FA; transform: translateY(-1px);
+}
+[data-testid="stPageLink"] a * {
+    color: #1E3A8A !important; font-size: 1.2rem !important;
     font-weight: 800 !important;
-    color: #1E3A8A !important;
-}
-[data-testid="stNavLink"]:hover {
-    background: #DCE6FA !important;
-    border-color: #1E3A8A !important;
-    transform: translateY(-1px);
-}
-/* aba ativa: fundo azul cheio */
-[data-testid="stNavLink"][aria-current="page"],
-[data-testid="stNavLink"].active {
-    background: linear-gradient(135deg, #1E3A8A, #24479E) !important;
-    border-color: #16265B !important;
-    box-shadow: 0 3px 10px rgba(30,58,138,.35);
-}
-[data-testid="stNavLink"][aria-current="page"] *,
-[data-testid="stNavLink"].active * {
-    color: #fff !important;
 }
 
 /* cabeçalho da marca */
@@ -167,6 +169,16 @@ div.stButton > button, div[data-testid="stFormSubmitButton"] > button {
 [data-testid="stRadio"] [role="radiogroup"] label div {
     font-size: 1.12rem !important; font-weight: 800 !important;
     color: #1E3A8A !important;
+}
+/* opção selecionada em ÂMBAR (destaque) */
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) {
+    background: linear-gradient(135deg, #F6C86B, #E8A33D) !important;
+    border-color: #E8A33D !important;
+    box-shadow: 0 2px 8px rgba(180,83,9,.28);
+}
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) p,
+[data-testid="stRadio"] [role="radiogroup"] label:has(input:checked) div {
+    color: #16265B !important;
 }
 
 /* ===== BOTÕES DE AÇÃO (Inserir / Salvar) grandes e em ÂMBAR ===== */
@@ -337,6 +349,28 @@ def rodape(texto):
 KGF_POR_KN = 101.9716
 
 
+def seletor_pagina(atual):
+    """Seletor destacado CALCULAR → Vigas / Pilares (no corpo da página).
+
+    atual: 'vigas' ou 'pilar' — define qual botão fica em âmbar (ativo).
+    """
+    st.markdown('<div class="pol-calc-label">Calcular</div>',
+                unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if atual == "vigas":
+            st.markdown('<div class="pol-pg-ativo">🏗️ Vigas</div>',
+                        unsafe_allow_html=True)
+        else:
+            st.page_link("pagina_vigas.py", label="Vigas", icon="🏗️")
+    with c2:
+        if atual == "pilar":
+            st.markdown('<div class="pol-pg-ativo">🏛️ Pilares</div>',
+                        unsafe_allow_html=True)
+        else:
+            st.page_link("pagina_pilar.py", label="Pilares", icon="🏛️")
+
+
 def seletor_unidade(key="unidade_forca"):
     """Seletor de sistema de unidades de força.
 
@@ -346,8 +380,10 @@ def seletor_unidade(key="unidade_forca"):
       un_fm = rótulo da carga distribuída ('kN/m' ou 'kgf/m')
     O cálculo interno é sempre em kN; a conversão é só na tela.
     """
+    st.markdown('<div class="pol-pergunta">Qual unidade de carga você quer '
+                'usar?</div>', unsafe_allow_html=True)
     op = st.radio("Unidade de força", ["kN · kN/m", "kgf · kgf/m"],
-                  horizontal=True, key=key,
+                  horizontal=True, key=key, label_visibility="collapsed",
                   help="Escolha o sistema de unidades das cargas e dos "
                        "esforços. O cálculo é o mesmo; muda só a exibição.")
     if op.startswith("kgf"):

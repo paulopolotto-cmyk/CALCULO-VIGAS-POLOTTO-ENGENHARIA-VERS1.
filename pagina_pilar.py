@@ -14,12 +14,15 @@ import streamlit as st
 
 import motor_pilar as mp
 from ui_comum import (NAVY, AMBAR, CINZA_TXT, CONCRETO,
-                      aplicar_estilo, header, sec, seletor_unidade, tabela)
+                      aplicar_estilo, header, sec, seletor_unidade, tabela,
+                      seletor_pagina)
 
 aplicar_estilo()
 header("Cálculo de Pilares",
        "Concreto armado · NBR 6118 · esbeltez + 2ª ordem (pilar-padrão) "
        "· flexo-compressão")
+
+seletor_pagina("pilar")
 
 # unidade de força (kN ou kgf) — cálculo interno sempre em kN
 fu, un_f, un_fm = seletor_unidade()
