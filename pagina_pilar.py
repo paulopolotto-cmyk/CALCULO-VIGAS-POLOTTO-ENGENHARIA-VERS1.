@@ -9,13 +9,12 @@ import json
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import pandas as pd
 import streamlit as st
 
 import motor_pilar as mp
 from ui_comum import (NAVY, AMBAR, CINZA_TXT, CONCRETO,
                       aplicar_estilo, header, sec, seletor_unidade, tabela,
-                      seletor_pagina)
+                      seletor_pagina, EXEMPLOS_PILAR)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas e Pilares",
@@ -32,34 +31,74 @@ if 'res_pilar' not in ss:
     ss.res_pilar = None
 if 'res_pilar_fp' not in ss:
     ss.res_pilar_fp = None
+for _k, _v in (('pilar_b', 20.0), ('pilar_h', 30.0), ('pilar_l0', 2.8),
+               ('pilar_fck', 25), ('pilar_caa', 'I')):
+    if _k not in ss:
+        ss[_k] = _v
+if 'pilar_Nk' not in ss:
+    ss.pilar_Nk = None
+
+
+def carregar_exemplo_pilar(ex):
+    dd = ex['dados']
+    ss.pilar_b = float(dd['b'])
+    ss.pilar_h = float(dd['h'])
+    ss.pilar_l0 = float(dd['l0'])
+    ss.pilar_fck = int(dd['fck'])
+    ss.pilar_caa = dd['caa']
+    ss.pilar_Nk = float(dd['Nk']) * fu          # em unidade de exibição
+    ss.res_pilar = None
+
+
+# ------------------------------------------------------------ exemplos
+with st.expander("📚 Exemplos prontos — carregue um pilar do cotidiano"):
+    st.caption("Toque em **Carregar** para preencher com um exemplo e "
+               "calcular na sequência.")
+    for _i, _ex in enumerate(EXEMPLOS_PILAR):
+        _ce, _cb = st.columns([4, 1.2])
+        _ce.markdown(f"**{_ex['nome']}**  \n{_ex['descr']}")
+        if _cb.button("Carregar", key=f"exp_{_i}", width="stretch"):
+            carregar_exemplo_pilar(_ex)
+            st.rerun()
 
 # ------------------------------------------------------------ entrada
 sec(1, "Inserir os dados do pilar", destaque=True)
 c1, c2 = st.columns(2)
-b = c1.number_input("Base b [cm] (menor dimensão)", min_value=14.0,
-                    max_value=120.0, value=20.0, step=1.0, format="%.0f")
-h = c2.number_input("Altura h [cm] (maior dimensão)", min_value=14.0,
-                    max_value=300.0, value=30.0, step=1.0, format="%.0f")
+b = c1.number_input(
+    "Base b [cm] (menor dimensão)", min_value=14.0, max_value=120.0,
+    step=1.0, format="%.0f", key="pilar_b",
+    help="Menor dimensão do pilar. Mínimo 14 cm; abaixo de 19 cm o "
+         "programa aplica o coeficiente γn (Tabela 13.1). Área mínima "
+         "360 cm².")
+h = c2.number_input(
+    "Altura h [cm] (maior dimensão)", min_value=14.0, max_value=300.0,
+    step=1.0, format="%.0f", key="pilar_h",
+    help="Maior dimensão do pilar. Se h > 5·b vira pilar-parede (fora do "
+         "escopo deste programa).")
 c3, c4 = st.columns(2)
-l0 = c3.number_input("Altura livre l0 [m]", min_value=0.5, max_value=10.0,
-                     value=2.8, step=0.1, format="%.2f",
-                     help="Adotado le = l0. Se a vinculação real levar a le "
-                          "maior, informe aqui o le.")
-fck = c4.number_input("Concreto fck [MPa]", min_value=20, max_value=50,
-                      value=25, step=5)
+l0 = c3.number_input(
+    "Altura livre l0 [m]", min_value=0.5, max_value=10.0, step=0.1,
+    format="%.2f", key="pilar_l0",
+    help="Distância livre entre apoios (pé-direito livre). Adotado como "
+         "comprimento de flambagem le. Se a vinculação real levar a le "
+         "maior, informe aqui o le.")
+fck = c4.number_input(
+    "Concreto fck [MPa]", min_value=20, max_value=50, step=5, key="pilar_fck",
+    help="Resistência do concreto. Em residências use 25 ou 30 MPa.")
 c5, c6 = st.columns(2)
-caa = c5.selectbox("Classe de agressividade (CAA)",
-                   ["I", "II", "III", "IV"], index=0,
-                   help="Define o cobrimento nominal: I=2,5 · II=3,0 · "
-                        "III=4,0 · IV=5,0 cm (Tabela 7.2). Veja abaixo qual "
-                        "escolher.")
-Nk_disp = c6.number_input(f"Força normal CARACTERÍSTICA Nk [{un_f}]",
-                          min_value=1.0, max_value=20000.0 * fu,
-                          value=None, step=10.0 * fu, format="%.0f",
-                          placeholder="digite a carga",
-                          help="O programa aplica γf = 1,4 e γn "
-                               "automaticamente. NÃO digite o valor já "
-                               "majorado.")
+caa = c5.selectbox(
+    "Classe de agressividade (CAA)", ["I", "II", "III", "IV"],
+    key="pilar_caa",
+    help="Define o cobrimento nominal: I=2,5 · II=3,0 · III=4,0 · IV=5,0 cm "
+         "(Tabela 7.2). Veja abaixo qual escolher.")
+Nk_disp = c6.number_input(
+    f"Força normal CARACTERÍSTICA Nk [{un_f}]", min_value=1.0,
+    max_value=20000.0 * fu, step=10.0 * fu, format="%.0f", key="pilar_Nk",
+    placeholder="digite a carga",
+    help="Carga vertical característica (SEM majorar) que chega neste "
+         "pilar — some as reações das vigas que apoiam nele. O programa "
+         "aplica γf=1,4 e γn automaticamente; não digite o valor já "
+         "majorado.")
 Nk = (Nk_disp or 0.0) / fu          # -> kN (interno)
 st.caption("Aço CA-50 · γf=1,4 · γc=1,4 · γs=1,15 · "
            "pilar interno de estrutura contraventada")
@@ -82,9 +121,17 @@ with st.expander("ℹ️ Classe de agressividade (CAA) — qual escolher?"):
 dados = {'b': b, 'h': h, 'l0': l0, 'fck': fck, 'Nk': Nk, 'caa': caa}
 fp = json.dumps(dados, sort_keys=True)
 
-calcular = st.button("⚡ CALCULAR PILAR", type="primary", width="stretch")
+_sem_nk = ss.pilar_Nk is None
+calcular = st.button("⚡ CALCULAR PILAR", type="primary", width="stretch",
+                     disabled=_sem_nk)
+if _sem_nk:
+    st.caption("Preencha a **força normal Nk** para habilitar o cálculo.")
 if calcular:
-    ss.res_pilar = mp.calcular_pilar(dados)
+    try:
+        ss.res_pilar = mp.calcular_pilar(dados)
+    except Exception as _e:
+        ss.res_pilar = {'erros': [f"Não foi possível calcular: {_e}. "
+                                  "Confira os dados de entrada."]}
     ss.res_pilar_fp = fp
 elif ss.res_pilar is not None and ss.res_pilar_fp != fp:
     ss.res_pilar = None

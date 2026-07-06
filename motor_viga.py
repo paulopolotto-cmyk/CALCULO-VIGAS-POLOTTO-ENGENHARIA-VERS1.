@@ -417,7 +417,9 @@ def verificar_flecha(res, alfa_f=1.32, alfa_e_agreg=1.0):
     def resultado(nome, L_m, Lref_m, fi_cm, EI, estadio, Ma_kNcm):
         fi = fi_cm * 10.0                            # mm (imediata)
         ft = fi * (1.0 + alfa_f)                     # mm (total c/ fluência)
-        lim = Lref_m * 1000.0 / 250.0               # mm (L/250)
+        lim = Lref_m * 1000.0 / 250.0               # mm (L/250 — visual)
+        # limite p/ alvenaria (Tab. 13.3): L/500 ≤ 10 mm (conservador: usa ft)
+        lim_alv = min(Lref_m * 1000.0 / 500.0, 10.0)
         ok = ft <= lim
         cf = 0.0
         residual = ft
@@ -431,6 +433,7 @@ def verificar_flecha(res, alfa_f=1.32, alfa_e_agreg=1.0):
                 'Ma': Ma_kNcm / 100.0, 'Mr': Mr / 100.0,
                 'flecha_imediata_mm': fi, 'flecha_total_mm': ft,
                 'limite_mm': lim, 'ok': ok,
+                'limite_alv_mm': lim_alv, 'ok_alv': ft <= lim_alv,
                 'contra_flecha_mm': cf, 'residual_mm': residual,
                 'resolve_com_cf': resolve}
 

@@ -364,8 +364,130 @@ def rodape(texto):
     st.caption(texto)
 
 
+# ---- Sobrecargas de uso (cargas acidentais) — NBR 6120:2019 [kN/m²] ----
+SOBRECARGAS_USO = {
+    "Residência — dormitório/sala (1,5)": 1.5,
+    "Residência — cozinha/serviço (2,0)": 2.0,
+    "Escritório (2,5)": 2.5,
+    "Corredor/escada (3,0)": 3.0,
+    "Loja/comércio (4,0)": 4.0,
+    "Garagem — veículos leves (3,0)": 3.0,
+    "Cobertura — só manutenção (1,0)": 1.0,
+}
+# Paredes — peso por m² de parede (alvenaria + revestimento) [kN/m²]
+PAREDES = {
+    "Sem parede": 0.0,
+    "Bloco cerâmico furado 15 cm (~1,8)": 1.8,
+    "Bloco de concreto 14 cm (~2,8)": 2.8,
+    "Tijolo maciço 1 vez (~3,6)": 3.6,
+    "Divisória leve (~1,0)": 1.0,
+}
+
+
+def assistente_carga(fu, un_fm, key="asst"):
+    """Assistente que estima a carga distribuída q [kN/m] de uma viga a
+    partir de componentes comuns (NBR 6120). Retorna q em kN/m se o usuário
+    confirmar, senão None. fu/un_fm só para exibir na unidade escolhida.
+    """
+    q_kN = None
+    with st.expander("🧮 Montar a carga (sobrecargas comuns) — opcional"):
+        st.caption("Estime a carga da viga somando os componentes. Os "
+                   "valores seguem a NBR 6120. O peso próprio da viga é "
+                   "somado depois, automaticamente.")
+        c1, c2 = st.columns(2)
+        larg = c1.number_input(
+            "Largura de influência da laje [m]", min_value=0.0,
+            max_value=15.0, value=4.0, step=0.1, format="%.2f", key=f"{key}_lg",
+            help="Quanto de laje 'descarrega' nesta viga: em geral metade do "
+                 "vão da laje de cada lado. Ex.: laje de 4 m entre duas "
+                 "vigas → ~2 m para cada viga.")
+        laje = c2.number_input(
+            "Peso da laje [kN/m²]", min_value=0.0, max_value=15.0, value=3.0,
+            step=0.5, format="%.1f", key=f"{key}_lj",
+            help="Peso próprio da laje. Maciça: ~25·espessura (laje de 12 cm "
+                 "≈ 3,0). Treliçada/pré-moldada comum: ~2,5 a 3,0 kN/m².")
+        c3, c4 = st.columns(2)
+        revest = c3.number_input(
+            "Revestimento/contrapiso [kN/m²]", min_value=0.0, max_value=5.0,
+            value=1.0, step=0.5, format="%.1f", key=f"{key}_rv",
+            help="Contrapiso + piso + forro. Valor usual: 1,0 kN/m².")
+        uso_lbl = c4.selectbox(
+            "Sobrecarga de uso (NBR 6120)", list(SOBRECARGAS_USO.keys()),
+            key=f"{key}_uso",
+            help="Carga acidental conforme o uso do ambiente (NBR 6120).")
+        uso = SOBRECARGAS_USO[uso_lbl]
+        c5, c6 = st.columns(2)
+        par_lbl = c5.selectbox(
+            "Parede sobre a viga", list(PAREDES.keys()), key=f"{key}_pl",
+            help="Tipo de parede que apoia diretamente na viga (se houver).")
+        alt_par = c6.number_input(
+            "Altura da parede [m]", min_value=0.0, max_value=8.0, value=2.8,
+            step=0.1, format="%.2f", key=f"{key}_ap",
+            disabled=(PAREDES[par_lbl] == 0.0),
+            help="Pé-direito da parede sobre a viga.")
+        parede = PAREDES[par_lbl] * alt_par                    # kN/m
+        q_kN_calc = (laje + revest + uso) * larg + parede      # kN/m
+
+        st.markdown(
+            f"**Carga estimada:** ({laje:.1f} laje + {revest:.1f} revest. + "
+            f"{uso:.1f} uso) × {larg:.2f} m"
+            + (f" + {parede:.2f} parede" if parede > 0 else "")
+            + f" = **{q_kN_calc * fu:.{0 if fu > 1 else 2}f} {un_fm}**")
+        if st.button(f"✔ Usar {q_kN_calc * fu:.{0 if fu > 1 else 1}f} "
+                     f"{un_fm} no campo de carga", key=f"{key}_btn",
+                     width="stretch"):
+            q_kN = q_kN_calc
+    return q_kN
+
+
 # 1 kN = 101,9716 kgf  (1 kgf = 9,80665 N)
 KGF_POR_KN = 101.9716
+
+
+# ---- Exemplos completos (casos do cotidiano) ----
+EXEMPLOS_VIGA = [
+    {"nome": "Viga biapoiada residencial",
+     "descr": "1 vão de 4,5 m, uso residencial. O caso mais simples.",
+     "secao": {"b": 15.0, "h": 45.0, "fck": 25, "cob": 2.5},
+     "tramos": [{"tipo": "Normal", "L": 4.5, "q": 18.0, "P": 0.0, "a": 0.0}]},
+    {"nome": "Viga contínua de 2 vãos",
+     "descr": "Vãos de 5 e 4 m — viga apoiada em 3 pilares.",
+     "secao": {"b": 15.0, "h": 50.0, "fck": 25, "cob": 2.5},
+     "tramos": [{"tipo": "Normal", "L": 5.0, "q": 20.0, "P": 0.0, "a": 0.0},
+                {"tipo": "Normal", "L": 4.0, "q": 18.0, "P": 0.0, "a": 0.0}]},
+    {"nome": "Viga de 3 vãos",
+     "descr": "5 / 4 / 5 m — viga contínua típica de pequeno edifício.",
+     "secao": {"b": 15.0, "h": 55.0, "fck": 30, "cob": 3.0},
+     "tramos": [{"tipo": "Normal", "L": 5.0, "q": 22.0, "P": 0.0, "a": 0.0},
+                {"tipo": "Normal", "L": 4.0, "q": 20.0, "P": 0.0, "a": 0.0},
+                {"tipo": "Normal", "L": 5.0, "q": 22.0, "P": 0.0, "a": 0.0}]},
+    {"nome": "Viga com balanço (marquise)",
+     "descr": "Balanço de 1,5 m + vão de 4,5 m.",
+     "secao": {"b": 15.0, "h": 50.0, "fck": 25, "cob": 2.5},
+     "tramos": [{"tipo": "Balanço Esquerdo", "L": 1.5, "q": 15.0,
+                 "P": 0.0, "a": 0.0},
+                {"tipo": "Normal", "L": 4.5, "q": 20.0, "P": 0.0, "a": 0.0}]},
+    {"nome": "Viga com carga concentrada",
+     "descr": "Vão de 6 m recebendo uma viga (P = 80 kN no meio).",
+     "secao": {"b": 20.0, "h": 60.0, "fck": 30, "cob": 3.0},
+     "tramos": [{"tipo": "Normal", "L": 6.0, "q": 15.0, "P": 80.0,
+                 "a": 3.0}]},
+]
+
+EXEMPLOS_PILAR = [
+    {"nome": "Pilar de residência (térreo)",
+     "descr": "20×30, pé-direito 2,8 m, carga 400 kN.",
+     "dados": {"b": 20.0, "h": 30.0, "l0": 2.8, "fck": 25, "Nk": 400.0,
+               "caa": "I"}},
+    {"nome": "Pilar de canto (pequeno)",
+     "descr": "20×20, 2,8 m, carga leve 250 kN.",
+     "dados": {"b": 20.0, "h": 20.0, "l0": 2.8, "fck": 25, "Nk": 250.0,
+               "caa": "II"}},
+    {"nome": "Pilar mais carregado",
+     "descr": "20×40, 3,0 m, 900 kN (pilar central de edifício baixo).",
+     "dados": {"b": 20.0, "h": 40.0, "l0": 3.0, "fck": 30, "Nk": 900.0,
+               "caa": "II"}},
+]
 
 
 def _botao_pagina(alvo, atual, path, label, icon):

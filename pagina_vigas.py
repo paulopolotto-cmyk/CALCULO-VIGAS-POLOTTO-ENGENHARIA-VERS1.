@@ -12,13 +12,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import streamlit as st
 
 import motor_viga as mv
 from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
                       aplicar_estilo, header, sec, seletor_unidade, tabela,
-                      mostrar_figura, seletor_pagina)
+                      mostrar_figura, seletor_pagina, assistente_carga,
+                      EXEMPLOS_VIGA)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas e Pilares",
@@ -50,6 +50,24 @@ if 'res_fp' not in ss:
     ss.res_fp = None
 if 'confirmar_limpar' not in ss:
     ss.confirmar_limpar = False
+if 'q_sugerido' not in ss:
+    ss.q_sugerido = None
+for _k, _v in (('viga_b', 15.0), ('viga_h', 50.0), ('viga_fck', 25),
+               ('viga_cob', 2.5)):
+    if _k not in ss:
+        ss[_k] = _v
+
+
+def carregar_exemplo_viga(ex):
+    ss.viga_b = float(ex['secao']['b'])
+    ss.viga_h = float(ex['secao']['h'])
+    ss.viga_fck = int(ex['secao']['fck'])
+    ss.viga_cob = float(ex['secao']['cob'])
+    ss.lista_vaos = [dict(t) for t in ex['tramos']]
+    ss.res = None
+    ss.edit_index = None
+    ss.q_sugerido = None
+    ss.confirmar_limpar = False
 
 
 def nomes_tramos(lista):
@@ -64,19 +82,41 @@ def nomes_tramos(lista):
     return nomes
 
 
+# ------------------------------------------------------------ exemplos
+with st.expander("📚 Exemplos prontos — carregue um caso do cotidiano"):
+    st.caption("Toque em **Carregar** para preencher a viga com um exemplo "
+               "e ver como o programa funciona. Depois é só calcular.")
+    for _i, _ex in enumerate(EXEMPLOS_VIGA):
+        _ce, _cb = st.columns([4, 1.2])
+        _ce.markdown(f"**{_ex['nome']}**  \n{_ex['descr']}")
+        if _cb.button("Carregar", key=f"exv_{_i}", width="stretch"):
+            carregar_exemplo_viga(_ex)
+            st.rerun()
+
 # ------------------------------------------------------------ seção 1
 sec(1, "Inserir seção, concreto e aço", destaque=True)
 c1, c2 = st.columns(2)
-b = c1.number_input("Base bw [cm]", min_value=10.0, max_value=100.0,
-                    value=15.0, step=1.0, format="%.0f")
-h = c2.number_input("Altura h [cm]", min_value=15.0, max_value=200.0,
-                    value=50.0, step=1.0, format="%.0f")
+b = c1.number_input(
+    "Base bw [cm]", min_value=10.0, max_value=100.0, step=1.0,
+    format="%.0f", key="viga_b",
+    help="Largura (base) da viga. Mínimo 12 cm pela NBR 6118. "
+         "Ex.: 15 cm é comum em residências.")
+h = c2.number_input(
+    "Altura h [cm]", min_value=15.0, max_value=200.0, step=1.0,
+    format="%.0f", key="viga_h",
+    help="Altura total da viga. Regra prática: da ordem de L/12 a L/10 do "
+         "maior vão. Ex.: vão de 5 m → h ≈ 40 a 50 cm.")
 c3, c4 = st.columns(2)
-fck = c3.number_input("Concreto fck [MPa]", min_value=20, max_value=50,
-                      value=25, step=5)
-cob = c4.number_input("Cobrimento c [cm]", min_value=2.0, max_value=5.0,
-                      value=2.5, step=0.5, format="%.1f",
-                      help="CAA I: 2,5 · CAA II: 3,0 · CAA III: 4,0 (Tab. 7.2)")
+fck = c3.number_input(
+    "Concreto fck [MPa]", min_value=20, max_value=50, step=5, key="viga_fck",
+    help="Resistência do concreto aos 28 dias. Em residências use 25 ou "
+         "30 MPa. O programa cobre de 20 a 50 MPa.")
+cob = c4.number_input(
+    "Cobrimento c [cm]", min_value=2.0, max_value=5.0, step=0.5,
+    format="%.1f", key="viga_cob",
+    help="Distância do aço até a face do concreto (proteção). CAA I "
+         "(interno seco) 2,5 · CAA II (urbano) 3,0 · CAA III "
+         "(marinho/industrial) 4,0 cm — Tabela 7.2 da NBR 6118.")
 g_pp_disp = 25.0 * b * h / 1e4 * fu
 pp = st.checkbox("Incluir peso próprio automaticamente "
                  f"(g = {g_pp_disp:.{_cf(2)}f} {un_fm})", value=True)
@@ -95,39 +135,61 @@ if editando and ss.edit_index >= len(ss.lista_vaos):
     editando = False
 
 if not editando:
-    st.caption("💡 Toque em cada campo de carga e digite — eles já começam "
-               "vazios (comprimento, carga, posição).")
-    with st.form("form_tramo", clear_on_submit=True):
+    q_novo = assistente_carga(fu, un_fm)
+    if q_novo is not None:
+        ss.q_sugerido = q_novo
+        st.rerun()
+    if ss.get('q_sugerido'):
+        st.caption(f"💡 Carga sugerida pelo assistente: "
+                   f"**{ss.q_sugerido * fu:.{_cf(1)}f} {un_fm}** "
+                   "(já preenchida no campo abaixo; pode alterar).")
+    st.caption("💡 Toque em cada campo e digite — os campos de carga "
+               "começam vazios (comprimento, carga, posição).")
+    with st.form("form_tramo", clear_on_submit=False):
         tipo = st.selectbox("Tipo do tramo",
                             ["Normal", "Balanço Esquerdo", "Balanço Direito"])
         cL, cQ = st.columns(2)
-        L_in = cL.number_input("Comprimento L [m]", min_value=0.1,
-                               max_value=30.0, value=None, step=0.1,
-                               format="%.2f", placeholder="ex: 4,50")
-        q_disp = cQ.number_input(f"Carga distribuída q [{un_fm}]",
-                                 min_value=0.0, max_value=500.0 * fu,
-                                 value=None, step=0.5 * fu,
-                                 format=f"%.{_cf(2)}f", placeholder="ex: 15")
+        L_in = cL.number_input(
+            "Comprimento L [m]", min_value=0.1, max_value=30.0, value=None,
+            step=0.1, format="%.2f", placeholder="ex: 4,50",
+            help="Vão: distância entre os eixos dos apoios (ou o "
+                 "comprimento do balanço), em metros.")
+        q_ini = (ss.q_sugerido * fu) if ss.get('q_sugerido') else None
+        q_disp = cQ.number_input(
+            f"Carga distribuída q [{un_fm}]", min_value=0.0,
+            max_value=500.0 * fu, value=q_ini, step=0.5 * fu,
+            format=f"%.{_cf(2)}f",
+            placeholder=("ex: 1500" if fu > 1 else "ex: 15"),
+            help="Carga por metro ao longo do tramo (laje + parede + "
+                 "revestimento + sobrecarga, somados). Use o assistente "
+                 "'🧮 Montar a carga' acima se tiver dúvida. O peso próprio "
+                 "da viga já é somado automaticamente.")
         cP, cA = st.columns(2)
-        P_disp = cP.number_input(f"Carga concentrada P [{un_f}]",
-                                 min_value=0.0, max_value=2000.0 * fu,
-                                 value=None, step=1.0 * fu,
-                                 format=f"%.{_cf(2)}f",
-                                 placeholder="0 se não houver")
-        a_in = cA.number_input("Posição de P: a [m] (da esquerda do tramo)",
-                               min_value=0.0, max_value=30.0, value=None,
-                               step=0.05, format="%.2f",
-                               placeholder="0 se não houver")
+        P_disp = cP.number_input(
+            f"Carga concentrada P [{un_f}]", min_value=0.0,
+            max_value=2000.0 * fu, value=None, step=1.0 * fu,
+            format=f"%.{_cf(2)}f", placeholder="0 se não houver",
+            help="Carga pontual (ex.: uma viga que se apoia sobre esta). "
+                 "Deixe vazio se não houver.")
+        a_in = cA.number_input(
+            "Posição de P: a [m] (da esquerda do tramo)", min_value=0.0,
+            max_value=30.0, value=None, step=0.05, format="%.2f",
+            placeholder="0 se não houver",
+            help="Distância da carga P até o apoio da ESQUERDA do tramo, em "
+                 "metros. Só preencha se houver P.")
         inserir = st.form_submit_button("➕ INSERIR TRAMO", width="stretch")
     if inserir:
         q_in = (q_disp or 0.0) / fu          # -> kN (interno)
         P_in = (P_disp or 0.0) / fu
-        a_val = a_in or 0.0
+        a_val = a_in if a_in is not None else 0.0
         erros_t = []
         if L_in is None or L_in <= 0:
             erros_t.append("Informe o comprimento L do tramo "
                            "(maior que zero).")
-        if L_in and P_in > 0 and not (0 <= a_val <= L_in):
+        if P_in > 0 and a_in is None:
+            erros_t.append("Informe a posição a (m, a partir da esquerda do "
+                           "tramo) da carga concentrada P.")
+        elif L_in and P_in > 0 and not (0 <= a_val <= L_in):
             erros_t.append(f"A posição da carga (a = {a_val:.2f} m) precisa "
                            f"estar dentro do tramo (0 ≤ a ≤ {L_in:.2f} m).")
         if tipo == "Balanço Esquerdo" and any(
@@ -203,7 +265,7 @@ if ss.lista_vaos:
     st.write("")
     nomes = nomes_tramos(ss.lista_vaos)
     for i, t in enumerate(ss.lista_vaos):
-        linha = (f"**{nomes[i]}** · L = {t['L']:.2f} m · "
+        linha = (f"<b>{nomes[i]}</b> · L = {t['L']:.2f} m · "
                  f"q = {t['q'] * fu:.{_cf(2)}f} {un_fm}")
         if t['P'] > 0:
             linha += (f" · P = {t['P'] * fu:.{_cf(1)}f} {un_f} "
@@ -234,9 +296,14 @@ else:
 # --------------------------------------------------- cálculo + invalidação
 fp_atual = json.dumps([dados_g, ss.lista_vaos], sort_keys=True)
 if calcular:
-    ss.res = mv.calcular_viga(dados_g, [
-        {'nome': n, **t} for n, t in zip(nomes_tramos(ss.lista_vaos),
-                                         ss.lista_vaos)])
+    try:
+        ss.res = mv.calcular_viga(dados_g, [
+            {'nome': n, **t} for n, t in zip(nomes_tramos(ss.lista_vaos),
+                                             ss.lista_vaos)])
+    except Exception as _e:
+        ss.res = {'erros': [f"Não foi possível calcular: {_e}. "
+                            "Confira os dados (comprimentos maiores que "
+                            "zero, cargas e posições válidas)."]}
     ss.res_fp = fp_atual
 elif ss.res is not None and ss.res_fp != fp_atual:
     ss.res = None
@@ -257,7 +324,7 @@ def _posicoes_apoios(est):
 def _larg_fig(est, base=7.2, por_tramo=1.9):
     n = (len(est['vaos']) + (1 if est['bal_esq'] else 0)
          + (1 if est['bal_dir'] else 0))
-    return max(base, por_tramo * n)
+    return min(26.0, max(base, por_tramo * n))   # teto p/ não estourar
 
 
 def fig_esquema(res, fu=1.0, un_f="kN"):
@@ -618,7 +685,7 @@ def fig_corte_longitudinal(res):
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
     n_seg = (len(est['vaos']) + (1 if est['bal_esq'] else 0)
              + (1 if est['bal_dir'] else 0))
-    W = max(8.5, 2.6 * n_seg)
+    W = min(28.0, max(8.5, 2.6 * n_seg))
     fig, ax = plt.subplots(figsize=(W, 5.2), dpi=150)
     fig.patch.set_facecolor('white')
     ax.set_xlim(-0.06 * L_tot, 1.13 * L_tot)
@@ -764,8 +831,9 @@ def fig_furos(res):
     off_e = est['bal_esq']['L'] if est['bal_esq'] else 0.0
     L_tot = xs_ap[-1] + (est['bal_dir']['L'] if est['bal_dir'] else 0.0)
 
-    fig, ax = plt.subplots(figsize=(max(7.2, 2.0 * (len(est['vaos']) + 2)),
-                                    3.8), dpi=150)
+    fig, ax = plt.subplots(
+        figsize=(min(26.0, max(7.2, 2.0 * (len(est['vaos']) + 2))), 3.8),
+        dpi=150)
     fig.patch.set_facecolor('white')
     ax.set_xlim(-0.05 * L_tot, 1.13 * L_tot)
     ax.set_ylim(-0.55, 1.55)
@@ -972,6 +1040,7 @@ if ss.res is not None:
     else:
         est = res['estatica']
         nomes_l = nomes_tramos(ss.lista_vaos)
+        fl_els = mv.verificar_flecha(res) if res.get('quantitativo') else None
 
         # ---- falhas de dimensionamento em destaque
         if res['falha_biela']:
@@ -990,6 +1059,25 @@ if ss.res is not None:
                      + ", ".join(locais)
                      + ". REDIMENSIONAR (aumentar h, bw ou fck). "
                        "Quantitativo bloqueado.")
+
+        # ---- veredito / resumo no topo
+        if not res['falha_flexao'] and not res['falha_biela'] and fl_els:
+            _q = res['quantitativo']
+            _itfl = fl_els['vaos'] + fl_els['balancos']
+            _fmax = max((it['flecha_total_mm'] for it in _itfl), default=0.0)
+            if all(it['ok'] for it in _itfl):
+                st.success("✅ **VIGA APROVADA** — flexão, cortante e flecha "
+                           "dentro dos limites da NBR 6118.")
+            else:
+                st.warning("⚠️ **Aprovada no ELU (flexão e cortante)**, mas a "
+                           "**flecha** passou do limite em algum vão — veja a "
+                           "seção *Flecha* abaixo (contra-flecha ou aumentar "
+                           "a altura h).")
+            _r1, _r2, _r3 = st.columns(3)
+            _r1.metric("Aço total", f"{_q['peso_total']:.0f} kg")
+            _r2.metric("Cortante máx",
+                       f"{est['V_max'] * fu:.{_cf(1)}f} {un_f}")
+            _r3.metric("Flecha máx", f"{_fmax:.1f} mm")
 
         # ---- avisos de escopo
         with st.expander("⚠️ Avisos e hipóteses de cálculo", expanded=False):
@@ -1107,7 +1195,7 @@ if ss.res is not None:
 
             # ---- flecha (ELS)
             sec(9, "Flecha (ELS)")
-            fl = mv.verificar_flecha(res)
+            fl = fl_els
             itens = fl['vaos'] + fl['balancos']
             tabela([{
                 "Local": it['nome'],
@@ -1121,6 +1209,19 @@ if ss.res is not None:
                        "Carga total tratada como quase-permanente "
                        "(conservador). Limite L/250 (visual, Tab. 13.3); "
                        "balanço usa 2×L. Contra-flecha ≤ L/350.")
+            _alv = [it for it in itens if not it['ok_alv']]
+            if _alv:
+                st.info("🧱 **Se houver parede de alvenaria sobre/sob a "
+                        "viga**, o limite é mais rígido: **L/500 (≤ 10 mm)** "
+                        "para não trincar (Tab. 13.3). Passam desse limite: "
+                        + "; ".join(f"{it['nome']} "
+                          f"({it['flecha_total_mm']:.1f} > "
+                          f"{it['limite_alv_mm']:.1f} mm)" for it in _alv)
+                        + ". Nesse caso aumente a altura h — a contra-flecha "
+                        "não evita a fissura da parede.")
+            else:
+                st.caption("🧱 Todas as flechas também atendem o limite de "
+                           "alvenaria L/500 (≤ 10 mm) para paredes.")
             for it in itens:
                 if it['ok']:
                     continue

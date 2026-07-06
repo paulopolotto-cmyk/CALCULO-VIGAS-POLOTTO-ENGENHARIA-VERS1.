@@ -3,6 +3,7 @@
 
 # === Backups locais ===
 *.bak
+backups_versoes/
 
 # === Pagina do GitHub salva (backup offline) ===
 NOVO*/
