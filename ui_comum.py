@@ -412,18 +412,46 @@ def assistente_carga(fu, un_fm, key="asst"):
                    "depois, automaticamente. Fórmula: q = (laje + "
                    "revestimento + sobrecarga de uso) × largura de "
                    "influência + parede.")
-        c1, c2 = st.columns(2)
-        larg = c1.number_input(
-            "Largura de influência da laje [m]", min_value=0.0,
-            max_value=15.0, value=4.0, step=0.1, format="%.2f",
-            key=f"{key}_lg",
-            help="É a FAIXA de laje que descarrega nesta viga = soma das "
-                 "metades dos vãos de laje de cada lado. Ex.: viga entre "
-                 "duas lajes de 4 m → 2 m de cada lado = 4 m. Viga de borda "
-                 "(laje só de um lado, vão 4 m) → ~2 m. É esse valor que "
-                 "transforma a carga de área (por m²) em carga por metro de "
-                 "viga.")
-        tipo_laje = c2.selectbox(
+
+        # ---- Largura de influência da laje (o "tamanho de laje" que pesa
+        #      sobre a viga). Pode ser calculada pelos vãos das lajes de cada
+        #      lado ou digitada direto.
+        modo_inf = st.radio(
+            "Como definir a largura de influência da laje?",
+            ["Pelos vãos das lajes (o programa calcula)",
+             "Digitar a largura direto"],
+            key=f"{key}_modo", horizontal=True,
+            help="A largura de influência é a FAIXA de laje que descarrega "
+                 "nesta viga. Vale metade do vão da laje de cada lado — a "
+                 "outra metade vai para a viga vizinha. É esse valor que "
+                 "transforma a carga por m² em carga por metro de viga.")
+        if modo_inf.startswith("Pelos vãos"):
+            cle, cld = st.columns(2)
+            L_esq = cle.number_input(
+                "Vão da laje à ESQUERDA [m]", min_value=0.0, max_value=12.0,
+                value=4.0, step=0.1, format="%.2f", key=f"{key}_le",
+                help="Distância desta viga até a viga/apoio vizinho do lado "
+                     "esquerdo (= vão da laje desse lado). Use 0 se a viga é "
+                     "de borda (não há laje à esquerda).")
+            L_dir = cld.number_input(
+                "Vão da laje à DIREITA [m]", min_value=0.0, max_value=12.0,
+                value=4.0, step=0.1, format="%.2f", key=f"{key}_ld",
+                help="Idem, do lado direito. Use 0 se não há laje desse lado.")
+            larg = (L_esq + L_dir) / 2.0
+            st.caption(
+                f"➡️ Largura de influência = (vão esq + vão dir) ÷ 2 = "
+                f"({L_esq:.2f} + {L_dir:.2f}) ÷ 2 = **{larg:.2f} m**  ·  "
+                f"cada laje entrega metade do seu vão para esta viga.")
+        else:
+            larg = st.number_input(
+                "Largura de influência da laje [m]", min_value=0.0,
+                max_value=15.0, value=4.0, step=0.1, format="%.2f",
+                key=f"{key}_lg",
+                help="Faixa de laje que descarrega nesta viga = soma das "
+                     "metades dos vãos de laje de cada lado. Ex.: viga entre "
+                     "duas lajes de 4 m → 2 m + 2 m = 4 m. Viga de borda "
+                     "(laje só de um lado, vão 4 m) → ~2 m.")
+        tipo_laje = st.selectbox(
             "Tipo de laje", list(TIPOS_LAJE.keys()), key=f"{key}_tl",
             help="A laje maciça calcula o peso pela espessura "
                  "(25 kN/m³ × espessura — NBR 6120). As demais usam pesos "
@@ -477,17 +505,32 @@ def assistente_carga(fu, un_fm, key="asst"):
             disabled=(PAREDES[par_lbl] == 0.0),
             help="Pé-direito da parede sobre a viga (altura da alvenaria).")
         parede = PAREDES[par_lbl] * alt_par                    # kN/m
-        q_kN_calc = (laje + revest + uso) * larg + parede      # kN/m
+        carga_m2 = laje + revest + uso                         # kN/m²
+        q_laje = carga_m2 * larg                               # kN/m (só laje)
+        q_kN_calc = q_laje + parede                            # kN/m (total)
 
+        # ---- Descrição matemática (embaixo da linha de influência) ----
+        st.markdown("---")
+        st.markdown("**📐 Como esta carga foi calculada (por metro de viga):**")
         st.markdown(
-            f"**Carga estimada** = ({_fa(laje)} laje + {_fa(revest)} revest. "
-            f"+ {_fa(uso)} uso) {un_area} × {larg:.2f} m"
-            + (f" + parede {parede * fu:.{ca}f} {un_fm}" if parede > 0
-               else ""))
+            f"**1)** Carga da laje por m² = {_fa(laje)} (peso próprio) + "
+            f"{_fa(revest)} (revest.) + {_fa(uso)} (uso, NBR 6120) = "
+            f"**{_fa(carga_m2)} {un_area}**")
+        st.markdown(
+            f"**2)** × largura de influência **{larg:.2f} m** "
+            f"(= faixa de laje que apoia na viga) = "
+            f"**{q_laje * fu:.{ca}f} {un_fm}**")
+        if parede > 0:
+            st.markdown(
+                f"**3)** + parede sobre a viga "
+                f"({_fa(PAREDES[par_lbl])} {un_area} × {alt_par:.2f} m de "
+                f"altura) = {parede * fu:.{ca}f} {un_fm}")
         st.markdown(
             f"### ➡️ q ≈ {q_kN_calc * KGF_POR_KN:,.0f} kgf/m"
             .replace(",", ".")
             + f"  ·  {q_kN_calc:.2f} kN/m")
+        st.caption("O peso próprio da própria viga é somado depois, "
+                   "automaticamente, no cálculo estrutural.")
         if st.button(f"✔ Usar esta carga ({q_kN_calc * fu:.{0 if fu > 1 else 1}f}"
                      f" {un_fm})", key=f"{key}_btn", width="stretch"):
             q_kN = q_kN_calc
