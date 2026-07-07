@@ -3,9 +3,28 @@
 import base64 as _b64
 import html as _html
 import io as _io
+import os as _os
 
 import streamlit as st
 import streamlit.components.v1 as components
+
+# Logo oficial Polotto (embutido como data-URI: funciona na web, no túnel e
+# no .exe, sem depender de arquivo externo em runtime).
+_LOGO_URI = None
+
+
+def _logo_uri():
+    global _LOGO_URI
+    if _LOGO_URI is None:
+        try:
+            _p = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)),
+                               "assets", "logo_polotto.png")
+            with open(_p, "rb") as _f:
+                _LOGO_URI = ("data:image/png;base64,"
+                             + _b64.b64encode(_f.read()).decode("ascii"))
+        except Exception:
+            _LOGO_URI = ""      # cai no logo textual (fallback) se faltar
+    return _LOGO_URI
 
 # paleta "azul engenharia"
 NAVY = "#1E3A8A"
@@ -77,17 +96,30 @@ _CSS = """
 /* cabeçalho da marca */
 .pol-header {
     background: linear-gradient(135deg, #16265B, #1E3A8A 55%, #24479E);
-    color: #fff; border-radius: 14px; padding: 22px 22px 18px;
-    margin-bottom: 4px;
+    color: #fff; border-radius: 14px; padding: 20px 22px 16px;
+    margin-bottom: 4px; text-align: center;
 }
-a.pol-marca-link { text-decoration: none !important; display: inline-block; }
+a.pol-marca-link { text-decoration: none !important; display: block; }
 a.pol-marca-link:hover .marca-txt { color: #F0C879; }
 a.pol-marca-link:hover .logo-badge { transform: scale(1.05); }
+a.pol-marca-link:hover .pol-logo-card {
+    transform: translateY(-1px); box-shadow: 0 6px 22px rgba(0,0,0,.32);
+}
 a.pol-marca-link:hover .pol-site-hint {
     background: #F0C879; color: #16265B;
 }
+/* cartão branco onde o logo oficial (preto+laranja) fica legível */
+.pol-logo-card {
+    display: inline-block; background: #fff; border-radius: 12px;
+    padding: 13px 18px; box-shadow: 0 3px 14px rgba(0,0,0,.24);
+    transition: transform .12s ease, box-shadow .12s ease;
+}
+.pol-logo-img {
+    display: block; margin: 0 auto; height: auto;
+    width: 100%; max-width: 260px;
+}
 .pol-header .marca {
-    display: flex; align-items: center; gap: 12px;
+    display: flex; align-items: center; justify-content: center; gap: 12px;
 }
 .pol-header .marca-txt .ext {
     font-size: .95rem; color: #F0C879; vertical-align: super;
@@ -118,7 +150,7 @@ a.pol-marca-link:hover .pol-site-hint {
 }
 .pol-header .divisor {
     height: 3px; width: 72px; border-radius: 99px;
-    background: #F0C879; margin: 10px 0 10px;
+    background: #F0C879; margin: 12px auto 10px;
 }
 .pol-header h1 {
     font-size: 1.08rem; line-height: 1.3; margin: 0;
@@ -333,19 +365,22 @@ def tabela(rows):
 
 
 def header(titulo, subtitulo):
+    uri = _logo_uri()
+    if uri:                        # logo oficial (imagem) num cartão branco
+        marca = (f'<div class="pol-logo-card">'
+                 f'<img class="pol-logo-img" src="{uri}" '
+                 f'alt="Polotto Engenharia — desde 1978"></div>')
+    else:                          # fallback textual (se o arquivo faltar)
+        marca = ('<div class="marca"><span class="logo-badge">P</span>'
+                 '<span class="marca-txt">Polotto <em>Engenharia</em>'
+                 '<span class="ext">&#8599;</span></span></div>')
     st.markdown(f"""
 <div class="pol-header">
   <a class="pol-marca-link" href="https://polottoengenharia.com.br"
      target="_blank" rel="noopener" title="Abrir polottoengenharia.com.br">
-    <div class="marca">
-      <span class="logo-badge">P</span>
-      <div>
-        <span class="marca-txt">Polotto <em>Engenharia</em><span
-          class="ext">&#8599;</span></span>
-        <div class="pol-site-hint">&#127760; polottoengenharia.com.br
-          &nbsp;·&nbsp; clique para visitar</div>
-      </div>
-    </div>
+    {marca}
+    <div class="pol-site-hint">&#127760; polottoengenharia.com.br
+      &nbsp;·&nbsp; clique para visitar</div>
   </a>
   <div class="divisor"></div>
   <h1>{titulo}</h1>
