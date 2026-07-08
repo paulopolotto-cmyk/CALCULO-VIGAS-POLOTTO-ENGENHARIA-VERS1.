@@ -16,7 +16,7 @@ import streamlit as st
 # Streamlit Cloud fique preso numa versão antiga em cache de um módulo
 # importado (motor_viga/motor_pilar/ui_comum) após um deploy que muda ao
 # mesmo tempo um módulo e uma página — causa comum de ImportError/AttributeError.
-for _m in ("ui_comum", "motor_viga", "motor_pilar"):
+for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje"):
     if _m in sys.modules:
         try:
             importlib.reload(sys.modules[_m])
@@ -29,6 +29,7 @@ st.set_page_config(page_title="Polotto Engenharia — Cálculo Estrutural",
 _paginas = [
     st.Page("pagina_vigas.py", title="Vigas", icon="🏗️", default=True),
     st.Page("pagina_pilar.py", title="Pilares", icon="🏛️"),
+    st.Page("pagina_lajes.py", title="Lajes", icon="🧱"),
     st.Page("pagina_pilar_previo.py", title="Pilares Prévios", icon="🏠"),
 ]
 

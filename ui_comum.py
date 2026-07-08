@@ -651,7 +651,9 @@ def seletor_pagina(atual):
         _botao_pagina("vigas", atual, "pagina_vigas.py", "Vigas", "🏗️")
     with c2:
         _botao_pagina("pilar", atual, "pagina_pilar.py", "Pilares", "🏛️")
-    # 3ª opção (programa novo), largura total, logo abaixo dos dois botões
+    # módulos adicionais (largura total, logo abaixo dos dois botões)
+    _botao_pagina("lajes", atual, "pagina_lajes.py",
+                  "Lajes (maciça e pré-moldada)", "🧱")
     _botao_pagina("previo", atual, "pagina_pilar_previo.py",
                   "Pilares Prévios — casas térreas", "🏠")
 
