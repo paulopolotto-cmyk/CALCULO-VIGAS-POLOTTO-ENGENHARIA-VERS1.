@@ -201,3 +201,24 @@ que expunham roadmap; nota de unidade dos momentos.
 
 QA pós-correções: 6 refs + 12 vãos + 9 padrões + extremos = **32+ cenários,
 0 falhas**; render 0 exceções (2 modos) e regressão 0 nas 4 páginas.
+
+## D11 — Rodada final de verificação (aprovado) e últimos ajustes
+
+2ª equipe (code-verify + eng-verify) confirmou as 13 correções corretas em
+fórmula/unidade/norma, sem regressão. Últimas pendências corrigidas:
+- **α do momento de fissuração** parametrizado: **1,5 (retangular, maciça)**
+  e **1,2 (seção T, treliçada)** — NBR 6118 17.3.1. Verificado à mão (Branson
+  fator 2,34; Mr=641). Efeito: treliçada mais conservadora (nervura T fissura
+  cedo → alertas + contra-flecha realistas; verde até ~3 m, vermelho em 4 m+).
+- **As_mín da nervura** sobre a **área bruta da seção T** (capa+alma), não só
+  bw·h.
+- **st.pills**: guarda com sentinela — ao digitar um vão fora dos presets o
+  chip perde o destaque (elimina o flicker/rerun redundante).
+- **PT-BR completo**: Quantitativos, coluna "Comprimento" das reações e
+  rótulos dos selectbox de integração agora com vírgula decimal.
+- Aproximação documentada: na maciça 2 direções, o fator de fissuração usa a
+  faixa 1D da direção governante (a favor da segurança) sobre a flecha da
+  placa 2D — aceitável para pré-dimensionamento.
+
+**Veredito final: APROVADO, sem pendências.** Restauração: `v-antes-lajes`
+(a2e07fa); módulo final além do commit 380e047.

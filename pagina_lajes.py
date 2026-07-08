@@ -40,6 +40,7 @@ _defaults = {
     "laje_grev": 1.0, "laje_gpar": 0.0,
     "laje_sup": "Apoiada", "laje_inf": "Apoiada",
     "laje_esq": "Apoiada", "laje_dir": "Apoiada",
+    "vao_pills": "4×4",
 }
 for _k, _v in _defaults.items():
     if _k not in ss:
@@ -99,8 +100,10 @@ st.caption("Toque em um vão padrão ou digite abaixo. **lx** = menor vão "
            "(direção principal da armação).")
 _opts = [f"{a:g}×{b:g}" for a, b in VAOS_RAPIDOS]
 _cur = f"{float(ss.laje_lx):g}×{float(ss.laje_ly):g}"
+# vão livre (não é um preset) → remove o destaque do chip (evita flicker)
+if _cur not in _opts and ss.get("vao_pills") is not None:
+    ss["vao_pills"] = None
 _pick = st.pills("Vãos padrão", _opts, selection_mode="single",
-                 default=(_cur if _cur in _opts else None),
                  label_visibility="collapsed", key="vao_pills")
 if _pick and _pick != _cur:
     _a, _b = _pick.split("×")
@@ -435,7 +438,7 @@ if fl["contraflecha_mm"] > 0:
 # reações por viga
 sec(9, f"Reações da laje nas vigas ({un_fm})")
 tabela([{"Viga": VIGA_NOME[e], "Borda": nome, "Comprimento":
-         f"{reac[e]['L']:.2f} m", "Carga q": f"{_fN(reac[e]['q'])} {un_fm}"}
+         f"{_f2(reac[e]['L'])} m", "Carga q": f"{_fN(reac[e]['q'])} {un_fm}"}
         for e, nome in LADOS])
 
 # cargas nos pilares
@@ -453,7 +456,7 @@ ci1, ci2 = st.columns(2)
 with ci1:
     st.markdown("**➡️ Enviar uma viga para o módulo de Vigas**")
     vsel = st.selectbox("Qual viga?", [f"{VIGA_NOME[e]} — borda {nome} "
-                        f"(L={reac[e]['L']:.2f} m, q={_fN(reac[e]['q'])} {un_fm})"
+                        f"(L={_f2(reac[e]['L'])} m, q={_fN(reac[e]['q'])} {un_fm})"
                         for e, nome in LADOS], key="viga_sel")
     e_sel = LADOS[[f"{VIGA_NOME[e]}" for e, _ in LADOS].index(vsel.split(" —")[0])][0]
     if st.button("🏗️ Enviar para Vigas", width="stretch", key="btn_viga"):
@@ -495,21 +498,21 @@ sec(12, "Quantitativos do pano")
 q = res["quant"]
 if is_trel:
     tabela([
-        {"Material": "Área do pano", "Quantidade": f"{q['area']:.2f} m²"},
+        {"Material": "Área do pano", "Quantidade": f"{_f2(q['area'])} m²"},
         {"Material": "Concreto (capa+nervuras)", "Quantidade":
-         f"{q['vol_conc']:.3f} m³"},
+         f"{_f2(q['vol_conc'], 3)} m³"},
         {"Material": "Vigotas treliçadas", "Quantidade":
-         f"{q['n_vigotas']} un · {q['comp_vigotas']:.1f} m"},
+         f"{q['n_vigotas']} un · {_f2(q['comp_vigotas'], 1)} m"},
         {"Material": "Elementos de enchimento", "Quantidade":
          f"≈ {q['n_element']} un"},
     ])
 else:
     tabela([
-        {"Material": "Área do pano", "Quantidade": f"{q['area']:.2f} m²"},
-        {"Material": "Concreto", "Quantidade": f"{q['vol_conc']:.3f} m³"},
-        {"Material": "Forma (fundo)", "Quantidade": f"{q['forma']:.2f} m²"},
+        {"Material": "Área do pano", "Quantidade": f"{_f2(q['area'])} m²"},
+        {"Material": "Concreto", "Quantidade": f"{_f2(q['vol_conc'], 3)} m³"},
+        {"Material": "Forma (fundo)", "Quantidade": f"{_f2(q['forma'])} m²"},
         {"Material": "Aço (estimado)", "Quantidade":
-         f"{q['kg_aco']:.1f} kg ({q['taxa_aco']:.1f} kg/m²)"},
+         f"{_f2(q['kg_aco'], 1)} kg ({_f2(q['taxa_aco'], 1)} kg/m²)"},
     ])
 
 

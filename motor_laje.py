@@ -109,14 +109,15 @@ def as_min(fck, h_cm, b_cm=100.0):
 ES = 21000.0                                    # kN/cm² (módulo do aço CA-50)
 
 
-def fator_fissuracao(fck, Ic, yt, Ma, As, d, Ecs_kNcm2, b):
+def fator_fissuracao(fck, Ic, yt, Ma, As, d, Ecs_kNcm2, b, alfa=1.5):
     """Fator Ic/Ieq (>=1) da rigidez equivalente de Branson (NBR 6118
     17.3.2.1.1). Todas as grandezas em cm/kN. Ma na comb. quase-permanente.
+    alfa = 1,5 (seção retangular) ou 1,2 (T / duplo-T) — item 17.3.1.
     Retorna (fator, Mr)."""
     if As <= 0 or Ma <= 0 or Ic <= 0 or Ecs_kNcm2 <= 0:
         return 1.0, 0.0
     fctm = 0.3 * fck ** (2.0 / 3.0) / 10.0      # kN/cm²
-    Mr = 1.5 * fctm * Ic / yt                    # kN·cm (seção retangular)
+    Mr = alfa * fctm * Ic / yt                   # kN·cm
     if Ma <= Mr:
         return 1.0, Mr                           # não fissura -> rigidez bruta
     ae = ES / Ecs_kNcm2                           # αe = Es/Ecs
@@ -508,7 +509,9 @@ def calcular_laje_trelicada(dados):
     bw_cm = bw * 100.0                                # 9 cm
     d = h - 2.0 - 0.5
     As_nerv, xi, ok = as_flexao(Md * INTEREIXO * 100.0, bf_cm, d, fck)
-    As_min_rib = as_min(fck, h, bw_cm)               # NBR: regra de viga (rib)
+    # As_min da nervura sobre a ÁREA BRUTA da seção T (capa + alma)
+    Ac_rib = bf_cm * capa + bw_cm * (h - capa)       # cm² por nervura
+    As_min_rib = (RHO_MIN.get(int(round(fck)), 0.15) / 100.0) * Ac_rib
     if As_nerv is not None:
         if xi is not None and 0.8 * xi * d > capa + 1e-6:
             avisos.append("Linha neutra abaixo da capa — seção T real; a "
@@ -533,7 +536,7 @@ def calcular_laje_trelicada(dados):
     yt_cm = (ht - yc) * 100.0                        # fibra tracionada (base)
     Ma_rib = p_qp * lx ** 2 * cM * INTEREIXO * 100.0  # kN·cm por nervura
     fator_fis, Mr = fator_fissuracao(fck, Ic_cm, yt_cm, Ma_rib, As_nerv_adot,
-                                     d, Ecs_cm, bf_cm)
+                                     d, Ecs_cm, bf_cm, alfa=1.2)  # seção T
     delta_i = delta_i_bruta * fator_fis
     af = alfa_f(0.0)
     flecha = _classifica_flecha(delta_i, af * delta_i, lx)
