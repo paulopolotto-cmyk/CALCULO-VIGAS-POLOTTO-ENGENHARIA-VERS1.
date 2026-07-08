@@ -22,6 +22,7 @@ st.set_page_config(page_title="Polotto Engenharia — Cálculo Estrutural",
 _paginas = [
     st.Page("pagina_vigas.py", title="Vigas", icon="🏗️", default=True),
     st.Page("pagina_pilar.py", title="Pilares", icon="🏛️"),
+    st.Page("pagina_pilar_previo.py", title="Pilares Prévios", icon="🏠"),
 ]
 
 try:
