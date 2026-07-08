@@ -140,3 +140,64 @@ dá momentos positivos de vão (Mx, My), momentos negativos de engaste
 Dormitório/sala/cozinha/banheiro 1,5 · área de serviço/despensa 2,0 · forro
 sem acesso 0,5 · corredor privativo 1,5 / comum 3,0 · garagem leve 3,0 ·
 varanda/terraço com acesso ~2,5 (marcado a confirmar). Concreto 25 kN/m³.
+
+## D8 — Interface, desenho e integração (validado)
+
+- 4º botão "🧱 Lajes (maciça e pré-moldada)" no seletor (largura total,
+  prominente), registrado nos dois entrypoints. Vigas/Pilares/Pilares Prévios
+  intactos (regressão: 0 exceções).
+- Cálculo automático (sem botão) com `st.cache_data` (chaves primitivas) para
+  não recalcular o solver de placa a cada rerun.
+- **Desenho do pano**: maciça → áreas tributárias de charneira (padrão em X);
+  treliçada → duas metades (1 direção) + direção das vigotas (NÃO usar o X de
+  charneira na treliçada — corrigido). Vigas V1–V4 e pilares P1–P4 rotulados
+  com carga.
+- **Integração validada ponta a ponta** (Playwright): "Enviar para Vigas" →
+  cria tramo `L, q` e a viga calcula; "Enviar para Pilares" → abre Pilares com
+  Nk. `st.switch_page` + pré-preenchimento das chaves existentes; **zero
+  alteração** em pagina_vigas/pagina_pilar.
+- Flecha usa combinação **quase-permanente** (não a total) e armadura usa
+  **Md=1,4·Mk** — correções de unidade feitas após o 1º QA (senão flecha
+  alarmista e aço subdimensionado).
+- Entregáveis: comparativo treliçada×maciça, quantitativos por pano, memória
+  em **PDF** (matplotlib PdfPages, sem dependência extra), disclaimer fixo.
+
+## D9 — Documentação
+`ROADMAP.md` (raiz, top 5) · `docs/lajes/README_LAJES.md` · docs de engenharia
+e auditoria em `docs/lajes/`. Pontos de restauração: `v-antes-lajes`
+(=a2e07fa), checkpoint do módulo em `3c703af`.
+
+## D10 — Auditoria final (equipe adversarial) e correções aplicadas
+
+Workflow de 3 revisores (código, engenharia NBR, UX) → 24 achados. Resolução:
+
+**Engenharia (correção/segurança) — TODOS corrigidos:**
+- **Flecha com rigidez FISSURADA de Branson** (era estádio I bruto →
+  subestimava 2–3×, a favor da insegurança). Implementado `fator_fissuracao`
+  (Mr=1,5·fctm·Ic/yt; Ieq de Branson; ν=0,2). Efeito verificado: maciça de
+  residência em geral NÃO fissura na q.p. (segue verde); treliçada fissura
+  (nervura) e passa a amarelo/vermelho nos vãos maiores — correto.
+- **kg_aco** corrigido (erro dimensional: faltava a área do pano) →
+  (As_x+As_y)·lx·ly. Agora ~3,5 kg/m² (antes ~0,8).
+- **As_mín da treliçada** aplicada (max com As_nerv) + aviso de ductilidade
+  (x/d>0,45) e de seção insuficiente.
+- **Verificação de cortante ELU** VRd1 (NBR 6118 19.4.1) na maciça e na
+  nervura, com aviso.
+- Momento positivo da treliçada como **seção T** (mesa=capa, b=bf).
+- Guarda para bordo livre (não tratado pelo solver → aviso).
+
+**Código — corrigidos:** PDF sob demanda + figura fechada (vazamento);
+`_comparativo` com `@st.cache_data`; `st.switch_page` com try/except (fallback
+fora da navegação); `motor_laje` no reload do `.exe` e nos `datas` do `.spec`
+(+ assets, pagina_pilar_previo).
+
+**UX — corrigidos:** títulos de seção com unidade dinâmica (kgf/kN);
+`st.metric` com `delta_color='off'` (sem seta verde enganosa); **12 vãos como
+`st.pills`** (chips que quebram linha + ativo destacado, resolve empilhamento
+no mobile); comparativo com 🟢/🟡/🔴; **números em PT-BR** (vírgula) nas
+tabelas; rótulo "Altura recomendada" (era "Vão-limite"); help de parede com
+valores de referência; toast ao enviar p/ Vigas/Pilares; remoções de textos
+que expunham roadmap; nota de unidade dos momentos.
+
+QA pós-correções: 6 refs + 12 vãos + 9 padrões + extremos = **32+ cenários,
+0 falhas**; render 0 exceções (2 modos) e regressão 0 nas 4 páginas.

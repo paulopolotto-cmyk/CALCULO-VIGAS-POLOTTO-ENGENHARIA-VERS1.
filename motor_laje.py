@@ -106,6 +106,41 @@ def as_min(fck, h_cm, b_cm=100.0):
     return rho * b_cm * h_cm
 
 
+ES = 21000.0                                    # kN/cm² (módulo do aço CA-50)
+
+
+def fator_fissuracao(fck, Ic, yt, Ma, As, d, Ecs_kNcm2, b):
+    """Fator Ic/Ieq (>=1) da rigidez equivalente de Branson (NBR 6118
+    17.3.2.1.1). Todas as grandezas em cm/kN. Ma na comb. quase-permanente.
+    Retorna (fator, Mr)."""
+    if As <= 0 or Ma <= 0 or Ic <= 0 or Ecs_kNcm2 <= 0:
+        return 1.0, 0.0
+    fctm = 0.3 * fck ** (2.0 / 3.0) / 10.0      # kN/cm²
+    Mr = 1.5 * fctm * Ic / yt                    # kN·cm (seção retangular)
+    if Ma <= Mr:
+        return 1.0, Mr                           # não fissura -> rigidez bruta
+    ae = ES / Ecs_kNcm2                           # αe = Es/Ecs
+    aa = b / 2.0
+    bb = ae * As
+    cc = -ae * As * d
+    x = (-bb + math.sqrt(bb * bb - 4.0 * aa * cc)) / (2.0 * aa)   # LN fissurada
+    Icr = b * x ** 3 / 3.0 + ae * As * (d - x) ** 2
+    r = (Mr / Ma) ** 3
+    Ieq = min(Ic, max(Icr, r * Ic + (1.0 - r) * Icr))
+    return Ic / Ieq, Mr
+
+
+def vrd1(fck, bw_cm, d_cm, As_cm2):
+    """Cortante resistente de laje/nervura SEM armadura transversal VRd1 (kN),
+    NBR 6118 19.4.1."""
+    fctk_inf = 0.7 * 0.3 * fck ** (2.0 / 3.0) / 10.0    # kN/cm²
+    fctd = fctk_inf / GAMMA_C
+    tau_rd = 0.25 * fctd
+    rho1 = min(As_cm2 / (bw_cm * d_cm), 0.02) if bw_cm * d_cm > 0 else 0.0
+    k = max(1.0, 1.6 - d_cm / 100.0)             # d em m
+    return tau_rd * k * (1.2 + 40.0 * rho1) * bw_cm * d_cm    # kN
+
+
 # ---------------------------------------------- reações por charneiras (D2)
 def reacoes_charneiras(lx, ly, apoios, p, n=400):
     """Reações da laje nas 4 bordas por charneiras plásticas (NBR 6118
@@ -274,6 +309,10 @@ def calcular_laje_macica(dados):
     p_qp = g_tot + psi2 * q                         # quase-perm. (flecha)
 
     avisos = []
+    if "livre" in apoios.values():
+        avisos.append("Bordo livre (balanço) ainda não é tratado pelo solver "
+                      "de placa — momentos/flecha aproximados; prefira apoiada "
+                      "ou engastada.")
     # espessura mínima
     h_min = ESP_MIN_MACICA["piso"]
     if h_cm < h_min:
@@ -319,10 +358,6 @@ def calcular_laje_macica(dados):
     mx_pos, my_pos, mx_eng, my_eng = mxu * p, myu * p, mxeu * p, myeu * p
     Mdx, Mdy, Mdxe, Mdye = mxu * pd, myu * pd, mxeu * pd, myeu * pd
 
-    delta_i = wu * p_qp * 1000.0                     # mm (quase-perm.)
-    af = alfa_f(0.0)
-    flecha = _classifica_flecha(delta_i, af * delta_i, lx)
-
     # armaduras (por metro) — a partir do MOMENTO DE CÁLCULO
     def _arm(Md_kNm, d):
         As, xi, ok = as_flexao(Md_kNm * 100.0, 100.0, d, fck)
@@ -338,6 +373,32 @@ def calcular_laje_macica(dados):
         "x_neg": _arm(Mdxe, d_x), "y_neg": _arm(Mdye, d_y),
     }
     if any(a["As"] is None for a in arm.values()):
+        avisos.append("Momento alto para a espessura (x/d>0,5) — aumente h.")
+
+    # flecha: rigidez FISSURADA de Branson na direção governante (ELS q.p.)
+    delta_i_bruta = wu * p_qp * 1000.0               # mm (estádio I)
+    Ecs_cm = Ecs * 1e-4                              # kN/m² -> kN/cm²
+    Ic = 100.0 * h_cm ** 3 / 12.0                    # cm⁴ (b=100 cm)
+    if mx_pos >= my_pos:
+        Ma, As_g, d_g = mxu * p_qp * 100.0, \
+            (arm["x_pos"]["As_adot"] or as_min(fck, h_cm)), d_x
+    else:
+        Ma, As_g, d_g = myu * p_qp * 100.0, \
+            (arm["y_pos"]["As_adot"] or as_min(fck, h_cm)), d_y
+    fator_fis, Mr = fator_fissuracao(fck, Ic, h_cm / 2.0, Ma, As_g, d_g,
+                                     Ecs_cm, 100.0)
+    delta_i = delta_i_bruta * fator_fis
+    af = alfa_f(0.0)
+    flecha = _classifica_flecha(delta_i, af * delta_i, lx)
+    flecha["fator_fissuracao"] = fator_fis
+
+    # cortante ELU sem estribos (NBR 6118 19.4.1)
+    Vsd = pd * lx / 2.0                              # kN/m
+    VRd1 = vrd1(fck, 100.0, d_x, arm["x_pos"]["As_adot"] or as_min(fck, h_cm))
+    if Vsd > VRd1:
+        avisos.append(f"Cortante Vsd={Vsd:.1f} > VRd1={VRd1:.1f} kN/m — "
+                      f"laje exigiria armadura de cisalhamento; aumente h.")
+    if any(a["As"] is None for a in arm.values()):
         avisos.append("Momento alto para a espessura: seção comprimida "
                       "demais (x/d>0,5). Aumente h.")
 
@@ -349,11 +410,10 @@ def calcular_laje_macica(dados):
     area = lx * ly
     vol_conc = area * h_cm / 100.0                   # m³
     forma = area                                     # m² (fundo)
-    As_med = (arm["x_pos"]["As_adot"] or 0) + (arm["y_pos"]["As_adot"] or 0)
-    # kg de aço estimado: (As_x*ly + As_y*lx) por m de largura, +30% negativas
-    kg_aco = (( (arm["x_pos"]["As_adot"] or 0) * ly
-               + (arm["y_pos"]["As_adot"] or 0) * lx) / 1e4
-              * PESO_ESP_ACO * 1.30)
+    # kg de aço ≈ (As_x + As_y) [cm²/m] × área [m²] → cm²·m; +30% (negativas,
+    # ancoragem, distribuição). As_x·lx·ly + As_y·lx·ly = (As_x+As_y)·área.
+    As_soma = (arm["x_pos"]["As_adot"] or 0) + (arm["y_pos"]["As_adot"] or 0)
+    kg_aco = As_soma * (lx * ly) / 1e4 * PESO_ESP_ACO * 1.30
 
     return {
         "tipo": "macica", "lx": lx, "ly": ly, "trocou_dir": troca,
@@ -440,19 +500,51 @@ def calcular_laje_trelicada(dados):
     I = (bf * hf ** 3 / 12.0 + A_fl * (yc - y_fl) ** 2
          + bw * (ht - hf) ** 3 / 12.0 + A_web * (yc - y_web) ** 2)
     I_m = I / bf                                      # por metro de largura
-
     Ecs = modulo_ecs(fck)
-    delta_i = (5.0 / 384.0) * p_qp * lx ** 4 / (Ecs * I_m) * 1000.0
+
+    # armadura de tração na nervura — seção T (mesa comprimida = capa, b=bf),
+    # momento de CÁLCULO por nervura
+    bf_cm = INTEREIXO * 100.0                         # 42 cm
+    bw_cm = bw * 100.0                                # 9 cm
+    d = h - 2.0 - 0.5
+    As_nerv, xi, ok = as_flexao(Md * INTEREIXO * 100.0, bf_cm, d, fck)
+    As_min_rib = as_min(fck, h, bw_cm)               # NBR: regra de viga (rib)
+    if As_nerv is not None:
+        if xi is not None and 0.8 * xi * d > capa + 1e-6:
+            avisos.append("Linha neutra abaixo da capa — seção T real; a "
+                          "armadura da nervura pode estar subestimada.")
+        if not ok:
+            avisos.append(f"x/d = {xi:.2f} > 0,45 na nervura — pouca "
+                          f"ductilidade; aumente a altura da laje.")
+        As_nerv_adot = max(As_nerv, As_min_rib)
+        As_por_m = As_nerv_adot / INTEREIXO
+    else:
+        As_nerv_adot = As_min_rib
+        As_por_m = None
+        avisos.append("Momento alto para a nervura (seção insuficiente) — "
+                      "aumente a altura ou use vigota protendida.")
+
+    # flecha: rigidez FISSURADA de Branson (por nervura), ELS quase-perm.
+    delta_i_bruta = (5.0 / 384.0) * p_qp * lx ** 4 / (Ecs * I_m) * 1000.0
     if continua:
-        delta_i *= 0.4                               # ~ contínua vs biapoiada
+        delta_i_bruta *= 0.4                         # ~ contínua vs biapoiada
+    Ecs_cm = Ecs * 1e-4
+    Ic_cm = I * 1e8                                  # m⁴ (por nervura) -> cm⁴
+    yt_cm = (ht - yc) * 100.0                        # fibra tracionada (base)
+    Ma_rib = p_qp * lx ** 2 * cM * INTEREIXO * 100.0  # kN·cm por nervura
+    fator_fis, Mr = fator_fissuracao(fck, Ic_cm, yt_cm, Ma_rib, As_nerv_adot,
+                                     d, Ecs_cm, bf_cm)
+    delta_i = delta_i_bruta * fator_fis
     af = alfa_f(0.0)
     flecha = _classifica_flecha(delta_i, af * delta_i, lx)
+    flecha["fator_fissuracao"] = fator_fis
 
-    # armadura de tração na nervura (por nervura, b=bw) — momento de CÁLCULO
-    d = h - 2.0 - 0.5
-    As_nerv, xi, ok = as_flexao(Md * INTEREIXO * 100.0, bw * 100.0, d, fck)
-    As_m_metro = as_min(fck, h) * 0.5                # nervurada: menor
-    As_por_m = (As_nerv / INTEREIXO) if As_nerv else None
+    # cortante ELU sem estribos por nervura (NBR 6118 19.4.1)
+    Vsd_rib = pd * lx / 2.0 * INTEREIXO              # kN por nervura
+    VRd1_rib = vrd1(fck, bw_cm, d, As_nerv_adot)
+    if Vsd_rib > VRd1_rib:
+        avisos.append(f"Cortante Vsd={Vsd_rib:.1f} > VRd1={VRd1_rib:.1f} kN "
+                      f"por nervura — aumente a altura (ou preveja estribos).")
 
     # reações: 2 vigas perpendiculares às vigotas <- p·lx/2 (kN/m)
     q_apoio = p * lx / 2.0

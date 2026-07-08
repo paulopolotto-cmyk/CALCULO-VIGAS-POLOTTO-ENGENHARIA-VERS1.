@@ -53,6 +53,11 @@ def _fN(v_kN):
     return f"{v:,.1f}".replace(",", " ").replace(".", ",")
 
 
+def _f2(v, casas=2):
+    """Número em formato PT-BR (vírgula decimal)."""
+    return f"{v:.{casas}f}".replace(".", ",")
+
+
 def _apoios_dict():
     m = {"Apoiada": "apoiado", "Engastada": "engastado", "Livre": "livre"}
     return {e: m[ss[f"laje_{e}"]] for e in ("sup", "inf", "esq", "dir")}
@@ -72,6 +77,13 @@ def _calc_trelica(lx, ly, h, ench, cont, fck, grev, uso, gpar):
     return ml.calcular_laje_trelicada(d)
 
 
+@st.cache_data(show_spinner=False)
+def _comparativo(lx0, ly0, fck, grev, uso, gpar, h_mac, h_trel, ench):
+    return ml.comparativo(dict(lx=lx0, ly=ly0, fck=fck, g_rev=grev, q_uso=uso,
+                               g_parede=gpar, h_macica=h_mac, h_trelica=h_trel,
+                               enchimento=ench))
+
+
 # ================================================= ENTRADAS ==============
 sec(1, "Tipo de laje", destaque=True)
 ss.laje_tipo = st.radio(
@@ -85,11 +97,15 @@ is_trel = ss.laje_tipo.startswith("Pré")
 sec(2, "Vãos do pano (lx × ly)")
 st.caption("Toque em um vão padrão ou digite abaixo. **lx** = menor vão "
            "(direção principal da armação).")
-cols = st.columns(4)
-for i, (a, b) in enumerate(VAOS_RAPIDOS):
-    if cols[i % 4].button(f"{a:g}×{b:g}", key=f"vao_{i}", width="stretch"):
-        ss.laje_lx, ss.laje_ly = float(a), float(b)
-        st.rerun()
+_opts = [f"{a:g}×{b:g}" for a, b in VAOS_RAPIDOS]
+_cur = f"{float(ss.laje_lx):g}×{float(ss.laje_ly):g}"
+_pick = st.pills("Vãos padrão", _opts, selection_mode="single",
+                 default=(_cur if _cur in _opts else None),
+                 label_visibility="collapsed", key="vao_pills")
+if _pick and _pick != _cur:
+    _a, _b = _pick.split("×")
+    ss.laje_lx, ss.laje_ly = float(_a), float(_b)
+    st.rerun()
 cvx, cvy = st.columns(2)
 ss.laje_lx = cvx.number_input("Vão lx [m]", 0.5, 12.0, float(ss.laje_lx),
                               0.1, "%.2f", key="in_lx")
@@ -113,18 +129,16 @@ if is_trel:
                                 index=0 if ss.laje_cont == "biapoiada" else 1,
                                 format_func=lambda s: "Biapoiada" if s == "biapoiada"
                                 else "Contínua")
-    st.caption(f"➡️ Vigotas armadas no menor vão (**{min(lx0, ly0):.2f} m**). "
-               f"Peso próprio adotado por catálogo (editável em futuras versões).")
+    st.caption(f"➡️ Vigotas armadas no menor vão (**{_f2(min(lx0, ly0))} m**). "
+               f"Peso próprio da vigota por catálogo do fabricante (NBR 14859).")
 else:
     sec(3, "Laje maciça — espessura e apoios")
-    csug = ml.h_recomendada_trelica  # (reuso da regra L/coef p/ sugestão)
     h_sug = max(8.0, min(lx0, ly0) * 100.0 / (40.0 if lam <= 2 else 45.0))
     ss.laje_h_mac = st.number_input(
         "Espessura h [cm]", 6.0, 20.0, float(ss.laje_h_mac), 1.0, "%.0f",
-        help=f"Sugestão pelo vão: ≈ {h_sug:.0f} cm. Mínimo NBR 6118: 8 cm "
-             f"(piso), 7 cm (forro).")
+        help="Mínimo NBR 6118 (13.2.4.1): 8 cm (piso), 7 cm (forro).")
     st.caption(f"💡 Sugestão de espessura pelo vão: **≈ {h_sug:.0f} cm** "
-               f"(λ = {lam:.2f}).")
+               f"(λ = {_f2(lam)}).")
     st.markdown("**Condições de apoio das 4 bordas** "
                 "(Engastada = continuidade com laje vizinha):")
     pcol = st.columns(4)
@@ -151,8 +165,10 @@ ss.laje_grev = grev_disp / fu
 gpar_disp = c4.number_input(f"Parede sobre a laje [{un_area}]", 0.0,
                             8.0 * fu, ss.laje_gpar * fu, 0.1 * fu,
                             f"%.{0 if fu > 1 else 2}f",
-                            help="Carga de parede distribuída na laje "
-                                 "(comprimento×altura×peso ÷ área). 0 se não há.")
+                            help="Parede apoiada sobre a laje, distribuída na "
+                                 "área (comprimento×altura×peso ÷ área do pano). "
+                                 "Ref.: bloco cerâmico furado ~1,8 kN/m² de "
+                                 "parede; drywall ~1,0. 0 se não há.")
 ss.laje_gpar = gpar_disp / fu
 st.caption(f"Carga de uso adotada: **{q_uso:.1f} kN/m²** "
            f"({q_uso * 101.9716:.0f} kgf/m²).")
@@ -333,15 +349,15 @@ else:
     st.error(f"{ic} Laje **{txt}** — aumente a espessura/altura ou reduza o vão.")
 
 m1, m2, m3 = st.columns(3)
-m1.metric("Carga total p", f"{res['p']:.2f} kN/m²",
-          f"{res['p'] * 101.9716:.0f} kgf/m²")
-m2.metric("Flecha total", f"{fl['total_mm']:.1f} mm",
-          f"limite {fl['lim_visual_mm']:.1f} mm")
+m1.metric("Carga total p", f"{_f2(res['p'])} kN/m²",
+          f"{res['p'] * 101.9716:.0f} kgf/m²", delta_color="off")
+m2.metric("Flecha total", f"{_f2(fl['total_mm'], 1)} mm",
+          f"limite {_f2(fl['lim_visual_mm'], 1)} mm", delta_color="off")
 if is_trel:
     m3.metric("Direção", "1 (menor vão)")
 else:
-    m3.metric("λ = ly/lx", f"{res['lambda']:.2f}",
-              f"armada em {res['direcao']} direç.")
+    m3.metric("λ = ly/lx", f"{_f2(res['lambda'])}",
+              f"armada em {res['direcao']} direç.", delta_color="off")
 
 for a in res.get("avisos", []):
     st.warning("⚠️ " + a)
@@ -352,15 +368,15 @@ mostrar_figura(fig_pano())
 # tabela de cargas
 sec(6, "Cargas na laje")
 tabela([
-    {"Parcela": "Peso próprio", "kN/m²": f"{res['g_pp']:.2f}",
+    {"Parcela": "Peso próprio", "kN/m²": _f2(res['g_pp']),
      "kgf/m²": f"{res['g_pp'] * 101.9716:.0f}"},
-    {"Parcela": "Revestimento", "kN/m²": f"{ss.laje_grev:.2f}",
+    {"Parcela": "Revestimento", "kN/m²": _f2(ss.laje_grev),
      "kgf/m²": f"{ss.laje_grev * 101.9716:.0f}"},
-    {"Parcela": "Parede", "kN/m²": f"{ss.laje_gpar:.2f}",
+    {"Parcela": "Parede", "kN/m²": _f2(ss.laje_gpar),
      "kgf/m²": f"{ss.laje_gpar * 101.9716:.0f}"},
-    {"Parcela": "Uso (NBR 6120)", "kN/m²": f"{q_uso:.2f}",
+    {"Parcela": "Uso (NBR 6120)", "kN/m²": _f2(q_uso),
      "kgf/m²": f"{q_uso * 101.9716:.0f}"},
-    {"Parcela": "TOTAL p", "kN/m²": f"{res['p']:.2f}",
+    {"Parcela": "TOTAL p", "kN/m²": _f2(res['p']),
      "kgf/m²": f"{res['p'] * 101.9716:.0f}"},
 ])
 
@@ -368,61 +384,62 @@ tabela([
 sec(7, "Esforços e armadura")
 if is_trel:
     tabela([
-        {"Item": "Momento no vão (car.)", "Valor": f"{res['M']:.2f} kN·m/m"},
-        {"Item": "Momento de cálculo Md", "Valor": f"{res['Md']:.2f} kN·m/m"},
-        {"Item": "Cortante V", "Valor": f"{res['V']:.2f} kN/m"},
+        {"Item": "Momento no vão (caract.)", "Valor": f"{_f2(res['M'])} kN·m/m"},
+        {"Item": "Momento de cálculo Md", "Valor": f"{_f2(res['Md'])} kN·m/m"},
+        {"Item": "Cortante V", "Valor": f"{_f2(res['V'])} kN/m"},
         {"Item": "Armadura na nervura", "Valor":
-         (f"{res['As_por_m']:.2f} cm²/m" if res['As_por_m'] else "—")},
-        {"Item": "Vão-limite (pré-dim)", "Valor":
-         f"h ≈ {res['h_reco']:.0f} cm " + ("✅" if res['ok_vao'] else "⚠️ subir h")},
+         (f"{_f2(res['As_por_m'])} cm²/m" if res['As_por_m'] else "seção ↑")},
+        {"Item": "Altura recomendada", "Valor":
+         f"h ≈ {res['h_reco']:.0f} cm" + ("" if res['ok_vao'] else " ⚠️ subir h")},
     ])
 else:
     mm = res["momentos"]
     ar = res["armaduras"]
+
+    def _asfmt(v):
+        return _f2(v) if v else "seção ↑"
+
     linhas = [
-        {"Direção": "Vão x (+)", "M car.": f"{mm['mx_pos']:.2f}",
-         "Md": f"{mm['Mdx']:.2f}",
-         "As (cm²/m)": (f"{ar['x_pos']['As_adot']:.2f}"
-                        if ar['x_pos']['As_adot'] else "seção↑")},
-        {"Direção": "Vão y (+)", "M car.": f"{mm['my_pos']:.2f}",
-         "Md": f"{mm['Mdy']:.2f}",
-         "As (cm²/m)": (f"{ar['y_pos']['As_adot']:.2f}"
-                        if ar['y_pos']['As_adot'] else "seção↑")},
+        {"Direção": "Vão x (+)", "M caract.": _f2(mm['mx_pos']),
+         "Md": _f2(mm['Mdx']), "As (cm²/m)": _asfmt(ar['x_pos']['As_adot'])},
+        {"Direção": "Vão y (+)", "M caract.": _f2(mm['my_pos']),
+         "Md": _f2(mm['Mdy']), "As (cm²/m)": _asfmt(ar['y_pos']['As_adot'])},
     ]
     if mm["mx_eng"] > 0:
-        linhas.append({"Direção": "Engaste x (−)", "M car.": f"{mm['mx_eng']:.2f}",
-                       "Md": f"{mm['Mdxe']:.2f}",
-                       "As (cm²/m)": (f"{ar['x_neg']['As_adot']:.2f}"
-                                      if ar['x_neg']['As_adot'] else "—")})
+        linhas.append({"Direção": "Engaste x (−)", "M caract.": _f2(mm['mx_eng']),
+                       "Md": _f2(mm['Mdxe']), "As (cm²/m)": _asfmt(ar['x_neg']['As_adot'])})
     if mm["my_eng"] > 0:
-        linhas.append({"Direção": "Engaste y (−)", "M car.": f"{mm['my_eng']:.2f}",
-                       "Md": f"{mm['Mdye']:.2f}",
-                       "As (cm²/m)": (f"{ar['y_neg']['As_adot']:.2f}"
-                                      if ar['y_neg']['As_adot'] else "—")})
+        linhas.append({"Direção": "Engaste y (−)", "M caract.": _f2(mm['my_eng']),
+                       "Md": _f2(mm['Mdye']), "As (cm²/m)": _asfmt(ar['y_neg']['As_adot'])})
     tabela(linhas)
+    st.caption("Momentos em kN·m/m; armadura As em cm²/m (por faixa de 1 m).")
 
 # flecha detalhada
 sec(8, "Flecha (ELS)")
+_ff = fl.get("fator_fissuracao", 1.0)
+_estadio = ("Estádio II (fissurada, Branson)" if _ff > 1.01
+            else "Estádio I (não fissurada)")
 tabela([
-    {"Item": "Flecha imediata (quase-perm.)", "Valor": f"{fl['imediata_mm']:.2f} mm"},
-    {"Item": "Flecha total (com fluência)", "Valor": f"{fl['total_mm']:.2f} mm"},
+    {"Item": "Flecha imediata (quase-perm.)", "Valor": f"{_f2(fl['imediata_mm'])} mm"},
+    {"Item": "Flecha total (com fluência ×3)", "Valor": f"{_f2(fl['total_mm'])} mm"},
+    {"Item": "Rigidez adotada", "Valor": _estadio},
     {"Item": "Limite visual  L/250", "Valor":
-     f"{fl['lim_visual_mm']:.1f} mm  " + ("✅" if fl['ok_visual'] else "🔴")},
+     f"{_f2(fl['lim_visual_mm'], 1)} mm  " + ("✅" if fl['ok_visual'] else "🔴")},
     {"Item": "Limite após alvenaria", "Valor":
-     f"{fl['lim_alv_mm']:.1f} mm  " + ("✅" if fl['ok_alv'] else "🔴")},
+     f"{_f2(fl['lim_alv_mm'], 1)} mm  " + ("✅" if fl['ok_alv'] else "🔴")},
 ])
 if fl["contraflecha_mm"] > 0:
     st.info(f"💡 Sugestão de **contra-flecha ≈ {fl['contraflecha_mm']:.0f} mm** "
             f"(≤ L/350) para compensar a flecha visual.")
 
 # reações por viga
-sec(9, "Reações da laje nas vigas (kN/m)")
+sec(9, f"Reações da laje nas vigas ({un_fm})")
 tabela([{"Viga": VIGA_NOME[e], "Borda": nome, "Comprimento":
          f"{reac[e]['L']:.2f} m", "Carga q": f"{_fN(reac[e]['q'])} {un_fm}"}
         for e, nome in LADOS])
 
 # cargas nos pilares
-sec(10, "Cargas estimadas nos pilares (kN)")
+sec(10, f"Cargas estimadas nos pilares ({un_f})")
 tabela([{"Pilar": p["nome"], "Nk (característica)": f"{_fN(p['Nk'])} {un_f}",
          "Nd (cálculo ×1,4)": f"{_fN(p['Nk'] * 1.4)} {un_f}"} for p in pilares])
 st.caption("Carga de canto = metade da reação de cada viga adjacente + peso "
@@ -446,7 +463,14 @@ with ci1:
                           "q": float(reac[e_sel]["q"]), "P": 0.0, "a": 0.0}]
         ss.res = None
         ss.edit_index = None
-        st.switch_page("pagina_vigas.py")
+        st.toast(f"{VIGA_NOME[e_sel]} enviada para Vigas: "
+                 f"L={_f2(reac[e_sel]['L'])} m · q={_fN(reac[e_sel]['q'])} "
+                 f"{un_fm} (seção 14×40).", icon="🏗️")
+        try:
+            st.switch_page("pagina_vigas.py")
+        except Exception:
+            st.info("Viga carregada. Abra a aba **Vigas** no seletor acima "
+                    "para ver e calcular.")
 with ci2:
     st.markdown("**➡️ Enviar um pilar para o módulo de Pilares**")
     psel = st.selectbox("Qual pilar?", [f"{p['nome']} — Nk={_fN(p['Nk'])} {un_f}"
@@ -457,7 +481,13 @@ with ci2:
         ss.pilar_fck, ss.pilar_caa = int(ss.laje_fck), "II"
         ss.pilar_Nk = float(pilares[p_i]["Nk"]) * fu
         ss.res_pilar = None
-        st.switch_page("pagina_pilar.py")
+        st.toast(f"{pilares[p_i]['nome']} enviado para Pilares: "
+                 f"Nk={_fN(pilares[p_i]['Nk'])} {un_f}.", icon="🏛️")
+        try:
+            st.switch_page("pagina_pilar.py")
+        except Exception:
+            st.info("Pilar carregado. Abra a aba **Pilares** no seletor "
+                    "acima para ver e calcular.")
 
 
 # ================================================= QUANTITATIVOS ========
@@ -486,21 +516,26 @@ else:
 # ================================================= COMPARATIVO ==========
 sec(13, "Comparativo rápido — treliçada × maciça")
 h_mac_c = float(ss.laje_h_mac) if not is_trel else max(8.0, min(lx0, ly0) * 100 / 40)
-comp = ml.comparativo(dict(lx=lx0, ly=ly0, fck=int(ss.laje_fck),
-                           g_rev=ss.laje_grev, q_uso=q_uso,
-                           g_parede=ss.laje_gpar,
-                           h_macica=h_mac_c, h_trelica=int(ss.laje_h_trel),
-                           enchimento=ss.laje_ench))
+comp = _comparativo(lx0, ly0, int(ss.laje_fck), ss.laje_grev, q_uso,
+                    ss.laje_gpar, h_mac_c, int(ss.laje_h_trel), ss.laje_ench)
 cm_, ct_ = comp["macica"], comp["trelicada"]
+
+
+def _sit(nivel):
+    ic = {"verde": "🟢 OK", "amarelo": "🟡 no limite",
+          "vermelho": "🔴 excede"}
+    return ic.get(nivel, nivel)
+
+
 tabela([
-    {"Critério": "Peso próprio (kN/m²)", "Treliçada": f"{ct_['g_pp']:.2f}",
-     "Maciça": f"{cm_['g_pp']:.2f}"},
-    {"Critério": "Carga total p (kN/m²)", "Treliçada": f"{ct_['p']:.2f}",
-     "Maciça": f"{cm_['p']:.2f}"},
-    {"Critério": "Flecha total (mm)", "Treliçada": f"{ct_['flecha']['total_mm']:.1f}",
-     "Maciça": f"{cm_['flecha']['total_mm']:.1f}"},
-    {"Critério": "Situação flecha", "Treliçada": ct_['flecha']['nivel'],
-     "Maciça": cm_['flecha']['nivel']},
+    {"Critério": "Peso próprio (kN/m²)", "Treliçada": _f2(ct_['g_pp']),
+     "Maciça": _f2(cm_['g_pp'])},
+    {"Critério": "Carga total p (kN/m²)", "Treliçada": _f2(ct_['p']),
+     "Maciça": _f2(cm_['p'])},
+    {"Critério": "Flecha total (mm)", "Treliçada": _f2(ct_['flecha']['total_mm'], 1),
+     "Maciça": _f2(cm_['flecha']['total_mm'], 1)},
+    {"Critério": "Situação flecha", "Treliçada": _sit(ct_['flecha']['nivel']),
+     "Maciça": _sit(cm_['flecha']['nivel'])},
 ])
 _leve = "treliçada" if ct_["g_pp"] < cm_["g_pp"] else "maciça"
 st.caption(f"➡️ A **{_leve}** é mais leve neste pano. A treliçada costuma "
@@ -544,14 +579,21 @@ def gerar_pdf():
                  family="monospace")
         pdf.savefig(fig)
         plt.close(fig)
-        pdf.savefig(fig_pano())
+        fig2 = fig_pano()
+        pdf.savefig(fig2)
+        plt.close(fig2)
     return buf.getvalue()
 
 
 sec(14, "Memória de cálculo (PDF)")
-st.download_button("📄 Baixar memória em PDF", data=gerar_pdf(),
-                   file_name=f"laje_{lx:.1f}x{ly:.1f}.pdf",
-                   mime="application/pdf", width="stretch")
+# Gera o PDF só quando solicitado (evita reprocessar a figura a cada rerun).
+if st.button("📄 Preparar memória em PDF", width="stretch"):
+    ss.laje_pdf = gerar_pdf()
+    ss.laje_pdf_nome = f"laje_{lx:.1f}x{ly:.1f}.pdf"
+if ss.get("laje_pdf"):
+    st.download_button("⬇️ Baixar PDF gerado", data=ss.laje_pdf,
+                       file_name=ss.get("laje_pdf_nome", "laje.pdf"),
+                       mime="application/pdf", width="stretch")
 
 st.divider()
 st.caption("⚠️ Ferramenta de **pré-dimensionamento e estudo**. Não substitui "

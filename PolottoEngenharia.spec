@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import copy_metadata
 
-datas = [('app_polotto.py', '.'), ('pagina_vigas.py', '.'), ('pagina_pilar.py', '.'), ('motor_viga.py', '.'), ('motor_pilar.py', '.'), ('ui_comum.py', '.'), ('.streamlit', '.streamlit')]
+datas = [('app_polotto.py', '.'), ('pagina_vigas.py', '.'), ('pagina_pilar.py', '.'), ('pagina_pilar_previo.py', '.'), ('pagina_lajes.py', '.'), ('motor_viga.py', '.'), ('motor_pilar.py', '.'), ('motor_laje.py', '.'), ('ui_comum.py', '.'), ('assets', 'assets'), ('.streamlit', '.streamlit')]
 binaries = []
 hiddenimports = []
 datas += copy_metadata('streamlit')
