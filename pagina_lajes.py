@@ -390,8 +390,17 @@ def fig_pano():
                     fontweight="bold", zorder=8,
                     bbox=dict(boxstyle="round", fc="#FEE2E2", ec="#B91C1C",
                               alpha=.95))
-    ax.set_xlim(-0.22 * lx, 1.22 * lx)
-    ax.set_ylim(-0.20 * ly, 1.20 * ly)
+    # cotas laterais dos vãos (lx embaixo, ly à esquerda)
+    ax.annotate("", xy=(0, -0.13 * ly), xytext=(lx, -0.13 * ly),
+                arrowprops=dict(arrowstyle="<->", color=NAVY, lw=1.4))
+    ax.text(lx / 2, -0.15 * ly, f"lx = {_f2(lx)} m", ha="center", va="top",
+            fontsize=8.5, color=NAVY, fontweight="bold")
+    ax.annotate("", xy=(-0.13 * lx, 0), xytext=(-0.13 * lx, ly),
+                arrowprops=dict(arrowstyle="<->", color=NAVY, lw=1.4))
+    ax.text(-0.15 * lx, ly / 2, f"ly = {_f2(ly)} m", ha="right", va="center",
+            fontsize=8.5, color=NAVY, fontweight="bold", rotation=90)
+    ax.set_xlim(-0.32 * lx, 1.24 * lx)
+    ax.set_ylim(-0.30 * ly, 1.20 * ly)
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(f"Pano {lx:.2f} × {ly:.2f} m — reações nas vigas (kN/m) e "
