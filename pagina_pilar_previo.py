@@ -96,8 +96,8 @@ CAA_OPC = ["I", "II", "III", "IV"]
 
 
 # ---------------------------------------------------- desenho das tributárias
-def fig_influencia(L):
-    fig, ax = plt.subplots(figsize=(6.4, 5.0))
+def fig_influencia(L, cargas):
+    fig, ax = plt.subplots(figsize=(6.4, 5.2))
     xs = [0, L, 2 * L]
     ys = [0, L, 2 * L]
     # áreas tributárias representativas
@@ -124,18 +124,29 @@ def fig_influencia(L):
         for j, y in enumerate(ys):
             ax.plot(x, y, 's', ms=13, color=cor(i, j),
                     markeredgecolor="white", markeredgewidth=1.2, zorder=3)
-    ax.text(L / 4, L / 4, f"canto\n{(L / 2) ** 2:.1f} m²", ha="center",
-            va="center", fontsize=8, fontweight="bold", color="#7c4a00",
-            zorder=4)
-    ax.text(L, L / 4, f"borda\n{L * (L / 2):.1f} m²", ha="center", va="center",
-            fontsize=8, fontweight="bold", color="#14307a", zorder=4)
-    ax.text(L, 1.30 * L, f"central\n{L * L:.1f} m²", ha="center", va="center",
-            fontsize=8.5, fontweight="bold", color="#7a1010", zorder=4)
+    ax.text(L / 4, L / 4,
+            f"canto\n{(L / 2) ** 2:.1f} m²\nNk {_fN(cargas['canto'])}",
+            ha="center", va="center", fontsize=7.8, fontweight="bold",
+            color="#7c4a00", zorder=4)
+    ax.text(L, L / 4,
+            f"borda\n{L * (L / 2):.1f} m²\nNk {_fN(cargas['borda'])}",
+            ha="center", va="center", fontsize=7.8, fontweight="bold",
+            color="#14307a", zorder=4)
+    ax.text(L, 1.32 * L,
+            f"central\n{L * L:.1f} m²\nNk {_fN(cargas['central'])}",
+            ha="center", va="center", fontsize=8.2, fontweight="bold",
+            color="#7a1010", zorder=4)
+    # etiquetas de carga junto aos pilares representativos (caixa branca)
+    _bb = dict(boxstyle="round,pad=0.25", fc="white", ec=NAVY, alpha=.95)
+    ax.annotate(f"Nk {_fN(cargas['central'])}", xy=(L, L), xytext=(1.75 * L, L),
+                ha="left", va="center", fontsize=7.5, color="#B91C1C",
+                fontweight="bold", bbox=_bb, zorder=6,
+                arrowprops=dict(arrowstyle="->", color="#B91C1C", lw=1.2))
     ax.annotate("", xy=(0, -0.26 * L), xytext=(L, -0.26 * L),
                 arrowprops=dict(arrowstyle="<->", color=CINZA_TXT, lw=1.3))
     ax.text(L / 2, -0.42 * L, f"vão = {L:.1f} m", ha="center", va="top",
             fontsize=9, color=CINZA_TXT)
-    ax.set_xlim(-0.35 * L, 2.35 * L)
+    ax.set_xlim(-0.55 * L, 2.5 * L)
     ax.set_ylim(-0.6 * L, 2.2 * L)
     ax.set_aspect("equal")
     ax.axis("off")
@@ -268,7 +279,8 @@ st.caption("Cada pilar recebe a carga de **metade do vão para cada lado**. "
            "Canto = ¼ do painel; borda = ½ painel; central = 1 painel "
            "inteiro. Sobre isso aplica-se a majoração de continuidade "
            "(canto 1,00 · borda 1,10 · central 1,20).")
-mostrar_figura(fig_influencia(vao))
+_cargas_fig = {c: detalhe[c][1] for c in ("canto", "borda", "central")}
+mostrar_figura(fig_influencia(vao, _cargas_fig))
 
 sec(6, "Memória de cálculo")
 for rot, chave, ic in TIPOS:
