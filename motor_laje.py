@@ -56,6 +56,20 @@ PP_TRELICA = {
     20: (4.0, 2.0, 2.9),     # 16+4
     25: (5.0, 2.4, 3.4),     # 20+5
 }
+
+# Áreas (cm²) e pesos (kg/m) por bitola (NBR 7480 / fios CA-60 e barras CA-50)
+AREA_BITOLA_CM2 = {4.2: 0.139, 5.0: 0.196, 6.0: 0.283, 6.3: 0.312, 7.0: 0.385,
+                   8.0: 0.503, 10.0: 0.785, 12.5: 1.227}
+PESO_BITOLA_KG = {4.2: 0.109, 5.0: 0.154, 6.0: 0.222, 6.3: 0.245, 7.0: 0.302,
+                  8.0: 0.395, 10.0: 0.617, 12.5: 0.963}
+# Treliça comercial TÍPICA por altura de laje (confirmar com o fornecedor):
+# (designação, H_treliça_cm, ø_banzo_sup, ø_diagonal, ø_banzo_inf, peso_kg/m)
+TRELICAS = {
+    12: ("TR 08644", 8, 6.0, 4.2, 4.2, 0.39),
+    16: ("TR 12644", 12, 6.0, 4.2, 4.2, 0.45),
+    20: ("TR 16745", 16, 7.0, 4.2, 5.0, 0.63),
+    25: ("TR 20745", 20, 7.0, 4.2, 5.0, 0.74),
+}
 INTEREIXO = 0.42               # m (espaçamento típico entre vigotas)
 LARG_NERVURA = 0.09            # m (largura média da nervura)
 
@@ -579,6 +593,61 @@ def calcular_laje_trelicada(dados):
                   "comp_vigotas": comp_vigotas, "n_element": n_element},
         "Ecs": Ecs, "avisos": avisos, "erros": [],
     }
+
+
+# --------------------------- detalhamento de armadura da laje treliçada ----
+def detalhar_armadura_trelica(res):
+    """Bitolas, comprimentos e QUADRO DE AÇO (barras a comprar + peso) da laje
+    treliçada. Retorna dict com 'treli', 'reforco', 'dist', 'quadro' (lista de
+    posições) e 'peso_total'. Comprimentos em m, peso em kg."""
+    h = int(res["h"])
+    desig, htre, o_sup, o_dia, o_inf, peso_m = TRELICAS.get(h, TRELICAS[16])
+    lx, ly = res["lx"], res["ly"]
+    q = res["quant"]
+    nv = q["n_vigotas"]
+    comp_vig = q["comp_vigotas"]
+    anc = 0.20                                     # ancoragem total (m)
+    As_nerv = res.get("As_nerv") or 0.0            # cm²/vigota (tração)
+    As_por_m = res.get("As_por_m") or 0.0
+    As_inf_tre = 2.0 * AREA_BITOLA_CM2[o_inf]      # banzo inferior da treliça
+    As_ref = max(0.0, As_nerv - As_inf_tre)        # reforço/vigota necessário
+
+    quadro = []
+    quadro.append({"pos": "TR", "desc": f"Treliça {desig}",
+                   "bitola": f"{o_sup:.1f}/{o_dia:.1f}/{o_inf:.1f}",
+                   "qtd": f"{nv} vigotas", "comp_un": lx + anc,
+                   "comp_tot": comp_vig, "peso": peso_m * comp_vig,
+                   "kind": "treliça"})
+    ref_n, ref_d = 0, 0.0
+    if As_ref > 1e-3:
+        for d in (8.0, 10.0, 12.5):
+            n = math.ceil(As_ref / AREA_BITOLA_CM2[d])
+            if n <= 2:
+                ref_n, ref_d = n, d
+                break
+        else:
+            ref_d = 12.5
+            ref_n = math.ceil(As_ref / AREA_BITOLA_CM2[12.5])
+        comp_un = lx + anc
+        qtd = ref_n * nv
+        comp_tot = qtd * comp_un
+        quadro.append({"pos": "N1", "desc": "Reforço de tração (na vigota)",
+                       "bitola": f"{ref_d:.1f}", "qtd": f"{qtd} barras",
+                       "comp_un": comp_un, "comp_tot": comp_tot,
+                       "peso": comp_tot * PESO_BITOLA_KG[ref_d], "kind": "barra"})
+    As_dist = max(0.9, 0.2 * As_por_m)             # cm²/m
+    o_dist = 5.0 if As_dist <= 3.0 else 6.3
+    s_dist = AREA_BITOLA_CM2[o_dist] / As_dist * 100.0      # cm
+    comp_tot_d = As_dist * lx * ly / AREA_BITOLA_CM2[o_dist]
+    quadro.append({"pos": "N2", "desc": "Distribuição na capa",
+                   "bitola": f"{o_dist:.1f}", "qtd": f"c/ {s_dist:.0f} cm",
+                   "comp_un": None, "comp_tot": comp_tot_d,
+                   "peso": comp_tot_d * PESO_BITOLA_KG[o_dist], "kind": "barra"})
+    peso_total = sum(x["peso"] for x in quadro)
+    return {"treli": (desig, htre, o_sup, o_dia, o_inf, peso_m),
+            "As_inf_tre": As_inf_tre, "As_ref": As_ref,
+            "reforco": (ref_n, ref_d), "dist": (o_dist, As_dist, s_dist),
+            "quadro": quadro, "peso_total": peso_total}
 
 
 # ------------------------------------------------- comparativo pré x maciça
