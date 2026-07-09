@@ -29,16 +29,6 @@ header("Pilares Prévios — Casas Térreas",
        "Pré-dimensionamento por área de influência · NBR 6118 / 6120")
 seletor_pagina("previo")
 
-# Fonte um pouco maior no corpo de texto desta página (melhor leitura na obra)
-st.markdown("""<style>
-[data-testid="stMarkdownContainer"] p,
-[data-testid="stMarkdownContainer"] li { font-size: 1.08rem; line-height: 1.55; }
-[data-testid="stCaptionContainer"] p,
-[data-testid="stCaptionContainer"] { font-size: 1.0rem !important; }
-[data-testid="stAlert"] p, [data-testid="stAlert"] li { font-size: 1.06rem;
-  line-height: 1.55; }
-</style>""", unsafe_allow_html=True)
-
 # unidade de força (kN ou kgf) — cálculo interno sempre em kN
 fu, un_f, un_fm = seletor_unidade()
 _un_area = "kgf/m²" if fu > 1 else "kN/m²"

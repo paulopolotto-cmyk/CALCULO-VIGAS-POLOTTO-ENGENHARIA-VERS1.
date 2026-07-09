@@ -37,9 +37,33 @@ CONCRETO = "#CBD5E1"
 
 _CSS = """
 <style>
+/* ===== TIPOGRAFIA GERAL: texto maior e em negrito (melhor visualização) === */
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li {
+    font-size: 1.07rem; line-height: 1.55; font-weight: 600;
+}
+[data-testid="stMarkdownContainer"] strong { font-weight: 800; }
+[data-testid="stCaptionContainer"],
+[data-testid="stCaptionContainer"] p,
+[data-testid="stCaptionContainer"] div {
+    font-size: 0.98rem !important; font-weight: 600 !important;
+    color: #475569 !important;
+}
+[data-testid="stAlert"] p, [data-testid="stAlert"] li {
+    font-size: 1.06rem; line-height: 1.5; font-weight: 700;
+}
+[data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label {
+    font-weight: 700 !important; font-size: 1.02rem !important;
+}
+[data-testid="stMetricValue"] { font-weight: 800 !important; }
+[data-testid="stMetricLabel"] p { font-weight: 700 !important; }
+.pol-tab td, .pol-tab th { font-weight: 700 !important; }
+
 /* esconde os steppers +/- dos number_inputs (melhor no touch) */
 [data-testid="stNumberInput"] button { display: none; }
-[data-testid="stNumberInput"] input { font-weight: 600; }
+[data-testid="stNumberInput"] input { font-weight: 700; font-size: 1.03rem; }
+[data-testid="stTextInput"] input { font-weight: 700; font-size: 1.03rem; }
+[data-baseweb="select"] > div { font-weight: 700; }
 
 /* ===== NAVEGAÇÃO: esconde a barra padrão (usamos o seletor CALCULAR) ===== */
 [data-testid="stNavLink"] { display: none !important; }
