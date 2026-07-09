@@ -575,6 +575,168 @@ def fig_planta_vigotas(res, lx, ly, esp):
     return fig
 
 
+# ------------------- detalhamento da laje MACIÇA (armadura) ---------------
+_AZUL = "#1E3A8A"
+_AMBAR = "#B45309"
+
+
+def fig_corte_transversal_mac(res, espm):
+    h = float(res["h"])
+    cob = espm["cobrimento"]
+    bx, sx = espm["x"]
+    by, sy = espm["y"]
+    neg = espm["xneg"] or espm["yneg"]
+    W = 100.0
+    fig, ax = plt.subplots(figsize=(7.4, 3.3))
+    ax.add_patch(mpatches.Rectangle((0, 0), W, h, fc="#E2E8F0", ec="#334155",
+                 lw=1.2, hatch="....", zorder=1))
+    xb = cob
+    while xb <= W - cob + 0.1:                    # positivas dir x (pontos)
+        ax.plot(xb, cob, "o", color=_VERM, ms=5, zorder=4)
+        xb += sx
+    ax.plot([cob, W - cob], [cob + 0.9, cob + 0.9], color=_AZUL, lw=1.8,
+            zorder=3)                             # dir y (linha)
+    if neg:
+        bn, sn = neg
+        xb = cob
+        while xb <= W - cob + 0.1:                # negativas (topo)
+            ax.plot(xb, h - cob, "o", color=_AMBAR, ms=5, zorder=4)
+            xb += sn
+    ax.annotate("", xy=(-7, 0), xytext=(-7, h),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(-11, h / 2, f"h = {h:.0f} cm", ha="right", va="center",
+            fontsize=8.5, color=NAVY, fontweight="bold", rotation=90)
+    _wb = dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=.9)
+    ax.text(W / 2, cob - 1.8,
+            f"N1 ø{bx:g} c/{sx:g} (dir. x, vermelho)  ·  "
+            f"N2 ø{by:g} c/{sy:g} (dir. y, azul)", ha="center", va="top",
+            fontsize=6.6, color="#0F172A", fontweight="bold", bbox=_wb,
+            zorder=6)
+    if neg:
+        ax.text(W / 2, h - cob + 1.4,
+                f"N3 ø{neg[0]:g} c/{neg[1]:g} (negativa, sobre apoio)",
+                ha="center", va="bottom", fontsize=6.8, color=_AMBAR,
+                fontweight="bold", bbox=_wb, zorder=6)
+    ax.text(W / 2, h + (3.2 if neg else 1.2), "malha inferior (positiva)",
+            ha="center", fontsize=6.5, color="#475569", fontweight="bold")
+    ax.set_xlim(-17, W + 4)
+    ax.set_ylim(-6.5, h + (5.5 if neg else 3.5))
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title("Corte transversal — laje maciça (armadura)", fontsize=10,
+                 color=NAVY, fontweight="bold")
+    return fig
+
+
+def fig_corte_longitudinal_mac(res, espm):
+    h = float(res["h"])
+    cob = espm["cobrimento"]
+    bx, sx = espm["x"]
+    L = 100.0
+    hk = min(4.0, h - 2 * cob)
+    fig, ax = plt.subplots(figsize=(7.4, 2.9))
+    ax.add_patch(mpatches.Rectangle((0, 0), L, h, fc="#E2E8F0", ec="#334155",
+                 lw=1.2, hatch="....", zorder=1))
+    for xe in (0.0, L):                           # apoios
+        ax.plot(xe, -0.4, "^", color="#334155", ms=10, zorder=5)
+    ax.plot([cob, cob, L - cob, L - cob], [cob + hk, cob, cob, cob + hk],
+            color=_VERM, lw=2.2, zorder=4)         # positiva inferior + ganchos
+    ax.text(L / 2, cob - 2.2, f"N1 ø{bx:g} c/{sx:g} — positiva (inferior)",
+            ha="center", va="top", fontsize=7.2, color=_VERM,
+            fontweight="bold", zorder=6)
+    if espm["xneg"]:
+        bn, sn = espm["xneg"]
+        Ln = 0.28 * L
+        ax.plot([cob, cob, cob + Ln], [h - cob - hk, h - cob, h - cob],
+                color=_AMBAR, lw=2.2, zorder=4)
+        ax.plot([L - cob, L - cob, L - cob - Ln],
+                [h - cob - hk, h - cob, h - cob], color=_AMBAR, lw=2.2,
+                zorder=4)
+        ax.text(cob + Ln / 2, h - cob + 1.4,
+                f"N3 ø{bn:g} c/{sn:g} (negativa/apoio)", ha="center",
+                va="bottom", fontsize=6.7, color=_AMBAR, fontweight="bold",
+                zorder=6)
+    ax.annotate("", xy=(L + 4, 0), xytext=(L + 4, h),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(L + 7, h / 2, f"h={h:.0f}", ha="left", va="center", fontsize=7.5,
+            color=NAVY, fontweight="bold")
+    ax.text(L / 2, -7.5, f"comprimento ≈ {_f2(res['lx'] + 0.20)} m "
+            f"(vão {_f2(res['lx'])} + ancoragem)", ha="center", fontsize=7.4,
+            color=NAVY, fontweight="bold")
+    ax.set_xlim(-5, L + 17)
+    ax.set_ylim(-10, h + 4)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title("Corte longitudinal — laje maciça (armadura)", fontsize=10,
+                 color=NAVY, fontweight="bold")
+    return fig
+
+
+def fig_planta_armadura_mac(res, lx, ly, espm):
+    bx, sx = espm["x"]
+    by, sy = espm["y"]
+    ap = _apoios_dict()
+    fig, ax = plt.subplots(figsize=(6.6, min(9.0, max(5.0, 6.6 * ly / lx))))
+    ax.add_patch(mpatches.Rectangle((0, 0), lx, ly, fc="#F8FAFC", ec=NAVY,
+                 lw=2.6, zorder=1))
+    # malha positiva (representativa): dir x vermelho, dir y azul tracejado
+    for k in range(1, 7):
+        ax.plot([0.05 * lx, 0.95 * lx], [ly * k / 7, ly * k / 7], color=_VERM,
+                lw=1.5, zorder=3)
+        ax.plot([lx * k / 7, lx * k / 7], [0.05 * ly, 0.95 * ly], color=_AZUL,
+                lw=1.2, ls=(0, (5, 3)), zorder=2)
+    # faixas de armadura NEGATIVA sobre bordas engastadas (âmbar)
+    seg = {"sup": (0, ly, lx, ly), "inf": (0, 0, lx, 0),
+           "esq": (0, 0, 0, ly), "dir": (lx, 0, lx, ly)}
+    for e, (x0, y0, x1, y1) in seg.items():
+        if ap.get(e) == "engastado":
+            if e in ("sup", "inf"):
+                yy = ly - 0.16 * ly if e == "sup" else 0.16 * ly
+                ax.add_patch(mpatches.Rectangle(
+                    (0, min(y0, yy)), lx, abs(yy - y0), fc=_AMBAR, alpha=.18,
+                    ec="none", zorder=1.5))
+            else:
+                xx = lx - 0.16 * lx if e == "dir" else 0.16 * lx
+                ax.add_patch(mpatches.Rectangle(
+                    (min(x0, xx), 0), abs(xx - x0), ly, fc=_AMBAR, alpha=.18,
+                    ec="none", zorder=1.5))
+    # legenda central
+    leg = (f"Malha inferior:\nN1 ø{bx:g} c/{sx:g} (dir. x)\n"
+           f"N2 ø{by:g} c/{sy:g} (dir. y)")
+    if res["momentos"]["mx_eng"] > 0 or res["momentos"]["my_eng"] > 0:
+        leg += "\n+ negativa nos engastes (âmbar)"
+    ax.text(lx / 2, ly / 2, leg, ha="center", va="center", fontsize=7,
+            color="#0F172A", fontweight="bold", zorder=7,
+            bbox=dict(boxstyle="round,pad=0.4", fc="white", ec=NAVY, alpha=.95))
+    # cargas distribuídas nas bordas (vigas de apoio)
+    mx, my = 0.03 * lx + 0.06, 0.03 * ly + 0.06
+    _bb = dict(boxstyle="round,pad=0.25", fc="white", ec=NAVY, alpha=.96)
+
+    def _cb(e, x, y, ha, va, rot=0):
+        ax.text(x, y, f"{VIGA_NOME[e]}: {_fN(reac[e]['q'])} {un_fm}", ha=ha,
+                va=va, fontsize=6.8, color=NAVY, fontweight="bold", bbox=_bb,
+                rotation=rot, zorder=8)
+    _cb("sup", lx * 0.72, ly + my, "center", "bottom")
+    _cb("inf", lx * 0.72, -my, "center", "top")
+    _cb("esq", -mx, ly * 0.72, "right", "center", 90)
+    _cb("dir", lx + mx, ly * 0.72, "left", "center", 90)
+    ax.annotate("", xy=(0, -0.12 * ly - 0.35), xytext=(lx, -0.12 * ly - 0.35),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(lx * 0.30, -0.15 * ly - 0.4, f"lx = {_f2(lx)} m", ha="center",
+            va="top", fontsize=9, color=NAVY, fontweight="bold")
+    ax.annotate("", xy=(-0.13 * lx - 0.35, 0), xytext=(-0.13 * lx - 0.35, ly),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(-0.16 * lx - 0.4, ly * 0.30, f"ly = {_f2(ly)} m", ha="right",
+            va="center", fontsize=9, color=NAVY, fontweight="bold", rotation=90)
+    ax.set_xlim(-0.30 * lx - 1.0, lx + 0.22 * lx + 0.7)
+    ax.set_ylim(-0.30 * ly - 0.9, ly + 0.16 * ly + 0.5)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(f"Planta de armadura — maciça {_f2(lx)} × {_f2(ly)} m",
+                 fontsize=10.5, color=NAVY, fontweight="bold")
+    return fig
+
+
 # ================================================= RESULTADOS ==========
 sec(5, "Resultado da laje", destaque=True)
 
@@ -729,6 +891,49 @@ if is_trel:
                "quando o As necessário supera o banzo inferior da treliça. "
                "Fios da treliça em CA-60; barras (reforço/distribuição) em "
                "CA-50. Pré-dimensionamento para orçamento/execução.")
+else:
+    espm = ml.detalhar_armadura_macica(res)
+    st.markdown('<div class="pol-sec destaque" style="padding-left:18px">'
+                '🔧 Detalhamento da armadura — para a obra</div>',
+                unsafe_allow_html=True)
+    st.caption("Cortes, planta de armadura, bitolas e quadro de aço da laje "
+               "maciça, prontos para apresentar e executar na obra.")
+    st.markdown("**Corte transversal** — seção de concreto e malha de "
+                "armadura (bitolas e espaçamentos):")
+    mostrar_figura(fig_corte_transversal_mac(res, espm))
+    st.markdown("**Corte longitudinal** — armadura positiva (inferior) e "
+                "negativa sobre os apoios engastados:")
+    mostrar_figura(fig_corte_longitudinal_mac(res, espm))
+    st.markdown("**Planta de armadura** — direções x/y, espaçamentos e cargas "
+                "nas vigas de apoio:")
+    mostrar_figura(fig_planta_armadura_mac(res, lx, ly, espm))
+
+    _q = res["quant"]
+    st.markdown("**Materiais (por pano):**")
+    tabela([
+        {"Material": "Concreto", "Quantidade":
+         f"{_f2(_q['vol_conc'], 3)} m³ · fck {ss.laje_fck} MPa"},
+        {"Material": "Fôrma (fundo)", "Quantidade": f"{_f2(_q['forma'])} m²"},
+        {"Material": "Espessura", "Quantidade": f"{res['h']:.0f} cm"},
+    ])
+    st.markdown("**🔩 Quadro de aço — ferro a comprar (barras e peso):**")
+    _lqm = [{"Pos.": _it["pos"], "Aço": _it["desc"], "ø (mm)": _it["bitola"],
+             "Qtd/esp.": _it["qtd"], "C. unit.": f"{_f2(_it['comp_un'])} m",
+             "C. total": f"{_f2(_it['comp_tot'], 1)} m",
+             "Peso": f"{_f2(_it['peso'], 1)} kg"} for _it in espm["quadro"]]
+    _lqm.append({"Pos.": "", "Aço": "TOTAL DE AÇO", "ø (mm)": "",
+                 "Qtd/esp.": "", "C. unit.": "", "C. total": "",
+                 "Peso": f"{_f2(espm['peso_total'], 1)} kg"})
+    tabela(_lqm)
+    _b12 = [f"{_it['pos']} ø{_it['bitola']}: "
+            f"≈ {math.ceil(_it['comp_tot'] / 12.0)} barras de 12 m"
+            for _it in espm["quadro"]]
+    if _b12:
+        st.caption("🛒 Barras de 12 m: " + " · ".join(_b12) + ".")
+    st.caption("Malha inferior positiva (direções x e y) + armadura negativa "
+               "sobre os engastes. Barras em CA-50; espaçamento múltiplo de "
+               "2,5 cm, ≤ min(2h, 20 cm). Pré-dimensionamento p/ orçamento/"
+               "execução.")
 
 # reações por viga
 sec(9, f"Reações da laje nas vigas ({un_fm})")
@@ -871,16 +1076,18 @@ def gerar_pdf():
             linhas.append(f"   {p['nome']}: Nk = {p['Nk']:.1f} kN  "
                           f"(Nd = {p['Nk'] * 1.4:.1f} kN)")
         _esp = ml.detalhar_armadura_trelica(res) if is_trel else None
-        if _esp:
+        _espm = None if is_trel else ml.detalhar_armadura_macica(res)
+        _quad = _esp or _espm
+        if _quad:
             linhas += ["", "QUADRO DE AÇO (ferro a comprar):"]
-            for _it in _esp["quadro"]:
+            for _it in _quad["quadro"]:
                 linhas.append(f"   {_it['pos']:<3} {_it['desc'][:30]:<30} "
-                              f"ø{_it['bitola']:<10} {str(_it['qtd']):<12} "
+                              f"ø{_it['bitola']:<10} {str(_it['qtd']):<16} "
                               f"L.tot={_it['comp_tot']:.1f} m  "
                               f"{_it['peso']:.1f} kg")
             linhas.append(f"   {'':<3} {'TOTAL DE AÇO':<30} "
-                          f"{'':<10} {'':<12} {'':<13} "
-                          f"{_esp['peso_total']:.1f} kg")
+                          f"{'':<10} {'':<16} {'':<13} "
+                          f"{_quad['peso_total']:.1f} kg")
         linhas += ["", "Norma: NBR 6118 / 6120 / 14859.",
                    "Ferramenta de PRÉ-DIMENSIONAMENTO — não substitui projeto "
                    "estrutural assinado por profissional habilitado."]
@@ -891,13 +1098,18 @@ def gerar_pdf():
         fig2 = fig_pano()
         pdf.savefig(fig2)
         plt.close(fig2)
-        # detalhamento das vigotas (treliçada) — para a obra
+        # detalhamento — para a obra
         if _esp:
-            for _f in (fig_corte_transversal(res, _esp),
-                       fig_corte_longitudinal(res, _esp),
-                       fig_planta_vigotas(res, lx, ly, _esp)):
-                pdf.savefig(_f)
-                plt.close(_f)
+            _figs = (fig_corte_transversal(res, _esp),
+                     fig_corte_longitudinal(res, _esp),
+                     fig_planta_vigotas(res, lx, ly, _esp))
+        else:
+            _figs = (fig_corte_transversal_mac(res, _espm),
+                     fig_corte_longitudinal_mac(res, _espm),
+                     fig_planta_armadura_mac(res, lx, ly, _espm))
+        for _f in _figs:
+            pdf.savefig(_f)
+            plt.close(_f)
     return buf.getvalue()
 
 

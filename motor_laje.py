@@ -650,6 +650,71 @@ def detalhar_armadura_trelica(res):
             "quadro": quadro, "peso_total": peso_total}
 
 
+# --------------------------- detalhamento de armadura da laje maciça -------
+def _bitola_espacamento(As, h):
+    """Escolhe (bitola_mm, espaçamento_cm) para a armadura de laje (As cm²/m).
+    Espaçamento múltiplo de 2,5 cm, entre 10 e min(2h, 20) cm."""
+    smax = min(20.0, 2.0 * h)
+    if not As or As <= 0:
+        return 6.3, smax
+    for dbit in (6.3, 8.0, 10.0, 12.5):
+        s = math.floor(AREA_BITOLA_CM2[dbit] / As * 100.0 / 2.5) * 2.5
+        if s >= 10.0:
+            return dbit, min(smax, s)
+    return 12.5, 10.0
+
+
+def detalhar_armadura_macica(res):
+    """Bitolas, espaçamentos e QUADRO DE AÇO da laje maciça. Retorna dict com
+    'quadro' (posições N1..), 'peso_total' e as bitolas/espaçamentos por
+    direção para os desenhos ('x','y','xneg','yneg')."""
+    lx, ly, h = res["lx"], res["ly"], res["h"]
+    arm = res["armaduras"]
+    mm = res["momentos"]
+    anc = 0.20
+    quadro = []
+
+    def _add(pos, desc, As, comp_un, extent):
+        if not As or As <= 0:
+            return None
+        bit, s = _bitola_espacamento(As, h)
+        n = math.ceil(extent / (s / 100.0)) + 1
+        comp_tot = n * comp_un
+        item = {"pos": pos, "desc": desc, "bitola": f"{bit:.1f}",
+                "qtd": f"c/ {s:.1f} cm ({n} un)", "comp_un": comp_un,
+                "comp_tot": comp_tot, "peso": comp_tot * PESO_BITOLA_KG[bit],
+                "kind": "barra", "bit": bit, "s": s}
+        quadro.append(item)
+        return item
+
+    _add("N1", "Positiva dir. x (inferior)", arm["x_pos"]["As_adot"],
+         lx + anc, ly)
+    if res["direcao"] == 2:
+        _add("N2", "Positiva dir. y (inferior)", arm["y_pos"]["As_adot"],
+             ly + anc, lx)
+    else:
+        _add("N2", "Distribuição (inferior)",
+             max(0.9, 0.2 * (arm["x_pos"]["As_adot"] or 0.0)), ly + anc, lx)
+    if mm["mx_eng"] > 0:
+        _add("N3", "Negativa dir. x (superior/apoio)",
+             arm["x_neg"]["As_adot"], 0.5 * lx + anc, ly)
+    if mm["my_eng"] > 0:
+        _add("N4", "Negativa dir. y (superior/apoio)",
+             arm["y_neg"]["As_adot"], 0.5 * ly + anc, lx)
+    peso_total = sum(x["peso"] for x in quadro)
+
+    _dist = max(0.9, 0.2 * (arm["x_pos"]["As_adot"] or 0.0))
+    return {"quadro": quadro, "peso_total": peso_total,
+            "x": _bitola_espacamento(arm["x_pos"]["As_adot"], h),
+            "y": _bitola_espacamento(
+                arm["y_pos"]["As_adot"] if res["direcao"] == 2 else _dist, h),
+            "xneg": (_bitola_espacamento(arm["x_neg"]["As_adot"], h)
+                     if mm["mx_eng"] > 0 else None),
+            "yneg": (_bitola_espacamento(arm["y_neg"]["As_adot"], h)
+                     if mm["my_eng"] > 0 else None),
+            "cobrimento": 2.0}
+
+
 # ------------------------------------------------- comparativo pré x maciça
 def comparativo(dados_base):
     """Compara treliçada x maciça para o mesmo pano. dados_base contém lx, ly,
