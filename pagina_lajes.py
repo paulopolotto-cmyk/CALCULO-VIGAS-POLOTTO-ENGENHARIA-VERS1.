@@ -440,27 +440,25 @@ def fig_corte_transversal(res, esp):
     ax.text(-9, h / 2, f"h = {h:.0f} cm", ha="right", va="center",
             fontsize=8.5, color=NAVY, fontweight="bold", rotation=90)
     ax.text(ie, h - capa / 2, "capa de concreto", ha="center", va="center",
-            fontsize=7.3, color="#334155")
+            fontsize=7.3, color="#334155", fontweight="bold")
     ax.text((ie - bv) / 4, (h - capa) / 2, lbl_bloco, ha="center",
             va="center", fontsize=7.3, color="#7c4a00", fontweight="bold")
-    ax.text(ie / 2, h - capa + 2.6, "treliça", ha="center", va="bottom",
-            fontsize=7, color=_VERM, fontweight="bold")
-    # legenda de bitolas da armadura
+    # legenda de bitolas da armadura (fora do desenho)
     _os, _od, _oi = esp["treli"][2], esp["treli"][3], esp["treli"][4]
     _rn, _rd = esp["reforco"]
     leg = (f"Treliça {esp['treli'][0]}\nbanzo sup ø{_os:.1f}  ·  "
            f"diag ø{_od:.1f}\nbanzo inf 2ø{_oi:.1f}")
     if _rn:
         leg += f"\n+ reforço {_rn}ø{_rd:.1f}/vigota"
-    ax.text(W + 6, -10, leg, ha="left", va="bottom", fontsize=6.3, color=_VERM,
-            fontweight="bold", bbox=dict(boxstyle="round", fc="#FFF5F5",
-            ec=_VERM, alpha=.95))
-    ax.set_xlim(-18, W + 40)
+    ax.text(W + 6, h * 0.55, leg, ha="left", va="center", fontsize=6.6,
+            color=_VERM, fontweight="bold", bbox=dict(boxstyle="round,pad=0.4",
+            fc="#FFF5F5", ec=_VERM, alpha=.97))
+    ax.set_xlim(-18, W + 48)
     ax.set_ylim(-11, h + 5)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title("Corte transversal da laje", fontsize=10, color=NAVY,
-                 fontweight="bold")
+    ax.set_title(f"Corte transversal — Treliça {esp['treli'][0]}",
+                 fontsize=10, color=NAVY, fontweight="bold")
     return fig
 
 
@@ -483,74 +481,92 @@ def fig_corte_longitudinal(res, esp):
     xs = np.arange(0, L + 0.1, passo)
     ys = [yb if i % 2 == 0 else yt for i in range(len(xs))]
     ax.plot(xs, ys, color=_VERM, lw=1.0, zorder=4)            # diagonais
-    ax.text(L / 2, yt + 1.4, f"banzo superior ø{_os:.1f}", ha="center",
-            fontsize=7, color=_VERM, fontweight="bold")
+    _wb = dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=.92)
+    ax.text(L / 2, yt - 1.7, f"banzo superior ø{_os:.1f}", ha="center",
+            va="top", fontsize=7, color=_VERM, fontweight="bold", bbox=_wb,
+            zorder=7)
     _txt_inf = f"banzo inferior 2ø{_oi:.1f}" + (
         f" + reforço {_rn}ø{_rd:.1f}" if _rn else "") + " (tração)"
-    ax.text(L / 2, yb - 2.8, _txt_inf, ha="center", fontsize=7, color=_VERM,
-            fontweight="bold")
-    ax.text(passo * 1.5 + 1, (yb + yt) / 2, f"diagonal ø{_od:.1f}", ha="left",
-            fontsize=6.5, color=_VERM, rotation=62)
+    ax.text(L / 2, yb - 3.2, _txt_inf, ha="center", fontsize=7.2, color=_VERM,
+            fontweight="bold", bbox=_wb, zorder=7)
+    ax.text(passo * 1.5, (yb + yt) / 2, f"diagonal ø{_od:.1f}", ha="center",
+            va="center", fontsize=6.6, color=_VERM, fontweight="bold",
+            rotation=62, bbox=_wb, zorder=7)
     ax.annotate("", xy=(L + 3, h - capa), xytext=(L + 3, h),
                 arrowprops=dict(arrowstyle="<->", color="#334155"))
-    ax.text(L + 5, h - capa / 2, f"capa {capa:.0f}", fontsize=7.5,
-            va="center", color="#334155")
-    ax.text(L / 2, -4.6, f"comprimento por vigota ≈ {_f2(res['lx'] + 0.20)} m "
-            f"(vão {_f2(res['lx'])} + ancoragem)", ha="center", fontsize=7.5,
-            color=NAVY)
-    ax.set_xlim(-3, L + 17)
-    ax.set_ylim(-7, h + 3)
+    ax.text(L + 5, h - capa / 2, f"capa\n{capa:.0f}", fontsize=7.5,
+            va="center", color="#334155", fontweight="bold")
+    ax.text(L / 2, -5.2, f"comprimento por vigota ≈ {_f2(res['lx'] + 0.20)} m "
+            f"(vão {_f2(res['lx'])} + ancoragem)", ha="center", fontsize=7.6,
+            color=NAVY, fontweight="bold")
+    ax.set_xlim(-3, L + 18)
+    ax.set_ylim(-8, h + 3)
     ax.set_aspect("equal")
     ax.axis("off")
-    ax.set_title("Corte longitudinal da vigota (armadura treliçada)",
+    ax.set_title(f"Corte longitudinal da vigota — Treliça {esp['treli'][0]}",
                  fontsize=10, color=NAVY, fontweight="bold")
     return fig
 
 
-def fig_planta_vigotas(res, lx, ly):
+def fig_planta_vigotas(res, lx, ly, esp):
     ie = 0.42
-    fig, ax = plt.subplots(figsize=(6.6, min(9.0, max(4.0, 6.6 * ly / lx))))
+    fig, ax = plt.subplots(figsize=(6.6, min(9.0, max(4.8, 6.6 * ly / lx))))
     ax.add_patch(mpatches.Rectangle((0, 0), lx, ly, fc="#FEF9C3", ec=NAVY,
-                 lw=2.4, zorder=1))
+                 lw=2.6, zorder=1))
     if lx <= ly:                       # vigotas correm em x
         y = ie / 2
         while y < ly - 1e-3:
             ax.plot([0, lx], [y, y], color=_VERM, lw=2.2, zorder=3)
             y += ie
-        ax.annotate("", xy=(lx * 0.62, ly * 0.5),
-                    xytext=(lx * 0.38, ly * 0.5),
-                    arrowprops=dict(arrowstyle="->", color=NAVY, lw=2.2))
-        ax.text(lx / 2, ly * 0.5 + max(0.12, ly * 0.03),
-                "direção das vigotas (x)", ha="center", fontsize=8,
+        ax.annotate("", xy=(lx * 0.62, ly * 0.5), xytext=(lx * 0.38, ly * 0.5),
+                    arrowprops=dict(arrowstyle="->", color=NAVY, lw=2.4))
+        ax.text(lx / 2, ly * 0.5 + max(0.14, ly * 0.035),
+                "direção das vigotas (x)", ha="center", fontsize=8.5,
                 color=NAVY, fontweight="bold", zorder=4)
     else:                              # vigotas correm em y
         x = ie / 2
         while x < lx - 1e-3:
             ax.plot([x, x], [0, ly], color=_VERM, lw=2.2, zorder=3)
             x += ie
-        ax.annotate("", xy=(lx * 0.5, ly * 0.62),
-                    xytext=(lx * 0.5, ly * 0.38),
-                    arrowprops=dict(arrowstyle="->", color=NAVY, lw=2.2))
+        ax.annotate("", xy=(lx * 0.5, ly * 0.62), xytext=(lx * 0.5, ly * 0.38),
+                    arrowprops=dict(arrowstyle="->", color=NAVY, lw=2.4))
         ax.text(lx / 2, ly / 2, " direção das\nvigotas (y)", ha="left",
-                fontsize=8, color=NAVY, fontweight="bold", zorder=4)
-    ax.annotate("", xy=(0, -0.045 * ly - 0.15),
-                xytext=(lx, -0.045 * ly - 0.15),
+                fontsize=8.5, color=NAVY, fontweight="bold", zorder=4)
+    # cargas distribuídas nas bordas (vigas de apoio) — do relatório
+    mx, my = 0.03 * lx + 0.06, 0.03 * ly + 0.06
+    _bb = dict(boxstyle="round,pad=0.25", fc="white", ec=NAVY, alpha=.96)
+
+    def _cb(e, x, y, ha, va, rot=0):
+        ax.text(x, y, f"{VIGA_NOME[e]}: {_fN(reac[e]['q'])} {un_fm}", ha=ha,
+                va=va, fontsize=6.8, color=NAVY, fontweight="bold", bbox=_bb,
+                rotation=rot, zorder=6)
+    _cb("sup", lx * 0.72, ly + my, "center", "bottom")
+    _cb("inf", lx * 0.72, -my, "center", "top")
+    _cb("esq", -mx, ly * 0.72, "right", "center", 90)
+    _cb("dir", lx + mx, ly * 0.72, "left", "center", 90)
+    # cotas (afastadas para não colidir com as cargas)
+    ax.annotate("", xy=(0, -0.12 * ly - 0.35), xytext=(lx, -0.12 * ly - 0.35),
                 arrowprops=dict(arrowstyle="<->", color=NAVY))
-    ax.text(lx / 2, -0.09 * ly - 0.2, f"lx = {_f2(lx)} m", ha="center",
+    ax.text(lx * 0.30, -0.15 * ly - 0.4, f"lx = {_f2(lx)} m", ha="center",
             va="top", fontsize=9, color=NAVY, fontweight="bold")
-    ax.annotate("", xy=(-0.05 * lx - 0.15, 0), xytext=(-0.05 * lx - 0.15, ly),
+    ax.annotate("", xy=(-0.13 * lx - 0.35, 0), xytext=(-0.13 * lx - 0.35, ly),
                 arrowprops=dict(arrowstyle="<->", color=NAVY))
-    ax.text(-0.09 * lx - 0.2, ly / 2, f"ly = {_f2(ly)} m", ha="right",
-            va="center", fontsize=9, color=NAVY, fontweight="bold",
-            rotation=90)
-    ax.text(lx, ly + 0.04 * ly + 0.1, "vigotas a cada 42 cm", ha="right",
-            fontsize=8, color=_VERM, fontweight="bold")
-    ax.set_xlim(-0.18 * lx - 0.5, lx + 0.15 * lx + 0.2)
-    ax.set_ylim(-0.16 * ly - 0.5, ly + 0.12 * ly + 0.3)
+    ax.text(-0.16 * lx - 0.4, ly * 0.30, f"ly = {_f2(ly)} m", ha="right",
+            va="center", fontsize=9, color=NAVY, fontweight="bold", rotation=90)
+    # tipo de treliça + armadura, no próprio desenho
+    _oi = esp["treli"][4]
+    _rn, _rd = esp["reforco"]
+    _info = (f"Treliça {esp['treli'][0]} · banzo inf 2ø{_oi:.1f}"
+             + (f" + reforço {_rn}ø{_rd:.1f}" if _rn else "")
+             + " · vigotas c/ 42 cm")
+    ax.text(lx / 2, -0.22 * ly - 0.75, _info, ha="center", va="top",
+            fontsize=7.4, color=_VERM, fontweight="bold")
+    ax.set_xlim(-0.30 * lx - 1.0, lx + 0.22 * lx + 0.7)
+    ax.set_ylim(-0.32 * ly - 1.0, ly + 0.18 * ly + 0.5)
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title(f"Planta das vigotas — {_f2(lx)} × {_f2(ly)} m",
-                 fontsize=10, color=NAVY, fontweight="bold")
+                 fontsize=10.5, color=NAVY, fontweight="bold")
     return fig
 
 
@@ -666,9 +682,9 @@ if is_trel:
     st.markdown("**Corte longitudinal da vigota** — banzos, diagonais e "
                 "bitolas:")
     mostrar_figura(fig_corte_longitudinal(res, esp))
-    st.markdown("**Planta das vigotas** — direção da armação (x/y) e "
-                "espaçamento a cada 42 cm:")
-    mostrar_figura(fig_planta_vigotas(res, lx, ly))
+    st.markdown("**Planta das vigotas** — direção da armação (x/y), cargas "
+                "nas vigas de apoio e espaçamento:")
+    mostrar_figura(fig_planta_vigotas(res, lx, ly, esp))
 
     _q = res["quant"]
     _capa_vol = _q["area"] * res["capa"] / 100.0
@@ -874,7 +890,7 @@ def gerar_pdf():
         if _esp:
             for _f in (fig_corte_transversal(res, _esp),
                        fig_corte_longitudinal(res, _esp),
-                       fig_planta_vigotas(res, lx, ly)):
+                       fig_planta_vigotas(res, lx, ly, _esp)):
                 pdf.savefig(_f)
                 plt.close(_f)
     return buf.getvalue()
