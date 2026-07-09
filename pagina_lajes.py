@@ -6,6 +6,7 @@ Calcula a laje, transfere as reações para as vigas e as cargas para os
 pilares (integração com os módulos existentes). NBR 6118 / 6120 / 14859.
 """
 import io
+import math
 
 import matplotlib
 matplotlib.use("Agg")
@@ -394,6 +395,150 @@ def fig_pano():
     return fig
 
 
+# --------------- detalhamento das vigotas treliçadas (para a obra) --------
+_VERM = "#B91C1C"
+
+
+def _treli_tri(ax, xc, y0, y1, larg=8.0):
+    """Treliça triangular (corte transversal) na posição xc."""
+    xl, xr = xc - larg / 2, xc + larg / 2
+    ax.plot([xl, xc, xr, xl], [y0, y1, y0, y0], color=_VERM, lw=1.3, zorder=5)
+    ax.plot([xl, xr], [y0, y0], "o", color=_VERM, ms=5, zorder=6)   # banzos inf
+    ax.plot([xc], [y1], "o", color=_VERM, ms=5, zorder=6)           # banzo sup
+
+
+def fig_corte_transversal(res):
+    h, capa = float(res["h"]), float(res["capa"])
+    ench = res["enchimento"]
+    ie, bv = 42.0, 12.0
+    cor_bloco = "#FDE9C8" if ench == "EPS" else "#E8B98A"
+    lbl_bloco = "EPS" if ench == "EPS" else "cerâmica"
+    fig, ax = plt.subplots(figsize=(7.4, 3.7))
+    W = 2 * ie
+    for x0, x1 in [(0, (ie - bv) / 2), ((ie + bv) / 2, (3 * ie - bv) / 2),
+                   ((3 * ie + bv) / 2, W)]:
+        ax.add_patch(mpatches.Rectangle((x0, 0), x1 - x0, h - capa,
+                     fc=cor_bloco, ec="#B08968", lw=0.8, zorder=1))
+    for xc in [ie / 2, 3 * ie / 2]:
+        ax.add_patch(mpatches.Rectangle((xc - bv / 2, 0), bv, h - capa,
+                     fc="#E2E8F0", ec="#64748B", lw=0.8, zorder=2))
+        ax.add_patch(mpatches.Rectangle((xc - bv / 2, 0), bv, 3.5,
+                     fc="#AEB8C8", ec="#475569", lw=0.9, zorder=3))
+        _treli_tri(ax, xc, 2.0, h - capa + 1.5)
+    ax.add_patch(mpatches.Rectangle((0, h - capa), W, capa, fc="#CBD5E1",
+                 ec="#334155", lw=1.1, hatch="....", zorder=4))
+    ax.annotate("", xy=(ie / 2, -4), xytext=(3 * ie / 2, -4),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(ie, -7.5, "intereixo 42 cm", ha="center", va="top", fontsize=8,
+            color=NAVY, fontweight="bold")
+    ax.annotate("", xy=(W + 5, h - capa), xytext=(W + 5, h),
+                arrowprops=dict(arrowstyle="<->", color="#334155"))
+    ax.text(W + 7, h - capa / 2, f"capa\n{capa:.0f} cm", ha="left",
+            va="center", fontsize=8, color="#334155", fontweight="bold")
+    ax.annotate("", xy=(-6, 0), xytext=(-6, h),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(-9, h / 2, f"h = {h:.0f} cm", ha="right", va="center",
+            fontsize=8.5, color=NAVY, fontweight="bold", rotation=90)
+    ax.text(ie, h - capa / 2, "capa de concreto", ha="center", va="center",
+            fontsize=7.3, color="#334155")
+    ax.text((ie - bv) / 4, (h - capa) / 2, lbl_bloco, ha="center",
+            va="center", fontsize=7.3, color="#7c4a00", fontweight="bold")
+    ax.text(ie / 2, h - capa + 2.6, "treliça", ha="center", va="bottom",
+            fontsize=7, color=_VERM, fontweight="bold")
+    ax.set_xlim(-18, W + 28)
+    ax.set_ylim(-11, h + 5)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title("Corte transversal da laje", fontsize=10, color=NAVY,
+                 fontweight="bold")
+    return fig
+
+
+def fig_corte_longitudinal(res):
+    h, capa = float(res["h"]), float(res["capa"])
+    L = 64.0
+    fig, ax = plt.subplots(figsize=(7.4, 2.7))
+    ax.add_patch(mpatches.Rectangle((0, 0), L, h - capa, fc="#EEF2F7",
+                 ec="#CBD5E1", lw=0.6, zorder=1))
+    ax.add_patch(mpatches.Rectangle((0, 0), L, 3.5, fc="#AEB8C8",
+                 ec="#475569", lw=0.9, zorder=2))
+    ax.add_patch(mpatches.Rectangle((0, h - capa), L, capa, fc="#CBD5E1",
+                 ec="#334155", lw=1.1, hatch="....", zorder=3))
+    yb, yt = 2.0, h - capa + 1.0
+    ax.plot([0, L], [yb, yb], color=_VERM, lw=1.9, zorder=5)   # banzo inferior
+    ax.plot([0, L], [yt, yt], color=_VERM, lw=1.9, zorder=5)   # banzo superior
+    passo = 8.0
+    xs = np.arange(0, L + 0.1, passo)
+    ys = [yb if i % 2 == 0 else yt for i in range(len(xs))]
+    ax.plot(xs, ys, color=_VERM, lw=1.0, zorder=4)            # diagonais
+    ax.text(L / 2, yt + 1.4, "banzo superior", ha="center", fontsize=7,
+            color=_VERM, fontweight="bold")
+    ax.text(L / 2, yb - 2.6, "banzo inferior (tração)", ha="center",
+            fontsize=7, color=_VERM, fontweight="bold")
+    ax.text(passo * 1.5 + 1, (yb + yt) / 2, "diagonal", ha="left",
+            fontsize=6.5, color=_VERM, rotation=62)
+    ax.annotate("", xy=(L + 3, h - capa), xytext=(L + 3, h),
+                arrowprops=dict(arrowstyle="<->", color="#334155"))
+    ax.text(L + 5, h - capa / 2, f"capa {capa:.0f}", fontsize=7.5,
+            va="center", color="#334155")
+    ax.text(L / 2, -4.2, "comprimento = vão + ancoragem (≈ 10 cm/lado)",
+            ha="center", fontsize=7.5, color=NAVY)
+    ax.set_xlim(-3, L + 17)
+    ax.set_ylim(-7, h + 3)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title("Corte longitudinal da vigota (armadura treliçada)",
+                 fontsize=10, color=NAVY, fontweight="bold")
+    return fig
+
+
+def fig_planta_vigotas(res, lx, ly):
+    ie = 0.42
+    fig, ax = plt.subplots(figsize=(6.6, min(9.0, max(4.0, 6.6 * ly / lx))))
+    ax.add_patch(mpatches.Rectangle((0, 0), lx, ly, fc="#FEF9C3", ec=NAVY,
+                 lw=2.4, zorder=1))
+    if lx <= ly:                       # vigotas correm em x
+        y = ie / 2
+        while y < ly - 1e-3:
+            ax.plot([0, lx], [y, y], color=_VERM, lw=2.2, zorder=3)
+            y += ie
+        ax.annotate("", xy=(lx * 0.62, ly * 0.5),
+                    xytext=(lx * 0.38, ly * 0.5),
+                    arrowprops=dict(arrowstyle="->", color=NAVY, lw=2.2))
+        ax.text(lx / 2, ly * 0.5 + max(0.12, ly * 0.03),
+                "direção das vigotas (x)", ha="center", fontsize=8,
+                color=NAVY, fontweight="bold", zorder=4)
+    else:                              # vigotas correm em y
+        x = ie / 2
+        while x < lx - 1e-3:
+            ax.plot([x, x], [0, ly], color=_VERM, lw=2.2, zorder=3)
+            x += ie
+        ax.annotate("", xy=(lx * 0.5, ly * 0.62),
+                    xytext=(lx * 0.5, ly * 0.38),
+                    arrowprops=dict(arrowstyle="->", color=NAVY, lw=2.2))
+        ax.text(lx / 2, ly / 2, " direção das\nvigotas (y)", ha="left",
+                fontsize=8, color=NAVY, fontweight="bold", zorder=4)
+    ax.annotate("", xy=(0, -0.045 * ly - 0.15),
+                xytext=(lx, -0.045 * ly - 0.15),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(lx / 2, -0.09 * ly - 0.2, f"lx = {_f2(lx)} m", ha="center",
+            va="top", fontsize=9, color=NAVY, fontweight="bold")
+    ax.annotate("", xy=(-0.05 * lx - 0.15, 0), xytext=(-0.05 * lx - 0.15, ly),
+                arrowprops=dict(arrowstyle="<->", color=NAVY))
+    ax.text(-0.09 * lx - 0.2, ly / 2, f"ly = {_f2(ly)} m", ha="right",
+            va="center", fontsize=9, color=NAVY, fontweight="bold",
+            rotation=90)
+    ax.text(lx, ly + 0.04 * ly + 0.1, "vigotas a cada 42 cm", ha="right",
+            fontsize=8, color=_VERM, fontweight="bold")
+    ax.set_xlim(-0.18 * lx - 0.5, lx + 0.15 * lx + 0.2)
+    ax.set_ylim(-0.16 * ly - 0.5, ly + 0.12 * ly + 0.3)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    ax.set_title(f"Planta das vigotas — {_f2(lx)} × {_f2(ly)} m",
+                 fontsize=10, color=NAVY, fontweight="bold")
+    return fig
+
+
 # ================================================= RESULTADOS ==========
 sec(5, "Resultado da laje", destaque=True)
 
@@ -491,6 +636,71 @@ tabela([
 if fl["contraflecha_mm"] > 0:
     st.info(f"💡 Sugestão de **contra-flecha ≈ {fl['contraflecha_mm']:.0f} mm** "
             f"(≤ L/350) para compensar a flecha visual.")
+
+# ---- detalhamento das vigotas (só treliçada) — para levar à obra ----
+if is_trel:
+    st.markdown('<div class="pol-sec destaque" style="padding-left:18px">'
+                '🔧 Detalhamento das vigotas — para a obra</div>',
+                unsafe_allow_html=True)
+    st.caption("Cortes, planta e quantitativos da laje pré-moldada treliçada, "
+               "prontos para apresentar e executar na obra.")
+    st.markdown("**Corte transversal** — capa de concreto, enchimento e "
+                "vigotas com armadura treliçada (triangular):")
+    mostrar_figura(fig_corte_transversal(res))
+    st.markdown("**Corte longitudinal da vigota** — armadura treliçada: "
+                "banzo superior, banzo inferior (tração) e diagonais:")
+    mostrar_figura(fig_corte_longitudinal(res))
+    st.markdown("**Planta das vigotas** — direção da armação (x/y) e "
+                "espaçamento das vigotas:")
+    mostrar_figura(fig_planta_vigotas(res, lx, ly))
+
+    _q = res["quant"]
+    _lx = res["lx"]
+    _As_m = res.get("As_por_m") or 0.0            # cm²/m (tração)
+    _As_vig = res.get("As_nerv") or 0.0           # cm²/vigota
+    _comp_arm = _lx + 0.20                         # m por vigota (c/ ancoragem)
+    _h_tre = max(6.0, res["h"] - res["capa"] - 1.5)
+    _As_dist = max(0.9, 0.2 * _As_m)              # cm²/m distribuição
+    _capa_vol = _q["area"] * res["capa"] / 100.0
+    _peso_aco = ((_As_m + _As_dist) * _q["area"] / 1e4) * 7850.0 * 1.10
+
+    def _sug_barra(As_cm2):
+        for d in (6.3, 8.0, 10.0, 12.5):
+            a = math.pi / 4.0 * (d / 10.0) ** 2
+            n = math.ceil(As_cm2 / a) if As_cm2 > 0 else 1
+            if n <= 3:
+                return f"{max(n, 1)} ø {d:.1f} mm"
+        d = 12.5
+        a = math.pi / 4.0 * (d / 10.0) ** 2
+        return f"{math.ceil(As_cm2 / a)} ø {d:.1f} mm"
+
+    st.markdown("**Quantitativos e comprimentos (por pano):**")
+    tabela([
+        {"Item": "Vigotas treliçadas", "Especificação":
+         f"{_q['n_vigotas']} un · total {_f2(_q['comp_vigotas'], 1)} m "
+         f"(cada {_f2(_lx)} m)"},
+        {"Item": "Treliça (armadura da vigota)", "Especificação":
+         f"altura ≈ {_h_tre:.0f} cm · banzos + diagonais (designação comercial "
+         f"do fornecedor — NBR 14862)"},
+        {"Item": "Armadura de tração (banzo inf. + reforço)", "Especificação":
+         f"As = {_f2(_As_m)} cm²/m ({_f2(_As_vig)} cm²/vigota) → "
+         f"{_sug_barra(_As_vig)}/vigota · comp. {_f2(_comp_arm)} m cada"},
+        {"Item": "Armadura de distribuição (capa)", "Especificação":
+         f"As ≥ {_f2(_As_dist)} cm²/m — tela/barras perpendiculares às vigotas"},
+        {"Item": "Blocos de enchimento", "Especificação":
+         f"≈ {_q['n_element']} un "
+         f"({'EPS' if res['enchimento'] == 'EPS' else 'cerâmica'})"},
+        {"Item": "Capa de concreto", "Especificação":
+         f"{res['capa']:.0f} cm · {_f2(_capa_vol, 3)} m³ · fck {ss.laje_fck} MPa"},
+        {"Item": "Concreto total (capa + nervuras)", "Especificação":
+         f"{_f2(_q['vol_conc'], 3)} m³"},
+        {"Item": "Aço estimado (tração + distribuição)", "Especificação":
+         f"≈ {_f2(_peso_aco, 1)} kg"},
+    ])
+    st.caption("Estimativas de pré-dimensionamento para orçamento/execução. A "
+               "treliça (banzos + diagonais) já vem pronta do fornecedor; o "
+               "reforço de tração é acrescentado quando o As necessário supera "
+               "o banzo inferior da treliça.")
 
 # reações por viga
 sec(9, f"Reações da laje nas vigas ({un_fm})")
@@ -642,6 +852,12 @@ def gerar_pdf():
         fig2 = fig_pano()
         pdf.savefig(fig2)
         plt.close(fig2)
+        # detalhamento das vigotas (treliçada) — para a obra
+        if is_trel:
+            for _f in (fig_corte_transversal(res), fig_corte_longitudinal(res),
+                       fig_planta_vigotas(res, lx, ly)):
+                pdf.savefig(_f)
+                plt.close(_f)
     return buf.getvalue()
 
 
