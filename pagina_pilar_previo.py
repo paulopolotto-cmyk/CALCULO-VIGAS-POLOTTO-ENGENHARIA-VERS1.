@@ -124,30 +124,39 @@ def fig_influencia(L, cargas):
         for j, y in enumerate(ys):
             ax.plot(x, y, 's', ms=13, color=cor(i, j),
                     markeredgecolor="white", markeredgewidth=1.2, zorder=3)
-    ax.text(L / 4, L / 4,
-            f"canto\n{(L / 2) ** 2:.1f} m²\nNk {_fN(cargas['canto'])}",
-            ha="center", va="center", fontsize=7.8, fontweight="bold",
-            color="#7c4a00", zorder=4)
-    ax.text(L, L / 4,
-            f"borda\n{L * (L / 2):.1f} m²\nNk {_fN(cargas['borda'])}",
-            ha="center", va="center", fontsize=7.8, fontweight="bold",
-            color="#14307a", zorder=4)
-    ax.text(L, 1.32 * L,
-            f"central\n{L * L:.1f} m²\nNk {_fN(cargas['central'])}",
-            ha="center", va="center", fontsize=8.2, fontweight="bold",
-            color="#7a1010", zorder=4)
-    # etiquetas de carga junto aos pilares representativos (caixa branca)
-    _bb = dict(boxstyle="round,pad=0.25", fc="white", ec=NAVY, alpha=.95)
-    ax.annotate(f"Nk {_fN(cargas['central'])}", xy=(L, L), xytext=(1.75 * L, L),
-                ha="left", va="center", fontsize=7.5, color="#B91C1C",
-                fontweight="bold", bbox=_bb, zorder=6,
-                arrowprops=dict(arrowstyle="->", color="#B91C1C", lw=1.2))
-    ax.annotate("", xy=(0, -0.26 * L), xytext=(L, -0.26 * L),
+    ax.text(L / 4, L / 4, f"canto\n{(L / 2) ** 2:.1f} m²", ha="center",
+            va="center", fontsize=8, fontweight="bold", color="#7c4a00",
+            zorder=4)
+    ax.text(L, L / 4, f"borda\n{L * (L / 2):.1f} m²", ha="center", va="center",
+            fontsize=8, fontweight="bold", color="#14307a", zorder=4)
+    ax.text(L, 1.30 * L, f"central\n{L * L:.1f} m²", ha="center", va="center",
+            fontsize=8.2, fontweight="bold", color="#7a1010", zorder=4)
+    # carga Nk em CADA pilar (etiqueta junto a todos os 9 marcadores)
+    for i, x in enumerate(xs):
+        for j, y in enumerate(ys):
+            if i == 1 and j == 1:
+                continue                     # central -> balão separado
+            t = "canto" if (i in (0, 2) and j in (0, 2)) else "borda"
+            dx = 0.0 if i == 1 else (-0.42 * L if i == 0 else 0.42 * L)
+            dy = 0.0 if j == 1 else (-0.42 * L if j == 0 else 0.42 * L)
+            ax.text(x + dx, y + dy, _fN(cargas[t]), ha="center", va="center",
+                    fontsize=6.6, fontweight="bold", color=cor(i, j), zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.2", fc="white",
+                              ec=cor(i, j), alpha=.96))
+    ax.annotate(_fN(cargas["central"]), xy=(L, L), xytext=(1.6 * L, L),
+                ha="left", va="center", fontsize=6.8, color="#B91C1C",
+                fontweight="bold", zorder=6,
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="#B91C1C",
+                          alpha=.96),
+                arrowprops=dict(arrowstyle="->", color="#B91C1C", lw=1.1))
+    ax.annotate("", xy=(0, -0.62 * L), xytext=(L, -0.62 * L),
                 arrowprops=dict(arrowstyle="<->", color=CINZA_TXT, lw=1.3))
-    ax.text(L / 2, -0.42 * L, f"vão = {L:.1f} m", ha="center", va="top",
-            fontsize=9, color=CINZA_TXT)
-    ax.set_xlim(-0.55 * L, 2.5 * L)
-    ax.set_ylim(-0.6 * L, 2.2 * L)
+    ax.text(L / 2, -0.74 * L, f"vão = {L:.1f} m", ha="center", va="top",
+            fontsize=9, color=CINZA_TXT, fontweight="bold")
+    ax.text(L, 2.62 * L, "carga Nk em cada pilar", ha="center", va="bottom",
+            fontsize=7.5, color=CINZA_TXT, fontweight="bold")
+    ax.set_xlim(-1.0 * L, 3.0 * L)
+    ax.set_ylim(-0.9 * L, 2.85 * L)
     ax.set_aspect("equal")
     ax.axis("off")
     ax.set_title("Áreas de influência — canto, borda e central",
