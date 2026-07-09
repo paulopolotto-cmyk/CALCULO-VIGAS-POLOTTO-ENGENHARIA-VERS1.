@@ -41,8 +41,11 @@ st.markdown("""<style>
   border-left:4px solid #E8A33D!important;}
 </style>""", unsafe_allow_html=True)
 
-VAOS_RAPIDOS = [(2, 1), (2, 2), (3, 3), (3.5, 3.5), (3.5, 4), (4, 4),
-                (4.5, 4.5), (5, 5), (5.5, 4.5), (6, 5), (6.5, 7), (7, 7)]
+# vãos padrão (lx menor × ly maior), em ordem crescente de área
+VAOS_RAPIDOS = [(2, 2), (2.5, 2.5), (3, 3), (3.5, 3.5), (3.5, 4), (4, 4),
+                (4, 4.5), (4.5, 4.5), (4.5, 5.5), (5, 5), (5, 6),
+                (5.5, 5.5), (5.5, 6), (6, 6), (6.5, 6.5), (6.5, 7), (7, 7),
+                (7.5, 7.5)]
 LADOS = [("sup", "Superior"), ("inf", "Inferior"),
          ("esq", "Esquerda"), ("dir", "Direita")]
 
@@ -110,7 +113,8 @@ ss.laje_tipo = st.radio(
 is_trel = ss.laje_tipo.startswith("Pré")
 
 sec(2, "Vãos do pano (lx × ly)")
-st.caption("Toque em um vão padrão ou digite abaixo. **lx** = menor vão "
+st.caption("Toque em um **vão padrão** abaixo (em ordem crescente) **ou** "
+           "digite um vão fora do padrão nos campos. **lx** = menor vão "
            "(direção principal da armação).")
 _opts = [f"{a:g}×{b:g}" for a, b in VAOS_RAPIDOS]
 _cur = f"{float(ss.laje_lx):g}×{float(ss.laje_ly):g}"
@@ -123,6 +127,7 @@ if _pick and _pick != _cur:
     _a, _b = _pick.split("×")
     ss.laje_lx, ss.laje_ly = float(_a), float(_b)
     st.rerun()
+st.markdown("✏️ **Ou digite o tamanho do seu vão (fora do padrão):**")
 cvx, cvy = st.columns(2)
 # usam a MESMA chave do estado (laje_lx/laje_ly) → ficam sempre em sincronia
 # com o chip de vão selecionado acima (sem defasagem/valor antigo).
