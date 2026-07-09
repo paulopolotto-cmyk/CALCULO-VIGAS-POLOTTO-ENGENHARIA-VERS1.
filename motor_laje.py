@@ -50,11 +50,11 @@ CARGAS_USO = {
 # Cerâmico: faixa de catálogo nacional (editável por fabricante).
 # capa: 4 cm até h=16; 5 cm para h>=20.
 PP_TRELICA = {
-    #  h_cm: (capa_cm, g_EPS, g_ceramico)
-    12: (4.0, 1.5, 2.0),
-    16: (4.0, 1.7, 2.4),
-    20: (5.0, 2.0, 2.9),
-    25: (5.0, 2.4, 3.4),
+    #  h_cm: (capa_cm, g_EPS, g_ceramico) — designação comercial h = ench+capa
+    12: (4.0, 1.5, 2.0),     # 8+4
+    16: (4.0, 1.7, 2.4),     # 12+4
+    20: (4.0, 2.0, 2.9),     # 16+4
+    25: (5.0, 2.4, 3.4),     # 20+5
 }
 INTEREIXO = 0.42               # m (espaçamento típico entre vigotas)
 LARG_NERVURA = 0.09            # m (largura média da nervura)

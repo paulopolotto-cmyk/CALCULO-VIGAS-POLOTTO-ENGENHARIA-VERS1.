@@ -27,6 +27,19 @@ seletor_pagina("lajes")
 fu, un_f, un_fm = seletor_unidade()
 ss = st.session_state
 
+# Realce visual: chip de vão selecionado em âmbar + borda âmbar nos campos de
+# parâmetro (confirma ao engenheiro o que foi escolhido e entra no cálculo).
+st.markdown("""<style>
+[data-testid="stButtonGroup"] button[kind="pillsActive"]{
+  background:linear-gradient(135deg,#F6C86B,#E8A33D)!important;
+  border-color:#E8A33D!important;font-weight:800!important;}
+[data-testid="stButtonGroup"] button[kind="pillsActive"] *{
+  color:#16265B!important;}
+[data-testid="stNumberInput"] input,
+[data-testid="stSelectbox"] [data-baseweb="select"]>div:first-child{
+  border-left:4px solid #E8A33D!important;}
+</style>""", unsafe_allow_html=True)
+
 VAOS_RAPIDOS = [(2, 1), (2, 2), (3, 3), (3.5, 3.5), (3.5, 4), (4, 4),
                 (4.5, 4.5), (5, 5), (5.5, 4.5), (6, 5), (6.5, 7), (7, 7)]
 LADOS = [("sup", "Superior"), ("inf", "Inferior"),
@@ -110,12 +123,51 @@ if _pick and _pick != _cur:
     ss.laje_lx, ss.laje_ly = float(_a), float(_b)
     st.rerun()
 cvx, cvy = st.columns(2)
-ss.laje_lx = cvx.number_input("Vão lx [m]", 0.5, 12.0, float(ss.laje_lx),
-                              0.1, "%.2f", key="in_lx")
-ss.laje_ly = cvy.number_input("Vão ly [m]", 0.5, 12.0, float(ss.laje_ly),
-                              0.1, "%.2f", key="in_ly")
+# usam a MESMA chave do estado (laje_lx/laje_ly) → ficam sempre em sincronia
+# com o chip de vão selecionado acima (sem defasagem/valor antigo).
+cvx.number_input("Vão lx [m]", 0.5, 12.0, step=0.1, format="%.2f",
+                 key="laje_lx")
+cvy.number_input("Vão ly [m]", 0.5, 12.0, step=0.1, format="%.2f",
+                 key="laje_ly")
 lx0, ly0 = float(ss.laje_lx), float(ss.laje_ly)
 lam = max(lx0, ly0) / min(lx0, ly0)
+
+# Ao mudar o vão (ou a vinculação), sugere automaticamente a ALTURA COMERCIAL
+# da laje pela norma. O engenheiro pode alterar depois — a escolha manual é
+# mantida enquanto o vão não mudar.
+_spk = (round(lx0, 2), round(ly0, 2), is_trel, ss.get("laje_cont"))
+if ss.get("_span_auto") != _spk:
+    ss["_span_auto"] = _spk
+    _q = ml.CARGAS_USO.get(ss.laje_uso, 1.5)          # carga de uso atual
+    if is_trel:
+        # a partir do pré-dim (L/30) sobe até a menor altura comercial que
+        # passa na flecha
+        _hr = ml.h_recomendada_trelica(min(lx0, ly0),
+                                       ss.get("laje_cont") == "continua")
+        _best = None
+        for _h in sorted(ml.PP_TRELICA):              # 12,16,20,25
+            if _h < _hr - 0.5:
+                continue
+            _r = _calc_trelica(lx0, ly0, _h, ss.laje_ench,
+                               ss.get("laje_cont", "biapoiada"),
+                               int(ss.laje_fck), ss.laje_grev, _q, ss.laje_gpar)
+            if not _r.get("erros") and _r["flecha"]["nivel"] != "vermelho":
+                _best = _h
+                break
+        ss.laje_h_trel = _best or max(ml.PP_TRELICA)
+    else:
+        # a partir do pré-dim (L/40, ou L/45 se 1 direção) sobe até passar
+        _h0 = int(max(8, round(min(lx0, ly0) * 100.0 /
+                               (40.0 if lam <= 2 else 45.0))))
+        _apt = tuple(sorted(_apoios_dict().items()))
+        _best = None
+        for _h in range(_h0, 21):
+            _r = _calc_macica(lx0, ly0, _apt, float(_h), int(ss.laje_fck),
+                              ss.laje_grev, _q, ss.laje_gpar)
+            if not _r.get("erros") and _r["flecha"]["nivel"] != "vermelho":
+                _best = _h
+                break
+        ss.laje_h_mac = float(_best or 20)
 
 if is_trel:
     sec(3, "Laje treliçada — altura e enchimento")
@@ -132,16 +184,21 @@ if is_trel:
                                 index=0 if ss.laje_cont == "biapoiada" else 1,
                                 format_func=lambda s: "Biapoiada" if s == "biapoiada"
                                 else "Contínua")
-    st.caption(f"➡️ Vigotas armadas no menor vão (**{_f2(min(lx0, ly0))} m**). "
-               f"Peso próprio da vigota por catálogo do fabricante (NBR 14859).")
+    _capa = ml.PP_TRELICA[int(ss.laje_h_trel)][0]
+    _ench_txt = "EPS" if ss.laje_ench == "EPS" else "cerâmica"
+    st.success(f"✔ **Laje comercial adotada: treliçada H{int(ss.laje_h_trel)} "
+               f"({int(ss.laje_h_trel - _capa)}+{int(_capa)} cm) {_ench_txt}** — "
+               f"altura sugerida pela norma para vão de "
+               f"{_f2(min(lx0, ly0))} m. Ajuste acima se quiser outra. "
+               f"Vigotas no menor vão; PP por catálogo NBR 14859.")
 else:
     sec(3, "Laje maciça — espessura e apoios")
-    h_sug = max(8.0, min(lx0, ly0) * 100.0 / (40.0 if lam <= 2 else 45.0))
     ss.laje_h_mac = st.number_input(
         "Espessura h [cm]", 6.0, 20.0, float(ss.laje_h_mac), 1.0, "%.0f",
         help="Mínimo NBR 6118 (13.2.4.1): 8 cm (piso), 7 cm (forro).")
-    st.caption(f"💡 Sugestão de espessura pelo vão: **≈ {h_sug:.0f} cm** "
-               f"(λ = {_f2(lam)}).")
+    st.success(f"✔ **Espessura adotada: {int(ss.laje_h_mac)} cm** — sugerida "
+               f"pela norma para o vão (λ = {_f2(lam)}). Ajuste acima se "
+               f"quiser outra.")
     st.markdown("**Condições de apoio das 4 bordas** "
                 "(Engastada = continuidade com laje vizinha):")
     pcol = st.columns(4)
