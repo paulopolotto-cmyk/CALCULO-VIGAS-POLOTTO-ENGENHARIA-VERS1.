@@ -6,6 +6,7 @@ via desenhos_viga / desenhos_pilar) + memorial de cálculo por elemento.
 Reusa os motores e desenhos aprovados; não altera nenhuma tela.
 """
 import io
+import textwrap
 
 import matplotlib
 matplotlib.use("Agg")
@@ -20,7 +21,62 @@ import desenhos_pilar as dp
 A4 = (8.27, 11.69)          # retrato (polegadas)
 
 
+# ------------------------------------------------------------ agrupar iguais
+def _kv(v):
+    """Duas vigas/baldrames são iguais se têm a mesma seção, os mesmos vãos
+    e a mesma carga (o desenho e o memorial saem idênticos)."""
+    return (v["secao"], tuple(round(x, 2) for x in v["vaos"]), round(v["w"], 1))
+
+
+def _kp(p):
+    """Dois pilares são iguais se têm a mesma seção e a mesma armadura
+    (mesmo detalhe de execução)."""
+    return (p["secao"], p.get("armadura", ""), p.get("estribo", ""))
+
+
+def _agrupar(elems, keyfn, repfn=None):
+    """Agrupa elementos iguais preservando a ordem de aparição. Devolve
+    [{'membros': [...], 'rep': elem_representativo}]. rep = mais crítico
+    (repfn) ou o primeiro."""
+    grupos, ordem = {}, []
+    for e in elems:
+        k = keyfn(e)
+        if k not in grupos:
+            grupos[k] = []
+            ordem.append(k)
+        grupos[k].append(e)
+    out = []
+    for k in ordem:
+        m = grupos[k]
+        rep = max(m, key=repfn) if repfn else m[0]
+        out.append({"membros": m, "rep": rep})
+    return out
+
+
+def _rotulo(prefixo, nomes):
+    if len(nomes) == 1:
+        return f"{prefixo} {nomes[0]}"
+    return f"{prefixo} {nomes[0]} (+{len(nomes)-1} iguais)"
+
+
+def _tipos(n):
+    return f"{n} tipo" + ("" if n == 1 else "s")
+
+
 # ------------------------------------------------------------ páginas de texto
+def _wrap(texto, largura=92):
+    """Quebra linhas longas (mantendo a indentação) para não vazar da página."""
+    out = []
+    for ln in texto.split("\n"):
+        if len(ln) <= largura:
+            out.append(ln)
+            continue
+        ind = ln[:len(ln) - len(ln.lstrip())]
+        out.append(textwrap.fill(ln, width=largura, subsequent_indent=ind + "  ",
+                                 break_long_words=False, break_on_hyphens=False))
+    return "\n".join(out)
+
+
 def _pag_texto(pdf, texto, titulo=None, mono=True, fs=9):
     fig = plt.figure(figsize=A4)
     fig.patch.set_facecolor("white")
@@ -30,14 +86,14 @@ def _pag_texto(pdf, texto, titulo=None, mono=True, fs=9):
                  color=NAVY, va="top")
         fig.text(0.06, 0.945, "─" * 92, fontsize=8, color=AMBAR, va="top")
         y = 0.925
-    fig.text(0.06, y, texto, fontsize=fs, va="top", ha="left",
+    fig.text(0.06, y, _wrap(texto), fontsize=fs, va="top", ha="left",
              family="monospace" if mono else "sans-serif", color="#0f172a",
              linespacing=1.35)
     pdf.savefig(fig)
     plt.close(fig)
 
 
-def _capa(pdf, r, proj):
+def _capa(pdf, r, proj, nv, nb, npil):
     fig = plt.figure(figsize=A4)
     fig.patch.set_facecolor("white")
     fig.text(0.5, 0.90, "POLOTTO ENGENHARIA", ha="center", fontsize=20,
@@ -46,14 +102,15 @@ def _capa(pdf, r, proj):
              ha="center", fontsize=13, color=CINZA_TXT)
     fig.text(0.5, 0.83, f"Projeto: {proj}", ha="center", fontsize=12,
              fontweight="bold", color="#0f172a")
-    fig.text(0.5, 0.80, "NBR 6118 · concreto C25 · aço CA-50A",
-             ha="center", fontsize=10, color=CINZA_TXT)
+    fig.text(0.5, 0.80, "NBR 6118 · concreto C25 · aço CA-50A · "
+             "elementos iguais agrupados", ha="center", fontsize=10,
+             color=CINZA_TXT)
 
     linhas = [
-        "RESUMO",
-        f"   Vigas de cobertura ....... {len(r['vigas'])}",
-        f"   Baldrames ................ {len(r['baldrames'])}",
-        f"   Pilares .................. {len(r['pilares'])}",
+        "RESUMO            (total · tipos p/ detalhar)",
+        f"   Vigas de cobertura ....... {len(r['vigas']):>2}  ·  {_tipos(nv)}",
+        f"   Baldrames ................ {len(r['baldrames']):>2}  ·  {_tipos(nb)}",
+        f"   Pilares .................. {len(r['pilares']):>2}  ·  {_tipos(npil)}",
         f"   Carga total à fundação ... {r['fund_tf']} tf",
         "",
         "AÇO A COMPRAR (por etapa)",
@@ -143,16 +200,25 @@ def _mem_viga(v):
     return "\n".join(L)
 
 
-def _mem_pilar(p):
-    rp = p["res"]
-    opt = p["opt"]
-    d = rp["dados"]
-    L = [f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CAA {d['caa']} "
-         f"(c={d['cob']:.1f} cm)",
-         f"l0={d['l0']:.2f} m · Nk={p['Nk']} kN (carga {p['carga_tf']} tf) · "
-         f"Nd={rp['Nd']:.0f} kN · γn={rp['gamma_n']:.2f} · ν={rp['ni']:.3f}",
-         "",
-         "ESBELTEZ E 2ª ORDEM:"]
+def _mem_pilar(p, nomes=None):
+    rp = p.get("res") or {}
+    opt = p.get("opt")
+    d = rp.get("dados")
+    L = []
+    if nomes and len(nomes) > 1:
+        L.append(f"IGUAIS ({len(nomes)}): " + ", ".join(nomes))
+        L.append("Mesmo detalhe de execução; dimensionado para o mais carregado.")
+        L.append("")
+    if not d:
+        L.append(f"Pilar {p['pilar']}: seção {p['secao']} — não foi possível "
+                 f"dimensionar (Nk={p.get('Nk')} kN). Revisar manualmente.")
+        return "\n".join(L)
+    L += [f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CAA {d['caa']} "
+          f"(c={d['cob']:.1f} cm)",
+          f"l0={d['l0']:.2f} m · Nk={p['Nk']} kN (carga {p['carga_tf']} tf) · "
+          f"Nd={rp['Nd']:.0f} kN · γn={rp['gamma_n']:.2f} · ν={rp['ni']:.3f}",
+          "",
+          "ESBELTEZ E 2ª ORDEM:"]
     for nome, dd in rp["direcoes"].items():
         so = "SIM" if dd["segunda_ordem"] else "não"
         L.append(f"  Direção {nome}: λ={dd['lambda']:.1f} (λ1={dd['lambda1']:.1f}) "
@@ -192,9 +258,10 @@ def _salva(pdf, fig, titulo=None):
 
 
 # ------------------------------------------------------------ elementos
-def _elemento_viga(pdf, v):
+def _elemento_viga(pdf, v, membros):
     res = v["res"]
-    cab = f"VIGA {v['nome']} — {v['secao']} cm — {v['nvaos']} vão(s)"
+    nomes = [m["nome"] for m in membros]
+    cab = _rotulo("VIGA", nomes) + f" — {v['secao']} cm — {v['nvaos']} vão(s)"
     if not res or "estatica" not in res:
         _pag_texto(pdf, "Não foi possível calcular esta viga.", titulo=cab)
         return
@@ -205,33 +272,44 @@ def _elemento_viga(pdf, v):
         tipo, idx, tit = _corte_args(res)
         _salva(pdf, dv.fig_corte_estribo(res, tipo, idx, tit),
                "Corte transversal e estribo")
-    _pag_texto(pdf, _mem_viga(v), titulo=f"Memorial — Viga {v['nome']}")
+    mem = _mem_viga(v)
+    if len(nomes) > 1:
+        mem = (f"IGUAIS ({len(nomes)}): " + ", ".join(nomes)
+               + "\nMesmo desenho e ferragem para todas.\n\n" + mem)
+    _pag_texto(pdf, mem, titulo="Memorial — " + _rotulo("Viga", nomes))
 
 
-def _elemento_pilar(pdf, p):
+def _elemento_pilar(pdf, p, membros):
     rp = p["res"]
     opt = p["opt"]
-    cab = f"PILAR {p['pilar']} — {p['secao']} cm — Nk {p['Nk']} kN"
+    nomes = [m["pilar"] for m in membros]
+    cab = _rotulo("PILAR", nomes) + f" — {p['secao']} cm"
     if not rp or not opt:
-        _pag_texto(pdf, _mem_pilar(p), titulo=cab)
+        _pag_texto(pdf, _mem_pilar(p, nomes), titulo=cab)
         return
     _salva(pdf, dp.fig_secao(rp, opt), cab + "  ·  Corte transversal")
     _salva(pdf, dp.fig_pilar_longitudinal(rp, opt))   # já se autointitula
-    _pag_texto(pdf, _mem_pilar(p), titulo=f"Memorial — Pilar {p['pilar']}")
+    _pag_texto(pdf, _mem_pilar(p, nomes), titulo="Memorial — " + _rotulo("Pilar", nomes))
 
 
 def gerar_pdf(r, proj="projeto"):
-    """Monta o PDF completo e devolve os bytes."""
+    """Monta o PDF completo (elementos iguais agrupados) e devolve os bytes."""
+    gv = _agrupar(r["vigas"], _kv)
+    gb = _agrupar(r["baldrames"], _kv)
+    gp = _agrupar(r["pilares"], _kp, repfn=lambda p: p.get("Nk", 0))
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        _capa(pdf, r, proj)
-        _divisoria(pdf, "VIGAS DE COBERTURA")
-        for v in r["vigas"]:
-            _elemento_viga(pdf, v)
-        _divisoria(pdf, "BALDRAMES")
-        for b in r["baldrames"]:
-            _elemento_viga(pdf, b)
-        _divisoria(pdf, "PILARES")
-        for p in r["pilares"]:
-            _elemento_pilar(pdf, p)
+        _capa(pdf, r, proj, len(gv), len(gb), len(gp))
+        _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
+                   f"{len(r['vigas'])} vigas)")
+        for g in gv:
+            _elemento_viga(pdf, g["rep"], g["membros"])
+        _divisoria(pdf, f"BALDRAMES\n({_tipos(len(gb))} · "
+                   f"{len(r['baldrames'])} baldrames)")
+        for g in gb:
+            _elemento_viga(pdf, g["rep"], g["membros"])
+        _divisoria(pdf, f"PILARES\n({_tipos(len(gp))} · "
+                   f"{len(r['pilares'])} pilares)")
+        for g in gp:
+            _elemento_pilar(pdf, g["rep"], g["membros"])
     return buf.getvalue()
