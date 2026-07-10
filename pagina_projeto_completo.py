@@ -15,6 +15,7 @@ import streamlit.components.v1 as components
 
 from ui_comum import aplicar_estilo, header, sec, seletor_pagina, tabela
 import editor_lancamento as el
+import calc_projeto as cp
 
 aplicar_estilo()
 header("Projeto Completo — Planta → Lançamento → Cálculo",
@@ -74,34 +75,69 @@ else:
                      "pelo botão **ENVIAR** do editor (estrutura_*.json).")
             st.stop()
 
-        r = el.resumo_estrutura(data)
+        proj = data.get("projeto") or up.name.rsplit(".", 1)[0]
+        rr = el.resumo_estrutura(data)
         sec(2, "Resumo da estrutura")
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Pilares", r["n_pilares"])
-        c2.metric("Vigas (trechos)", r["n_vigas"])
-        c3.metric("Vigas contínuas", r["n_continuas"])
-        c4.metric("Total → fundação", f"{r['total_tf']} tf")
+        c1.metric("Pilares", rr["n_pilares"])
+        c2.metric("Vigas (trechos)", rr["n_vigas"])
+        c3.metric("Vigas contínuas", rr["n_continuas"])
+        c4.metric("Total → fundação", f"{rr['total_tf']} tf")
 
-        sec(3, "Vigas contínuas (segmentos alinhados agrupados)")
-        if r["linhas"]:
-            rows = [{"Viga contínua": f"{'VH' if l['dir']=='H' else 'VV'}{i+1}",
-                     "Nº de vãos": l["nvaos"],
-                     "Comprimento": f"{l['comp']:.2f} m",
-                     "Vãos (m)": " + ".join(f"{v:.2f}" for v in l["vaos"])}
-                    for i, l in enumerate(r["linhas"])]
-            tabela(rows)
-            st.caption(f"Vão máximo entre apoios: **{r['vao_max']:.2f} m**.")
-        else:
-            st.warning("Nenhuma viga encontrada no arquivo.")
+        with st.spinner("Rodando o cálculo NBR 6118 de todas as vigas, baldrames e pilares…"):
+            r = cp.calcular_projeto(data)
 
-        sec(4, "Relação de cargas dos pilares")
-        prows = [{"Pilar": p.get("pilar"),
-                  "Carga (tf)": p.get("carga_tf", "-"),
-                  "Seção": p.get("secao", "-"),
-                  "Forma": p.get("forma", "-")} for p in r["pilares"]]
-        tabela(prows)
+        # ---- vigas de cobertura
+        sec(3, "Vigas de cobertura (viga contínua NBR 6118)")
+        st.caption(f"Laje lançada na direção "
+                   f"**{'horizontal' if r['principal']=='H' else 'vertical'}** "
+                   f"(cobertura q ≈ {r['q_cob']} kN/m²). A seção cresce sozinha se o vão exigir.")
+        tabela([{"Viga": v["nome"], "Seção": v["secao"], "Nº vãos": v["nvaos"],
+                 "Vãos (m)": " + ".join(f"{x:.2f}" for x in v["vaos"]),
+                 "Carga w (kN/m)": v["w"], "M máx (kN·m)": v["mmax"],
+                 "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
 
-        st.info("✅ Leitura e **agrupamento das vigas contínuas** prontos. "
-                "**Em construção (próxima etapa):** o detalhamento completo — cada viga "
-                "contínua rodada no motor NBR 6118 (momentos, cortante, armadura e desenho) "
-                "e cada pilar dimensionado — reusando os motores de Vigas e Pilares.")
+        # ---- baldrames
+        sec(4, "Baldrames (vigas de fundação sob as paredes)")
+        st.caption(f"Carga de parede ≈ {r['wall']} kN/m sobre cada linha de baldrame.")
+        tabela([{"Baldrame": b["nome"], "Seção": b["secao"], "Nº vãos": b["nvaos"],
+                 "Vãos (m)": " + ".join(f"{x:.2f}" for x in b["vaos"]),
+                 "Carga w (kN/m)": b["w"], "M máx (kN·m)": b["mmax"],
+                 "Aço (kg)": b["peso"] if b["peso"] else "—"} for b in r["baldrames"]])
+
+        # ---- pilares
+        sec(5, "Pilares (pré-dimensionamento — casa térrea)")
+        tabela([{"Pilar": p["pilar"], "Seção (cm)": p["secao"],
+                 "Carga (tf)": p["carga_tf"], "Armadura": p["armadura"],
+                 "Aço (kg)": p["peso"]} for p in r["pilares"]])
+
+        # ---- fundação
+        sec(6, "Cargas na fundação")
+        st.metric("Carga total à fundação (cobertura + alvenaria/baldrames)",
+                  f"{r['fund_tf']} tf")
+        st.caption("A carga de cada sapata/estaca é a carga do pilar correspondente na "
+                   "tabela acima. O dimensionamento das fundações depende do SPT do terreno.")
+
+        # ---- QUANTITATIVO de aço a comprar
+        sec(7, "Relação de aço a comprar (por etapa e total)", destaque=True)
+        q1, q2, q3, q4 = st.columns(4)
+        q1.metric("Vigas", f"{r['aco_vigas']} kg")
+        q2.metric("Pilares", f"{r['aco_pilares']} kg")
+        q3.metric("Baldrames", f"{r['aco_baldrames']} kg")
+        q4.metric("TOTAL", f"{r['aco_total']} kg")
+        tabela([
+            {"Etapa": "Vigas de cobertura", "Aço CA-50/60 (kg)": r["aco_vigas"]},
+            {"Etapa": "Pilares", "Aço CA-50/60 (kg)": r["aco_pilares"]},
+            {"Etapa": "Baldrames", "Aço CA-50/60 (kg)": r["aco_baldrames"]},
+            {"Etapa": "TOTAL A COMPRAR", "Aço CA-50/60 (kg)": r["aco_total"]},
+        ])
+        st.caption("Inclui ~10% de perdas/emendas em vigas e baldrames e ~8% nos pilares.")
+        if r["falhas"]:
+            st.warning("Verificar manualmente (não passaram nem no maior perfil): "
+                       + ", ".join(r["falhas"]))
+
+        # ---- relatório HTML para baixar
+        html_rel = cp.relatorio_html(r, proj)
+        st.download_button("📥 Baixar relatório completo (HTML)",
+                           data=html_rel.encode("utf-8"),
+                           file_name=f"relatorio_{proj}.html", mime="text/html")
