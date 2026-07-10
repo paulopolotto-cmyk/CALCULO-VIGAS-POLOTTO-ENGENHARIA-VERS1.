@@ -1,18 +1,26 @@
 # -*- coding: utf-8 -*-
 """Projeto Completo — CÁLCULO/DETALHAMENTO automático a partir do estrutura_*.json
-(saída do editor visual). Reusa motor_viga (viga contínua NBR 6118, Três Momentos)
-para as vigas de cobertura e os baldrames; pilares em pré-dimensionamento (térrea).
+(saída do editor visual). Reusa os MESMOS motores das telas aprovadas:
+motor_viga (viga contínua NBR 6118, Três Momentos) para as vigas de cobertura e
+os baldrames, e motor_pilar (NBR 6118, 2ª ordem/flexo-compressão) para os pilares.
 NÃO altera os módulos aprovados.
 
-Saída: detalhamento por viga contínua / baldrame / pilar + quantitativo de aço por
-etapa (vigas, pilares, baldrames) e TOTAL a comprar, além das cargas de fundação.
+Padrões (para os testes): concreto C25, aço CA-50A; VIGAS com base bw = 14 cm e
+altura h = 10% do MAIOR vão (uma seção por viga contínua); PILARES 14×30 que
+crescem pela norma se a armadura passar do limite. Saída: detalhamento completo
+por viga/baldrame/pilar (figuras + memorial) + quantitativo de aço por etapa
+(vigas, pilares, baldrames) e TOTAL a comprar, além das cargas de fundação.
 """
 import motor_viga as mv
+import motor_pilar as mp
 from editor_lancamento import agrupar_vigas_continuas
 
 Q_COB = 3.0    # kN/m² cobertura (laje EPS 16+4 + telha fibrocimento + sobrecarga)
 WALL = 6.0     # kN/m parede sobre baldrame (~15 cm rebocada, altura ~2,85 m)
-FCK = 25.0
+FCK = 25.0     # concreto C25 (padrão)
+BW = 14        # base padrão das vigas/baldrames (assenta na parede) [cm]
+L0_PILAR = 3.0  # pé-direito livre dos pilares (comprimento de flambagem) [m]
+CAA = "II"     # classe de agressividade (urbana) — cobrimento dos pilares
 PESO_LIN = {5.0: 0.154, 6.3: 0.245, 8.0: 0.395, 10.0: 0.617,
             12.5: 0.963, 16.0: 1.578, 20.0: 2.466}   # kg/m
 
@@ -32,7 +40,7 @@ def _peso(res):
     return round(q["peso_total"], 1) if q and q.get("peso_total") else None
 
 
-def _detalhar(nome, vaos, w, b=14, h=40):
+def _detalhar(nome, vaos, w, b=BW, h=40):
     tramos = [{"tipo": "Normal", "nome": f"{nome}.{k+1}", "L": float(v),
                "q": float(w), "P": 0.0, "a": 0.0}
               for k, v in enumerate(vaos) if v and v > 0.1]
@@ -42,16 +50,40 @@ def _detalhar(nome, vaos, w, b=14, h=40):
     return mv.calcular_viga(dados, tramos)
 
 
-def _detalhar_auto(nome, vaos, w, b=14):
-    """Detalha aumentando a altura (40→50→60→70) até a viga passar."""
+def _altura_viga(vaos):
+    """Altura padrão h = 10% do MAIOR vão (múltiplo de 5, mínimo 30 cm)."""
+    vv = [v for v in vaos if v and v > 0.1]
+    h = 10.0 * max(vv) if vv else 40.0          # 10% do maior vão (cm)
+    return max(30, int(5 * round(h / 5.0)))
+
+
+def _detalhar_viga(nome, vaos, w, b=BW):
+    """Detalha a partir de h = 10% do maior vão; só cresce se ainda falhar."""
+    h0 = _altura_viga(vaos)
     res = None
-    for h in (40, 50, 60, 70):
+    for h in range(h0, 105, 5):
         res = _detalhar(nome, vaos, w, b=b, h=h)
         if res is None:
             return None, h
         if not (res.get("falha_flexao") or res.get("falha_biela")):
             return res, h
-    return res, 70
+    return res, 100
+
+
+def _detalhar_pilar(carga_tf):
+    """Dimensiona no motor_pilar. Padrão 14×30; cresce a seção pela norma
+    (h, depois b) até haver arranjo de armadura válido (≤ 4% de aço)."""
+    Nk = max(1.0, float(carga_tf or 0.0)) * 9.81        # tf -> kN
+    tentativas = ([(14, h) for h in range(30, 75, 5)]    # 14×30 .. 14×70
+                  + [(19, h) for h in range(30, 100, 5)]  # b=19 (sem γn)
+                  + [(25, h) for h in range(30, 130, 5)])
+    rp = None
+    for b, h in tentativas:
+        rp = mp.calcular_pilar({"b": b, "h": h, "l0": L0_PILAR, "fck": FCK,
+                                "Nk": Nk, "caa": CAA})
+        if "erros" not in rp and rp.get("opcoes"):
+            return rp, rp["opcoes"][0], f"{b}x{h}", round(Nk)
+    return rp, None, "14x30", round(Nk)
 
 
 def _mmax(res):
@@ -79,39 +111,37 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
         arr = posH if l["dir"] == "H" else posV
         w = round(q_cob * _trib(l["pos"], arr), 2) if l["dir"] == principal else 0.0
         nome = f"{'VH' if l['dir'] == 'H' else 'VV'}{i+1}"
-        res, h = _detalhar_auto(nome, l["vaos"], w)
+        res, h = _detalhar_viga(nome, l["vaos"], w)
         vigas_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
-                              comp=l["comp"], vaos=l["vaos"], w=w, secao=f"14x{h}",
+                              comp=l["comp"], vaos=l["vaos"], w=w, secao=f"{BW}x{h}",
                               mmax=_mmax(res), peso=_peso(res),
                               falha=bool(res and (res.get("falha_flexao") or res.get("falha_biela"))),
                               res=res))
-    # ---- baldrames (mesmas linhas, carga de parede, 14x40)
+    # ---- baldrames (mesmas linhas, carga de parede)
     baldr_det = []
     for i, l in enumerate(linhas):
         nome = f"B{i+1}"
-        res, h = _detalhar_auto(nome, l["vaos"], wall)
+        res, h = _detalhar_viga(nome, l["vaos"], wall)
         baldr_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
-                              comp=l["comp"], vaos=l["vaos"], w=wall, secao=f"14x{h}",
+                              comp=l["comp"], vaos=l["vaos"], w=wall, secao=f"{BW}x{h}",
                               mmax=_mmax(res), peso=_peso(res),
                               falha=bool(res and (res.get("falha_flexao") or res.get("falha_biela"))),
                               res=res))
-    # ---- pilares (pré-dimensionamento: seção do editor + armadura mínima)
+    # ---- pilares (dimensionados no motor_pilar; 14×30 crescendo pela norma)
     pil_det = []
     aco_pil = 0.0
     for i, p in enumerate(pilares):
-        sec = str(p.get("secao", "14x30"))
-        try:
-            bb, hh = [float(x) for x in sec.lower().replace("+", "").split("x")[:2]]
-        except Exception:
-            bb, hh = 14.0, 30.0
-        L_long = 4 * (h_pilar + 0.5)                 # 4 ø10 (pé-direito + arranque)
-        n_est = int(h_pilar / 0.15) + 1              # estribos ø5 c/15
-        per = 2 * ((bb - 4) + (hh - 4)) / 100 + 0.10  # m por estribo
-        peso = L_long * PESO_LIN[10.0] + n_est * per * PESO_LIN[5.0]
+        nome = p.get("pilar", f"P{i+1}")
+        carga = p.get("carga_tf", 0) or 0
+        rp, opt, secao, Nk = _detalhar_pilar(carga)
+        peso = opt["peso_total"] if opt else 0.0
         aco_pil += peso
-        pil_det.append(dict(pilar=p.get("pilar", f"P{i+1}"), secao=sec,
-                            carga_tf=p.get("carga_tf", 0),
-                            armadura="4 ø10 + estribo ø5 c/15", peso=round(peso, 1)))
+        pil_det.append(dict(pilar=nome, secao=secao, carga_tf=carga, Nk=Nk,
+                            armadura=(opt["texto"] if opt else "SEÇÃO INSUFICIENTE"),
+                            estribo=(f"ø{opt['phi_t']:.1f} c/{opt['s_est']:.0f}"
+                                     if opt else "—"),
+                            peso=round(peso, 1), falha=opt is None,
+                            res=rp, opt=opt))
 
     # ---- quantitativo de aço (a comprar) por etapa
     aco_vigas = round(sum(v["peso"] for v in vigas_det if v["peso"]) * 1.10, 1)
@@ -121,7 +151,8 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     fund_tf = data.get("total_tf")
     if fund_tf is None:
         fund_tf = round(sum(p.get("carga_tf", 0) for p in pilares), 1)
-    falhas = [v["nome"] for v in (vigas_det + baldr_det) if v["falha"]]
+    falhas = ([v["nome"] for v in (vigas_det + baldr_det) if v["falha"]]
+              + [p["pilar"] for p in pil_det if p["falha"]])
 
     return dict(vigas=vigas_det, baldrames=baldr_det, pilares=pil_det,
                 aco_vigas=aco_vigas, aco_pilares=aco_pilares, aco_baldrames=aco_baldr,

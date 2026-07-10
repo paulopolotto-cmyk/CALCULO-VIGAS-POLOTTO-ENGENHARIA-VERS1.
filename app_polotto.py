@@ -9,7 +9,8 @@ import sys
 
 import streamlit as st
 
-for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje", "editor_lancamento", "calc_projeto"):
+for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje", "editor_lancamento",
+           "desenhos_viga", "desenhos_pilar", "calc_projeto", "relatorio_pdf"):
     if _m in sys.modules:
         try:
             importlib.reload(sys.modules[_m])

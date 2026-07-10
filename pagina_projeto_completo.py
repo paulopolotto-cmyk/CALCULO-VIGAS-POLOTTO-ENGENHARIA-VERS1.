@@ -16,6 +16,7 @@ import streamlit.components.v1 as components
 from ui_comum import aplicar_estilo, header, sec, seletor_pagina, tabela
 import editor_lancamento as el
 import calc_projeto as cp
+import relatorio_pdf as rpdf
 
 aplicar_estilo()
 header("Projeto Completo — Planta → Lançamento → Cálculo",
@@ -136,8 +137,26 @@ else:
             st.warning("Verificar manualmente (não passaram nem no maior perfil): "
                        + ", ".join(r["falhas"]))
 
-        # ---- relatório HTML para baixar
+        # ---- relatório resumido em HTML (rápido)
+        sec(8, "Baixar os relatórios")
         html_rel = cp.relatorio_html(r, proj)
-        st.download_button("📥 Baixar relatório completo (HTML)",
+        st.download_button("📥 Relatório resumido (HTML — abre no navegador)",
                            data=html_rel.encode("utf-8"),
                            file_name=f"relatorio_{proj}.html", mime="text/html")
+
+        # ---- detalhamento COMPLETO em PDF (cada viga e cada pilar) — sob demanda
+        st.markdown("**Detalhamento completo (PDF):** o mesmo que sai no modo "
+                    "manual — esquema, diagramas, cortes e memorial — para **cada "
+                    "viga e cada pilar**. Gera um PDF grande (leva ~1 minuto).")
+        n_el = len(r["vigas"]) + len(r["baldrames"]) + len(r["pilares"])
+        if st.button(f"🛠️ Gerar detalhamento completo em PDF ({n_el} elementos)"):
+            st.session_state.pop("pdf_projeto", None)
+            with st.spinner("Desenhando cada viga e cada pilar (esquema, diagramas, "
+                            "cortes e memorial)… isso leva cerca de 1 minuto."):
+                st.session_state["pdf_projeto"] = rpdf.gerar_pdf(r, proj)
+            st.success("PDF pronto! Baixe abaixo.")
+        if st.session_state.get("pdf_projeto"):
+            st.download_button("📥 Baixar detalhamento completo (PDF)",
+                               data=st.session_state["pdf_projeto"],
+                               file_name=f"detalhamento_{proj}.pdf",
+                               mime="application/pdf")

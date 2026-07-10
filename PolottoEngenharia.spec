@@ -2,7 +2,7 @@
 from PyInstaller.utils.hooks import collect_all
 from PyInstaller.utils.hooks import copy_metadata
 
-datas = [('app_polotto.py', '.'), ('pagina_vigas.py', '.'), ('pagina_pilar.py', '.'), ('pagina_pilar_previo.py', '.'), ('pagina_lajes.py', '.'), ('pagina_projeto_completo.py', '.'), ('editor_lancamento.py', '.'), ('calc_projeto.py', '.'), ('editor_template.html', '.'), ('motor_viga.py', '.'), ('motor_pilar.py', '.'), ('motor_laje.py', '.'), ('ui_comum.py', '.'), ('assets', 'assets'), ('.streamlit', '.streamlit')]
+datas = [('app_polotto.py', '.'), ('pagina_vigas.py', '.'), ('pagina_pilar.py', '.'), ('pagina_pilar_previo.py', '.'), ('pagina_lajes.py', '.'), ('pagina_projeto_completo.py', '.'), ('editor_lancamento.py', '.'), ('calc_projeto.py', '.'), ('relatorio_pdf.py', '.'), ('desenhos_viga.py', '.'), ('desenhos_pilar.py', '.'), ('editor_template.html', '.'), ('motor_viga.py', '.'), ('motor_pilar.py', '.'), ('motor_laje.py', '.'), ('ui_comum.py', '.'), ('assets', 'assets'), ('.streamlit', '.streamlit')]
 binaries = []
 hiddenimports = []
 datas += copy_metadata('streamlit')
