@@ -9,7 +9,7 @@ import sys
 
 import streamlit as st
 
-for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje"):
+for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje", "editor_lancamento"):
     if _m in sys.modules:
         try:
             importlib.reload(sys.modules[_m])
@@ -24,6 +24,7 @@ _paginas = [
     st.Page("pagina_pilar.py", title="Pilares", icon="🏛️"),
     st.Page("pagina_lajes.py", title="Lajes", icon="🧱"),
     st.Page("pagina_pilar_previo.py", title="Pilares Prévios", icon="🏠"),
+    st.Page("pagina_projeto_completo.py", title="Projeto Completo", icon="📐"),
 ]
 
 try:

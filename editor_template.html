@@ -1,0 +1,247 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Editor Estrutural</title>
+<style>
+:root{--azul:#1E3A8A;--ambar:#B45309;--verm:#B91C1C;--cyan:#0891B2;--verde:#15803D;--ink:#0F172A;--muted:#475569;--line:#E2E8F0;--bg:#F1F5F9;--card:#fff;--soft:#EFF3FB}
+@media(prefers-color-scheme:dark){:root{--ink:#E7EDF7;--muted:#9FB0CC;--line:#22314F;--bg:#0B1220;--card:#111A2E;--soft:#16233F;--azul:#6E93E6;--verm:#F0736B;--cyan:#22D3EE}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+.top{background:var(--azul);color:#fff;padding:10px 16px}.top h1{margin:0;font-size:1.1rem;font-weight:800}.top p{margin:3px 0 0;font-size:.82rem;opacity:.9}
+.tools{display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:7px 14px;background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.tool{font-size:.8rem;font-weight:700;padding:6px 9px;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;white-space:nowrap}
+.tool:hover{background:var(--soft)}.tool.on{background:var(--azul);color:#fff;border-color:var(--azul)}
+.tool .kb{font-size:.66rem;opacity:.7;margin-left:3px;border:1px solid currentColor;border-radius:4px;padding:0 3px}
+.sep{width:1px;height:22px;background:var(--line);margin:0 2px}.send{background:var(--verde);color:#fff;border-color:var(--verde)}
+.wrap{display:flex;flex-wrap:wrap;gap:14px;padding:14px;max-width:1320px;margin:0 auto}
+.left{flex:1 1 560px;min-width:320px}.right{flex:0 1 350px;min-width:290px}
+.planbox{position:relative;width:100%;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.08);touch-action:none;user-select:none;-webkit-user-select:none}
+svg{touch-action:none}
+.planbox img{width:100%;display:block;user-select:none;pointer-events:none}svg{position:absolute;top:0;left:0;width:100%;height:100%}
+.status{margin:8px 2px;font-size:.85rem;color:var(--muted);font-weight:600}.status b{color:var(--azul)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:13px 15px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.card h2{margin:0 0 9px;font-size:1rem;font-weight:800;border-bottom:2px solid var(--line);padding-bottom:5px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px}.m .k{font-size:.68rem;text-transform:uppercase;color:var(--muted);font-weight:800}.m .v{font-size:1.35rem;font-weight:800;color:var(--azul)}
+.warn{background:#FEF2F2;border:1px solid var(--verm);border-radius:8px;padding:7px 10px;font-size:.82rem;font-weight:700;color:var(--verm);margin-top:6px}
+@media(prefers-color-scheme:dark){.warn{background:#2A1416}}.ok{color:#15803D;font-weight:700;margin-top:7px}
+.wb{font-size:.72rem;font-weight:800;border:none;border-radius:6px;padding:2px 9px;margin-left:5px;cursor:pointer;color:#fff}.wb.k{background:#15803D}.wb.r{background:#B91C1C}
+table{width:100%;border-collapse:collapse;font-size:.82rem}th,td{padding:4px 7px;border-bottom:1px solid var(--line);text-align:right}th:first-child,td:first-child{text-align:left}
+th{background:var(--soft);color:var(--azul);font-weight:800;position:sticky;top:0}.tbl{max-height:250px;overflow:auto;border:1px solid var(--line);border-radius:8px}.big{color:var(--ambar)!important;font-weight:800}
+.leg{font-size:.95rem;color:var(--muted);line-height:1.85}.leg b{color:var(--ink)}
+.legc{display:flex;gap:11px;flex-wrap:wrap;font-size:.78rem;font-weight:700;margin-top:6px}.legc i{display:inline-block;width:18px;height:4px;border-radius:2px;vertical-align:middle;margin-right:4px}
+.hint{font-size:.86rem;color:var(--muted);line-height:1.55;margin-top:8px}
+</style></head><body>
+<div class="top"><h1>Editor de Lan&ccedil;amento Estrutural &mdash; __PROJ__</h1>
+<p>Pilar <b>vermelho</b>=fixo; clique e fica <b>verde</b> para mover. Viga <b>amarela</b>: clique e arraste <b>livre</b> (atravessa c&ocirc;modos) ou use as <b>setas</b>. Bot&atilde;o <b>Alinhar</b> encaixa tudo nas paredes. S&oacute; grava no <b>Salvar</b>.</p></div>
+<div class="tools">
+ <button class="tool on" data-mode="sel">&#9995; Mover<span class="kb">S</span></button>
+ <button class="tool" data-mode="pilar">&#9724; +Pilar<span class="kb">P</span></button>
+ <button class="tool" data-mode="viga">&#9585; +Viga<span class="kb">V</span></button>
+ <button class="tool" data-mode="excluir">&#128465; Excluir<span class="kb">E</span></button>
+ <span class="sep"></span>
+ <button class="tool" id="ret">&#9646; Retang.<span class="kb">R</span></button>
+ <button class="tool" id="quad">&#9632; Quadr.<span class="kb">Q</span></button>
+ <button class="tool" id="girar">&#8635; Girar<span class="kb">G</span></button>
+ <span class="sep"></span>
+ <button class="tool" id="auto">Auto-vigas</button>
+ <button class="tool" id="alinhar">&#10530; Alinhar</button>
+ <button class="tool" id="renum"># Renumerar</button>
+ <button class="tool" id="min">&#9723; In&iacute;cio m&iacute;n.</button>
+ <button class="tool" id="undo">&#8630; Desfazer<span class="kb">Ctrl+Z</span></button>
+ <button class="tool" id="reset">Restaurar</button>
+ <span class="sep"></span>
+ <button class="tool" id="salvar">&#128190; Salvar</button>
+ <button class="tool" id="editar">&#128193; Editar</button>
+ <input type="file" id="file" accept=".json" style="display:none">
+ <button class="tool" id="autofile">&#128308; Auto-salvar arquivo</button>
+ <span id="autoind" style="font-size:.72rem;font-weight:700;color:#15803D;align-self:center"></span>
+ <span class="sep"></span>
+ <button class="tool send" id="send">&#10148; ENVIAR<span class="kb">Enter</span></button>
+</div>
+<div class="wrap">
+ <div class="left">
+  <div class="planbox" id="box"><img src="__IMG__" alt="planta">
+   <svg id="ov" viewBox="__X0__ __Y0__ __VW__ __VH__" preserveAspectRatio="none">
+    <g id="axes"></g><g id="beams"></g><g id="sup"></g><g id="lbl"></g><g id="pil"></g><g id="pend"></g></svg></div>
+  <div class="status" id="status"></div>
+  <div class="legc"><span><i style="background:#EAB308"></i>viga</span>
+   <span><i style="background:#16A34A"></i>movendo (verde)</span><span style="color:#B91C1C">&#9632; pilar fixo</span></div>
+ </div>
+ <div class="right">
+  <div class="card"><h2>Resumo</h2><div class="metrics">
+    <div class="m"><div class="k">Pilares</div><div class="v" id="npil">0</div></div>
+    <div class="m"><div class="k">Total&rarr;fund.</div><div class="v" id="stot">0</div><div class="k">tf</div></div>
+    <div class="m"><div class="k">V&atilde;o m&aacute;x</div><div class="v" id="vmax">0</div><div class="k">m</div></div>
+    <div class="m"><div class="k">Avisos</div><div class="v" id="nav" style="color:var(--verm)">0</div></div>
+   </div><div id="wbox"></div></div>
+  <div class="card"><h2>Cargas &amp; se&ccedil;&atilde;o</h2>
+   <div class="tbl"><table><thead><tr><th>Pilar</th><th>kN</th><th>tf</th><th>Se&ccedil;&atilde;o</th></tr></thead><tbody id="tbody"></tbody></table></div>
+   <p class="hint">Retangular 14&times;30 cresce p/ 14&times;40&hellip; se a carga passar (<b class="big">&acirc;mbar</b>). Quadrado 20&times;20&hellip; (garagem na divisa).</p></div>
+  <div class="card"><h2>Atalhos</h2><div class="leg">
+   <b>S</b> mover &middot; <b>P</b> +pilar &middot; <b>V</b> +viga &middot; <b>E</b> excluir &middot; <b>R/Q</b> retang./quadr. &middot; <b>G</b> girar<br>
+   <b>Setas</b> ajuste fino (Shift = passo maior) &middot; <b>Ctrl+Z</b> desfazer &middot; <b>Del</b> apaga &middot; <b>Enter</b> enviar
+   <div class="hint"><b>Alinhar</b> encaixa pilares nas paredes e endireita as vigas. <b>Renumerar</b> reordena P1&hellip;Pn. <b>In&iacute;cio m&iacute;n.</b> come&ccedil;a s&oacute; nos cantos/interse&ccedil;&otilde;es. <b>+Viga</b>: clique em pilares ou em <b>qualquer ponto</b> para marcar a viga onde quiser (Esc para parar) &mdash; sem regra. Para mover um <b>pilar</b>: clique nele e arraste, ou use as <b>setas</b> (n&atilde;o precisa apagar) &mdash; vale nos modos <b>Mover</b> e <b>+Pilar</b>. Para mover uma <b>viga</b>: clique nela (fica azul-clara, com al&ccedil;as) e arraste pelo <b>meio</b> ou pela <b>ponta</b>, ou use as <b>setas</b>. Nada trava.</div></div></div>
+ </div>
+</div>
+<script>
+const X0=__X0__,Y0=__Y0__,VW=__VW__,VH=__VH__,S=__S__,POOL=__POOL__,FCD=2.5/1.4,LSKEY='__LSKEY__';
+const VX=__VX__,HY=__HY__,INIT=__PILLARS__,MIN=__MIN__;
+let pillars=JSON.parse(JSON.stringify(INIT));
+let nextId=Math.max(0,...pillars.map(p=>p.id))+1,nextBid=1,beams=[];
+let mode='sel',selP=null,selB=null,drag=-1,dragBeam=null,dragLast=null,moved=false,vigaStart=null,cache=null,hist=[],defShape='ret',rt=null,lastIssues=[],fileHandle=null,fsTimer=null;
+const $=id=>document.getElementById(id);
+const svg=$('ov'),gA=$('axes'),gB=$('beams'),gS=$('sup'),gL=$('lbl'),gP=$('pil'),gPend=$('pend');
+const byId=id=>pillars.find(p=>p.id==id),byBid=b=>beams.find(x=>x.id==b);
+const inpool=(x,y)=>x>POOL[0]&&x<POOL[2]&&y>POOL[1]&&y<POOL[3];
+const dvx=x=>Math.min(...VX.map(a=>Math.abs(a-x))),dhy=y=>Math.min(...HY.map(a=>Math.abs(a-y)));
+function snapVX(x){let b=x,bt=20;for(const a of VX){let d=Math.abs(a-x);if(d<bt){bt=d;b=a;}}return b;}
+function snapHY(y){let b=y,bt=20;for(const a of HY){let d=Math.abs(a-y);if(d<bt){bt=d;b=a;}}return b;}
+function snapVXt(x,t){let b=x,bt=t;for(const a of VX){let d=Math.abs(a-x);if(d<bt){bt=d;b=a;}}return b;}
+function snapHYt(y,t){let b=y,bt=t;for(const a of HY){let d=Math.abs(a-y);if(d<bt){bt=d;b=a;}}return b;}
+function snapAxis(p,tol){tol=tol||11;let sv=false,sh=false;for(const a of VX)if(Math.abs(a-p.x)<tol){p.x=a;sv=true;break;}for(const a of HY)if(Math.abs(a-p.y)<tol){p.y=a;sh=true;break;}if(sv&&!sh)p.ori='v';else if(sh&&!sv)p.ori='h';return p;}
+pillars.forEach(p=>snapAxis(p));
+function renumber(){pillars.sort((a,b)=>{let ry=Math.round(a.y/24)-Math.round(b.y/24);return ry!=0?ry:a.x-b.x;});}
+function snap(){hist.push(JSON.stringify({pillars,beams,nextId,nextBid}));if(hist.length>90)hist.shift();}
+function undo(){if(hist.length){let s=JSON.parse(hist.pop());pillars=s.pillars;beams=s.beams;nextId=s.nextId;nextBid=s.nextBid;selP=null;selB=null;vigaStart=null;renderFull();}}
+function nearestPil(x,y){let pid=null,dm=36*36;for(const p of pillars){let dd=(p.x-x)**2+(p.y-y)**2;if(dd<dm){dm=dd;pid=p.id;}}return pid;}
+function pilName(q){let pid=q?nearestPil(q.x,q.y):null;return pid==null?'?':('P'+(pillars.findIndex(p=>p.id==pid)+1));}
+function epXY(ep,d){d=d||0;if(ep.t=='xy')return{x:ep.x,y:ep.y};if(ep.t=='p'){let p=byId(ep.id);return p?{x:p.x,y:p.y}:null;}if(d>6)return null;let bm=byBid(ep.bid);if(!bm)return null;let a=epXY(bm.A,d+1),c=epXY(bm.B,d+1);if(!a||!c)return null;return{x:a.x+ep.s*(c.x-a.x),y:a.y+ep.s*(c.y-a.y)};}
+function straighten(bm){if(bm.A.t=='xy'&&bm.B.t=='xy'){let a=bm.A,c=bm.B,dx=Math.abs(a.x-c.x),dy=Math.abs(a.y-c.y);if(dx>0.1&&dx<=dy&&dx<20){let mx=snapVX((a.x+c.x)/2);a.x=mx;c.x=mx;}else if(dy>0.1&&dy<dx&&dy<20){let my=snapHY((a.y+c.y)/2);a.y=my;c.y=my;}}}
+function beamData(){let o=[];for(const bm of beams){let a=epXY(bm.A),c=epXY(bm.B);if(!a||!c)continue;o.push({bm,a,c,L:Math.hypot(a.x-c.x,a.y-c.y)/S,diag:(Math.abs(a.x-c.x)>10&&Math.abs(a.y-c.y)>10)});}return o;}
+function prune(){let ok=false;while(!ok){ok=true;let keep=[];for(const bm of beams){let good=true;for(const ep of[bm.A,bm.B]){if(ep.t=='b'&&!byBid(ep.bid))good=false;}if(good)keep.push(bm);else ok=false;}beams=keep;}}
+function autobeams(){beams=[];for(let i=0;i<pillars.length;i++){let p=pillars[i],r=null,d=null;
+ for(let j=0;j<pillars.length;j++){if(j==i)continue;let q=pillars[j];if(Math.abs(q.y-p.y)<16&&q.x>p.x+2&&(!r||q.x<r.x))r=q;if(Math.abs(q.x-p.x)<16&&q.y>p.y+2&&(!d||q.y<d.y))d=q;}
+ if(r&&(r.x-p.x)/S<8.6){let b={id:nextBid++,A:{t:'xy',x:p.x,y:p.y},B:{t:'xy',x:r.x,y:r.y}};straighten(b);beams.push(b);}
+ if(d&&(d.y-p.y)/S<8.6){let b={id:nextBid++,A:{t:'xy',x:p.x,y:p.y},B:{t:'xy',x:d.x,y:d.y}};straighten(b);beams.push(b);}}}
+function migrateBeams(){let co=beams.map(bm=>[epXY(bm.A),epXY(bm.B)]);beams.forEach((bm,i)=>{let a=co[i][0],c=co[i][1];bm.A=a?{t:'xy',x:a.x,y:a.y}:{t:'xy',x:X0+VW/2,y:Y0+VH/2};bm.B=c?{t:'xy',x:c.x,y:c.y}:{t:'xy',x:X0+VW/2,y:Y0+VH/2};});}
+function bbox(){let xs=pillars.map(p=>p.x),ys=pillars.map(p=>p.y);return{mnx:Math.min(...xs),mxx:Math.max(...xs),mny:Math.min(...ys),mxy:Math.max(...ys)};}
+function loads(bd){let bb=bbox(),ar={};pillars.forEach(p=>ar[p.id]=0);let st=10;
+ for(let x=bb.mnx;x<=bb.mxx;x+=st)for(let y=bb.mny;y<=bb.mxy;y+=st){if(inpool(x,y))continue;let k=pillars[0]?pillars[0].id:0,dm=1e18;for(const p of pillars){let dd=(p.x-x)**2+(p.y-y)**2;if(dd<dm){dm=dd;k=p.id;}}ar[k]+=(st/S)*(st/S);}
+ let Nc={},Nb={};pillars.forEach(p=>{Nc[p.id]=ar[p.id]*3.36;Nb[p.id]=0;});
+ function resolve(q,ld,ex,d){if(d>6||!q)return;let pid=nearestPil(q.x,q.y);if(pid!=null){if(Nb[pid]!=null)Nb[pid]+=ld;return;}
+   let best=null;for(const o2 of bd){if(o2.bm.id==ex)continue;let rr=segd(q,o2.a,o2.c);if(rr.d<12&&(!best||rr.d<best.d))best={o:o2,t:rr.t,d:rr.d};}
+   if(best){resolve(best.o.a,ld*(1-best.t),best.o.bm.id,d+1);resolve(best.o.c,ld*best.t,best.o.bm.id,d+1);}}
+ bd.forEach(o=>{let e=(Math.abs(o.a.x-bb.mnx)<22&&Math.abs(o.c.x-bb.mnx)<22)||(Math.abs(o.a.x-bb.mxx)<22&&Math.abs(o.c.x-bb.mxx)<22)||(Math.abs(o.a.y-bb.mny)<22&&Math.abs(o.c.y-bb.mny)<22)||(Math.abs(o.a.y-bb.mxy)<22&&Math.abs(o.c.y-bb.mxy)<22);
+   let w=(e?6.5:4.0)+1.4,W=w*o.L;resolve(o.a,W/2,o.bm.id,0);resolve(o.c,W/2,o.bm.id,0);});
+ let Nt={};pillars.forEach(p=>Nt[p.id]=Nc[p.id]+Nb[p.id]);return{Nc,Nb,Nt};}
+function secao(Nt,shape){let Nd=1.4*Nt;if(shape=='quad'){for(const a of [20,25,30,35])if(0.85*FCD*a*a>=Nd)return a+"x"+a;return"35x35+";}for(const h of [30,40,50,60])if(0.85*FCD*14*h>=Nd)return"14x"+h;return"14x60+";}
+function issues(bd){let w=[];
+ pillars.forEach((p,i)=>{if(dvx(p.x)>18&&dhy(p.y)>18)w.push({msg:'P'+(i+1)+' parece fora de parede'});});
+ return w;}
+function drawAxes(){gA.innerHTML=VX.map(x=>`<line x1="${x}" y1="${Y0}" x2="${x}" y2="${Y0+VH}" stroke="#93C5FD" stroke-width="0.5" stroke-dasharray="4 5" opacity="0.3"/>`).join('')+HY.map(y=>`<line x1="${X0}" y1="${y}" x2="${X0+VW}" y2="${y}" stroke="#93C5FD" stroke-width="0.5" stroke-dasharray="4 5" opacity="0.3"/>`).join('');}
+function drawBeams(bd){gB.innerHTML=bd.map(o=>{let sl=(selB&&o.bm.id==selB);let c=sl?'#16A34A':'#EAB308';let w=sl?6:3.6;let dash='';return `<line x1="${o.a.x}" y1="${o.a.y}" x2="${o.c.x}" y2="${o.c.y}" stroke="${c}" stroke-width="${w}" stroke-opacity="0.9" ${dash}/>`;}).join('');
+ if(selB){let sb=byBid(selB);if(sb)for(const ep of[sb.A,sb.B])if(ep.t=='xy')gB.innerHTML+='<circle cx="'+ep.x+'" cy="'+ep.y+'" r="5.5" fill="#16A34A" stroke="#fff" stroke-width="1.4"/>';}
+ gS.innerHTML=bd.map(o=>{let t='';for(const ep of [o.bm.A,o.bm.B]){if(ep.t=='b'){let q=epXY(ep);if(q)t+=`<path d="M ${q.x} ${q.y-3} L ${q.x-4} ${q.y+4} L ${q.x+4} ${q.y+4} Z" fill="#15803D" stroke="#fff" stroke-width="0.6"/>`;}}return t;}).join('');
+ gL.innerHTML='';}
+function drawPil(){gP.innerHTML=pillars.map((p,i)=>{let sc=cache?secao(cache.Nt[p.id],p.shape):"14x30";let base=p.shape=='quad'?"20x20":"14x30";let big=sc!==base;let off=(dvx(p.x)>18&&dhy(p.y)>18);
+   let c=(p.id===selP)?'#16A34A':(big?'#B45309':'#B91C1C');let r;
+   if(p.shape=='quad')r=`<rect x="${p.x-6}" y="${p.y-6}" width="12" height="12" fill="${c}" stroke="#fff" stroke-width="1.6"/>`;
+   else if(p.ori=='v')r=`<rect x="${p.x-4}" y="${p.y-8}" width="8" height="16" fill="${c}" stroke="#fff" stroke-width="1.5"/>`;
+   else r=`<rect x="${p.x-8}" y="${p.y-4}" width="16" height="8" fill="${c}" stroke="#fff" stroke-width="1.5"/>`;
+   let ld=cache?cache.Nt[p.id].toFixed(0):'';
+   return `<g>${r}<text x="${p.x}" y="${p.y-10}" text-anchor="middle" font-size="9" fill="${c}" font-weight="bold">P${i+1}</text><text x="${p.x}" y="${p.y+18}" text-anchor="middle" font-size="8" fill="#0F172A" font-weight="bold">${ld}</text></g>`;}).join('');}
+function drawPending(){if(!vigaStart){gPend.innerHTML='';return;}let q=epXY(vigaStart);gPend.innerHTML=q?`<circle cx="${q.x}" cy="${q.y}" r="5.5" fill="none" stroke="#15803D" stroke-width="2"/>`:'';}
+const npil=$('npil'),stot=$('stot'),vmaxEl=$('vmax'),nav=$('nav'),wbox=$('wbox'),tbody=$('tbody'),statusEl=$('status');
+function panel(bd){let vmax=bd.length?Math.max(...bd.map(o=>o.L)):0;lastIssues=issues(bd);
+ npil.textContent=pillars.length;stot.textContent=cache?(Object.values(cache.Nt).reduce((a,b)=>a+b,0)/9.81).toFixed(0):'0';vmaxEl.textContent=vmax.toFixed(2);nav.textContent=lastIssues.length;
+ wbox.innerHTML=lastIssues.length?lastIssues.slice(0,8).map(it=>{let bb=it.bid!=null?' <button class="wb k" onclick="manterViga('+it.bid+')">manter</button><button class="wb r" onclick="removerViga('+it.bid+')">remover</button>':'';return '<div class="warn">&#9888; '+it.msg+bb+'</div>';}).join('')+(lastIssues.length>8?`<div class="hint">&hellip;+${lastIssues.length-8} aviso(s)</div>`:''):'<div class="ok">&#10004; Tudo alinhado, sem avisos.</div>';
+ if(cache)tbody.innerHTML=pillars.map((p,i)=>{let sc=secao(cache.Nt[p.id],p.shape);let base=p.shape=='quad'?"20x20":"14x30";return `<tr><td>P${i+1}</td><td><b>${cache.Nt[p.id].toFixed(0)}</b></td><td>${(cache.Nt[p.id]/9.81).toFixed(1)}</td><td class="${sc!==base?'big':''}">${sc}</td></tr>`;}).join('');}
+function setStatus(){let m={sel:'Mover/Selecionar',pilar:'+Pilar (clique na parede)',viga:'+Viga: clique numa VIGA = editar/mover; em pilar/vazio = desenhar nova (Esc para)',excluir:'Excluir (clique pilar/viga)'}[mode];statusEl.innerHTML='Modo: <b>'+m+'</b> &middot; padr&atilde;o: <b>'+(defShape=='quad'?'quadrado':'retangular')+'</b>';}
+function autoSaveFile(){if(!fileHandle)return;clearTimeout(fsTimer);fsTimer=setTimeout(writeFile,500);}
+function renderFull(){prune();let bd=beamData();cache=loads(bd);drawAxes();drawBeams(bd);drawPil();drawPending();panel(bd);setStatus();try{localStorage.setItem(LSKEY,JSON.stringify({pillars,beams,nextId,nextBid}));}catch(e){}autoSaveFile();}
+function renderLive(){let bd=beamData();drawBeams(bd);drawPil();drawPending();vmaxEl.textContent=(bd.length?Math.max(...bd.map(o=>o.L)):0).toFixed(2);}
+function schedFull(){renderLive();clearTimeout(rt);rt=setTimeout(renderFull,150);}
+function toPt(e){let r=svg.getBoundingClientRect();return{x:X0+(e.clientX-r.left)/r.width*VW,y:Y0+(e.clientY-r.top)/r.height*VH};}
+function hitPil(pt){for(let i=0;i<pillars.length;i++)if(Math.abs(pillars[i].x-pt.x)<11&&Math.abs(pillars[i].y-pt.y)<11)return i;return -1;}
+function segd(p,a,b){let dx=b.x-a.x,dy=b.y-a.y,l2=dx*dx+dy*dy;if(!l2)return{d:1e9,t:0};let t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/l2));return{d:Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy)),t};}
+function hitBeam(pt){let bd=beamData(),bi=null,bm=18,bt=0;for(const o of bd){let r=segd(pt,o.a,o.c);if(r.d<bm){bm=r.d;bi=o.bm.id;bt=r.t;}}return{id:bi,t:bt};}
+function epAt(pt){let i=hitPil(pt);if(i>=0)return{t:'xy',x:pillars[i].x,y:pillars[i].y};return{t:'xy',x:Math.round(pt.x),y:Math.round(pt.y)};}
+function sameEP(a,b){if(!a||!b)return false;let qa=epXY(a),qb=epXY(b);return qa&&qb&&Math.hypot(qa.x-qb.x,qa.y-qb.y)<6;}
+function addPil(pt){snap();let p=snapAxis({id:nextId++,x:Math.round(pt.x),y:Math.round(pt.y),shape:defShape,ori:'h'});pillars.push(p);selP=p.id;renderFull();}
+function delPil(id){snap();pillars=pillars.filter(p=>p.id!=id);selP=null;renderFull();}
+function vigaClick(pt){let ep=epAt(pt);
+ if(vigaStart==null){vigaStart=ep;renderFull();return;}
+ if(Math.hypot(vigaStart.x-ep.x,vigaStart.y-ep.y)<8){vigaStart=null;renderFull();return;}
+ if(Math.abs(ep.x-vigaStart.x)>=Math.abs(ep.y-vigaStart.y))ep={t:'xy',x:ep.x,y:vigaStart.y};else ep={t:'xy',x:vigaStart.x,y:ep.y};
+ snap();let nb={id:nextBid++,A:vigaStart,B:ep};beams.push(nb);selB=nb.id;selP=null;vigaStart=ep;renderFull();}
+svg.addEventListener('pointerdown',e=>{e.preventDefault();try{svg.setPointerCapture(e.pointerId);}catch(_){}let pt=toPt(e);
+ if(mode==='sel'){
+   let hbm=selB!=null?byBid(selB):null,hp=null;
+   if(hbm){for(const k of ['A','B']){let ep=hbm[k];if(ep&&ep.t=='xy'&&Math.hypot(ep.x-pt.x,ep.y-pt.y)<9){hp=k;break;}}}
+   if(hp){snap();dragBeam={id:selB,part:hp};moved=false;renderFull();return;}
+   let i=hitPil(pt);if(i>=0){snap();drag=i;selP=pillars[i].id;selB=null;moved=false;}
+   else{let hb=hitBeam(pt);selP=null;selB=hb.id;dragBeam=null;moved=false;
+     if(hb.id!=null){let bm=byBid(hb.id),a=epXY(bm.A),c=epXY(bm.B);snap();
+       if(bm.A.t=='xy'&&a&&Math.hypot(a.x-pt.x,a.y-pt.y)<7)dragBeam={id:hb.id,part:'A'};
+       else if(bm.B.t=='xy'&&c&&Math.hypot(c.x-pt.x,c.y-pt.y)<7)dragBeam={id:hb.id,part:'B'};
+       else{dragBeam={id:hb.id,part:'mid'};dragLast=pt;}}}
+   renderFull();}
+ else if(mode==='pilar'){let i=hitPil(pt);if(i>=0){snap();drag=i;selP=pillars[i].id;selB=null;moved=false;renderFull();}else addPil(pt);}
+ else if(mode==='viga'){
+   if(vigaStart==null&&hitPil(pt)<0){let hb=hitBeam(pt);if(hb.id!=null){selB=hb.id;selP=null;let bm=byBid(hb.id),a=epXY(bm.A),c=epXY(bm.B);snap();moved=false;
+     if(bm.A.t=='xy'&&Math.hypot(a.x-pt.x,a.y-pt.y)<9)dragBeam={id:hb.id,part:'A'};
+     else if(bm.B.t=='xy'&&Math.hypot(c.x-pt.x,c.y-pt.y)<9)dragBeam={id:hb.id,part:'B'};
+     else{dragBeam={id:hb.id,part:'mid'};dragLast=pt;}renderFull();return;}}
+   vigaClick(pt);}
+ else if(mode==='excluir'){let i=hitPil(pt);if(i>=0)delPil(pillars[i].id);else{let hb=hitBeam(pt);if(hb.id!=null){snap();beams=beams.filter(b=>b.id!=hb.id);selB=null;renderFull();}}}});
+svg.addEventListener('pointermove',e=>{
+ if(drag>=0){moved=true;let pt=toPt(e),p=pillars[drag];p.x=Math.max(X0+3,Math.min(X0+VW-3,pt.x));p.y=Math.max(Y0+3,Math.min(Y0+VH-3,pt.y));renderLive();return;}
+ if(dragBeam){moved=true;let pt=toPt(e),bm=byBid(dragBeam.id);if(!bm){dragBeam=null;return;}
+   if(dragBeam.part=='A'&&bm.A.t=='xy'){bm.A.x=pt.x;bm.A.y=pt.y;}
+   else if(dragBeam.part=='B'&&bm.B.t=='xy'){bm.B.x=pt.x;bm.B.y=pt.y;}
+   else if(dragBeam.part=='mid'){for(const ep of [bm.A,bm.B]){if(ep.t=='b'){let q=epXY(ep);if(q){ep.t='xy';ep.x=q.x;ep.y=q.y;delete ep.bid;delete ep.s;}}}let dx=pt.x-dragLast.x,dy=pt.y-dragLast.y;for(const ep of [bm.A,bm.B]){if(ep.t=='xy'){ep.x+=dx;ep.y+=dy;}}dragLast=pt;}
+   renderLive();}});
+svg.addEventListener('pointerup',e=>{try{svg.releasePointerCapture(e.pointerId);}catch(_){}
+ if(drag>=0){drag=-1;renderFull();}
+ if(dragBeam){dragBeam=null;renderFull();}});
+svg.addEventListener('pointercancel',()=>{drag=-1;dragBeam=null;});
+function setMode(m){mode=m;vigaStart=null;selB=null;selP=null;drag=-1;dragBeam=null;document.querySelectorAll('.tool[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));setStatus();drawPil();drawPending();}
+$('box').addEventListener('dragstart',e=>e.preventDefault());
+document.querySelectorAll('.tool[data-mode]').forEach(b=>b.onclick=()=>setMode(b.dataset.mode));
+function setShape(sh){defShape=sh;if(selP!=null){let p=byId(selP);snap();p.shape=sh;renderFull();}else setStatus();}
+function girar(){if(selP!=null){let p=byId(selP);if(p.shape=='ret'){snap();p.ori=p.ori=='h'?'v':'h';renderFull();}}}
+function alinhar(silent){if(!silent)snap();pillars.forEach(p=>snapAxis(p,16));for(const bm of beams){if(bm.A.t=='xy'){bm.A.x=snapVX(bm.A.x);bm.A.y=snapHY(bm.A.y);}if(bm.B.t=='xy'){bm.B.x=snapVX(bm.B.x);bm.B.y=snapHY(bm.B.y);}straighten(bm);}if(!silent)renderFull();}
+$('ret').onclick=()=>setShape('ret');$('quad').onclick=()=>setShape('quad');$('girar').onclick=girar;
+$('alinhar').onclick=()=>alinhar();$('renum').onclick=()=>{snap();renumber();renderFull();};
+$('min').onclick=()=>{if(!confirm('Reiniciar com apenas cantos/interseções? (você completa o resto)'))return;snap();pillars=MIN.map((c,i)=>snapAxis({id:i+1,x:c[0],y:c[1],shape:'ret',ori:'h'}));nextId=MIN.length+1;nextBid=1;autobeams();selP=null;selB=null;renderFull();};
+$('auto').onclick=()=>{snap();autobeams();renderFull();};$('undo').onclick=undo;
+$('reset').onclick=()=>{if(!confirm('Restaurar o lançamento inicial? (perde as alterações não salvas)'))return;snap();try{localStorage.removeItem(LSKEY);}catch(e){}pillars=JSON.parse(JSON.stringify(INIT));pillars.forEach(p=>snapAxis(p));nextId=Math.max(0,...pillars.map(p=>p.id))+1;nextBid=1;autobeams();selP=null;selB=null;renderFull();};
+function salvar(){let data={_tipo:'lancamento_caldeira',pillars,beams,nextId,nextBid};let bl=new Blob([JSON.stringify(data)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='lancamento_caldeira.json';a.click();alert('Lançamento SALVO em lancamento_caldeira.json (Downloads).\nDepois use "Editar" para reabrir e continuar.');}
+$('salvar').onclick=salvar;
+$('editar').onclick=()=>$('file').click();
+$('file').onchange=ev=>{let fl=ev.target.files[0];if(!fl)return;let rd=new FileReader();rd.onload=()=>{try{let d=JSON.parse(rd.result);
+ if(d.pillars){snap();pillars=d.pillars;beams=d.beams||[];nextId=d.nextId||(Math.max(0,...pillars.map(p=>p.id))+1);nextBid=d.nextBid||(Math.max(0,...beams.map(b=>b.id||0))+1);selP=null;selB=null;migrateBeams();renderFull();alert('Lançamento carregado! Pode continuar editando.');}
+ else if(d.pilares){snap();
+   pillars=d.pilares.map((q,i)=>({id:i+1,x:Math.round(X0+(+q.x_m||0)*S),y:Math.round(Y0+VH-(+q.y_m||0)*S),shape:q.forma=='quadrado'?'quad':'ret',ori:q.sentido=='vertical'?'v':'h'}));
+   let ep=(mx,my,nm)=>{if(mx!=null&&mx!==undefined)return{t:'xy',x:Math.round(X0+(+mx)*S),y:Math.round(Y0+VH-(+my)*S)};let i=parseInt(String(nm||'').replace('P',''))-1;let pp=pillars[i];return pp?{t:'xy',x:pp.x,y:pp.y}:{t:'xy',x:X0+VW/2,y:Y0+VH/2};};
+   beams=(d.vigas||[]).map((o,i)=>({id:i+1,A:ep(o.x1_m,o.y1_m,o.de),B:ep(o.x2_m,o.y2_m,o.ate)}));
+   nextId=pillars.length+1;nextBid=beams.length+1;selP=null;selB=null;renderFull();alert('Projeto carregado do arquivo de envio! Pode continuar editando.');}
+ else alert('Arquivo não reconhecido. Carregue um lancamento_caldeira.json (Salvar) ou um estrutura_caldeira.json (ENVIAR).');}
+ catch(err){alert('Não consegui ler esse arquivo (JSON inválido).');}};rd.readAsText(fl);ev.target.value='';};
+async function writeFile(){if(!fileHandle)return;try{let w=await fileHandle.createWritable();await w.write(JSON.stringify({_tipo:'lancamento_caldeira',pillars,beams,nextId,nextBid}));await w.close();$('autoind').textContent='🔴 auto-salvo '+new Date().toLocaleTimeString();}catch(e){$('autoind').textContent='⚠ erro ao salvar';}}
+$('autofile').onclick=async()=>{if(fileHandle){fileHandle=null;$('autoind').textContent='auto-arquivo: desligado';return;}if(!window.showSaveFilePicker){alert('Este navegador não deixa gravar em arquivo automaticamente.\nUse o Chrome ou o Edge.\n(O autosave interno do navegador já protege contra queda de energia: reabra o arquivo que ele volta.)');return;}try{fileHandle=await window.showSaveFilePicker({suggestedName:'lancamento_caldeira.json',types:[{description:'Lancamento',accept:{'application/json':['.json']}}]});await writeFile();}catch(e){}};
+function enviar(){let bd=beamData();let w=issues(bd);
+ if(w.length&&!confirm('Nota: '+w.length+' pilar(es) parecem fora de parede.\n\nVocê é o engenheiro — deseja ENVIAR assim mesmo?'))return;
+ cache=loads(bd);let m=S;
+ let data={projeto:"Caldeira",escala_pt_por_m:S,avisos:w,
+  pilares:pillars.map((p,i)=>({pilar:"P"+(i+1),x_m:+((p.x-X0)/m).toFixed(2),y_m:+((Y0+VH-p.y)/m).toFixed(2),forma:p.shape=='quad'?'quadrado':'retangular',sentido:p.shape=='quad'?'-':(p.ori=='v'?'vertical':'horizontal'),carga_kN:+cache.Nt[p.id].toFixed(0),carga_tf:+(cache.Nt[p.id]/9.81).toFixed(1),secao:secao(cache.Nt[p.id],p.shape)})),
+  vigas:bd.map(o=>({de:pilName(o.a),ate:pilName(o.c),x1_m:+((o.a.x-X0)/m).toFixed(2),y1_m:+((Y0+VH-o.a.y)/m).toFixed(2),x2_m:+((o.c.x-X0)/m).toFixed(2),y2_m:+((Y0+VH-o.c.y)/m).toFixed(2),vao_m:+o.L.toFixed(2),aviso:o.L>7})),
+  total_tf:+(Object.values(cache.Nt).reduce((a,b)=>a+b,0)/9.81).toFixed(0)};
+ let bl=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='estrutura_caldeira.json';a.click();
+ alert('Estrutura ENVIADA!\n\nBaixei estrutura_caldeira.json (pasta Downloads).\nMande esse arquivo no chat que eu gero o relatorio completo.');}
+$('send').onclick=enviar;
+window.manterViga=function(bid){let bm=byBid(bid);if(bm){snap();bm.ok=true;renderFull();}};
+window.removerViga=function(bid){snap();beams=beams.filter(b=>b.id!=bid);selB=null;renderFull();};
+window.addEventListener('keydown',e=>{
+ if(e.ctrlKey&&(e.key==='z'||e.key==='Z')){e.preventDefault();undo();return;}
+ if(e.key==='Escape'){vigaStart=null;renderFull();return;}
+ if(e.target.tagName==='INPUT')return;
+ if(e.key.startsWith('Arrow')&&(selP!=null||selB!=null)){e.preventDefault();let st=e.shiftKey?4:1;if(!e.repeat)snap();
+   let dx=(e.key=='ArrowLeft'?-st:e.key=='ArrowRight'?st:0),dy=(e.key=='ArrowUp'?-st:e.key=='ArrowDown'?st:0);
+   if(selP!=null){let p=byId(selP);p.x+=dx;p.y+=dy;}
+   else{let bm=byBid(selB);if(bm)for(const ep of [bm.A,bm.B])if(ep.t=='xy'){ep.x+=dx;ep.y+=dy;}}
+   schedFull();return;}
+ let k=e.key.toLowerCase();
+ if(k==='s')setMode('sel');else if(k==='p')setMode('pilar');else if(k==='v')setMode('viga');else if(k==='e')setMode('excluir');
+ else if(k==='r')setShape('ret');else if(k==='q')setShape('quad');else if(k==='g')girar();
+ else if(e.key==='Delete'||e.key==='Backspace'){if(selP!=null)delPil(selP);else if(selB!=null){snap();beams=beams.filter(b=>b.id!=selB);selB=null;renderFull();}}
+ else if(e.key==='Enter')enviar();});
+(function(){try{let s=localStorage.getItem(LSKEY);if(s){let d=JSON.parse(s);if(d.pillars&&d.pillars.length){pillars=d.pillars;beams=d.beams||[];nextId=d.nextId;nextBid=d.nextBid;migrateBeams();renderFull();return;}}}catch(e){}autobeams();renderFull();})();
+</script></body></html>

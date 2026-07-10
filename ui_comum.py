@@ -680,6 +680,8 @@ def seletor_pagina(atual):
                   "Lajes (maciça e pré-moldada)", "🧱")
     _botao_pagina("previo", atual, "pagina_pilar_previo.py",
                   "Pilares Prévios — casas térreas", "🏠")
+    _botao_pagina("completo", atual, "pagina_projeto_completo.py",
+                  "Projeto Completo — inserir planta e lançar", "📐")
 
 
 def seletor_unidade(key="unidade_forca"):
