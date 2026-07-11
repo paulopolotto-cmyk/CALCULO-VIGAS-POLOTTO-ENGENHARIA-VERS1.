@@ -198,6 +198,21 @@ def tipos_disponiveis():
     return list(ml.CARGAS_USO.keys())
 
 
+def eixos_grade(data, tol=0.15):
+    """Posições x (linhas verticais) e y (horizontais) das vigas — para lançar
+    laje à mão alinhada à estrutura. Junta linhas próximas (mesma parede)."""
+    H, V = _segmentos(data.get("vigas", []))
+
+    def merge(vals):
+        out = []
+        for v in sorted(set(round(x, 2) for x in vals)):
+            if not out or v - out[-1] > tol:
+                out.append(v)
+        return out
+
+    return merge(x for x, _, _ in V), merge(y for y, _, _ in H)
+
+
 def resumo_lajes(lajes):
     """Totais das lajes: aço em barras a comprar (+10%), metros de vigota, área."""
     return dict(

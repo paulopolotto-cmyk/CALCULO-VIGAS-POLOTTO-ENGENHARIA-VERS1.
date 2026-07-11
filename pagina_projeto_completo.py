@@ -273,25 +273,31 @@ else:
         rl = {"aco_barras": 0.0, "vigotas_m": 0.0, "area": 0.0, "falhas": []}
 
     with st.expander("➕ Adicionar laje (onde a detecção não pegou)"):
-        st.caption("Informe os limites do cômodo em metros (os mesmos eixos x/y da "
-                   "planta acima). A laje sai retangular entre esses limites.")
-        a1, a2, a3, a4 = st.columns(4)
-        _x0 = a1.number_input("x de", value=0.0, step=0.1, format="%.2f", key="nl_x0")
-        _x1 = a2.number_input("x até", value=3.0, step=0.1, format="%.2f", key="nl_x1")
-        _y0 = a3.number_input("y de", value=0.0, step=0.1, format="%.2f", key="nl_y0")
-        _y1 = a4.number_input("y até", value=3.0, step=0.1, format="%.2f", key="nl_y1")
-        _tp = st.selectbox("Tipo de uso", cl.tipos_disponiveis(), key="nl_tp")
-        _tl = st.checkbox("Recebe telhado", key="nl_tl")
-        if st.button("Adicionar laje", type="primary"):
-            if abs(_x1 - _x0) < 0.3 or abs(_y1 - _y0) < 0.3:
-                st.warning("Cômodo muito pequeno — confira os limites.")
-            else:
-                ss["laje_mcount"] += 1
-                _nm = f"M{ss['laje_mcount']}"
-                ss["laje_manuais"].append(cl.comodo_manual(_x0, _x1, _y0, _y1, _nm))
-                ss["laje_tipos"][_nm] = _tp
-                ss["laje_telhado"][_nm] = _tl
-                st.rerun()
+        _Xs, _Ys = cl.eixos_grade(ss.pc_data)
+        if len(_Xs) < 2 or len(_Ys) < 2:
+            st.caption("Não há linhas de viga suficientes para lançar laje à mão.")
+        else:
+            st.caption("Escolha os limites da laje pelas **linhas de viga** — ela sai "
+                       "alinhada à estrutura. (Se faltar viga num lado, o ideal é "
+                       "acrescentar a viga no editor; aqui é o jeito rápido.)")
+            a1, a2, a3, a4 = st.columns(4)
+            _x0 = a1.selectbox("x de (m)", _Xs, index=0, key="nlx0")
+            _x1 = a2.selectbox("x até (m)", _Xs, index=min(1, len(_Xs) - 1), key="nlx1")
+            _y0 = a3.selectbox("y de (m)", _Ys, index=0, key="nly0")
+            _y1 = a4.selectbox("y até (m)", _Ys, index=min(1, len(_Ys) - 1), key="nly1")
+            _tp = st.selectbox("Tipo de uso (sobrecarga)", cl.tipos_disponiveis(),
+                               key="nltp")
+            _tl = st.checkbox("Recebe telhado", key="nltl")
+            if st.button("➕ Adicionar esta laje", type="primary"):
+                if abs(_x1 - _x0) < 0.3 or abs(_y1 - _y0) < 0.3:
+                    st.warning("Escolha limites diferentes (x de ≠ x até e y de ≠ y até).")
+                else:
+                    ss["laje_mcount"] += 1
+                    _nm = f"M{ss['laje_mcount']}"
+                    ss["laje_manuais"].append(cl.comodo_manual(_x0, _x1, _y0, _y1, _nm))
+                    ss["laje_tipos"][_nm] = _tp
+                    ss["laje_telhado"][_nm] = _tl
+                    st.rerun()
 
     # ---- vigas de cobertura
     sec(2, "Vigas de cobertura (viga contínua NBR 6118)")
