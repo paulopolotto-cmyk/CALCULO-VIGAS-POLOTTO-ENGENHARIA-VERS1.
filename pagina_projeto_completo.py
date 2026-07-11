@@ -187,6 +187,7 @@ else:
     ss.setdefault("laje_vigota", {})
     ss.setdefault("laje_telhado", {})
     ss.setdefault("laje_mcount", 0)
+    ss.setdefault("laje_flip", 0)
     ss.setdefault("g_telhado", 0.5)
 
     comodos = ([c for c in ss["pc_comodos"] if c["nome"] not in ss["laje_excluidas"]]
@@ -240,10 +241,28 @@ else:
             st.rerun()
         lajes = cl.calcular_lajes(comodos, ss["laje_tipos"], ss["laje_vigota"],
                                   ss["laje_telhado"], g_telhado=ss["g_telhado"])
-        _fl = cl.fig_lajes(ss.pc_data, lajes)
-        if _fl is not None:
-            st.pyplot(_fl, width="stretch")
-            plt.close(_fl)                     # libera memória (evita vazamento)
+        # planta INTERATIVA — clicar numa laje GIRA a direção da vigota
+        _ev = st.plotly_chart(cl.fig_lajes_plotly(ss.pc_data, lajes),
+                              key=f"lajeplot_{ss['laje_flip']}", on_select="rerun",
+                              selection_mode="points",
+                              config={"displayModeBar": False})
+        try:
+            _pts = _ev["selection"]["points"]
+        except Exception:
+            _pts = None
+        if _pts:
+            _nm = _pts[0].get("customdata")
+            if isinstance(_nm, (list, tuple)):
+                _nm = _nm[0] if _nm else None
+            if _nm:
+                _cur = (ss["laje_vigota"].get(_nm)
+                        or next((c["vigota"] for c in comodos if c["nome"] == _nm), "H"))
+                ss["laje_vigota"][_nm] = "V" if _cur == "H" else "H"
+                ss["laje_flip"] += 1
+                st.rerun()
+        st.caption("👆 **Clique numa laje** na planta para **girar a direção** da "
+                   "vigota (a seta muda na hora). O padrão vem no menor vão. "
+                   "🟦 detectada · 🟩 tracejada = lançada à mão.")
         rl = cl.resumo_lajes(lajes)
         st.caption(f"Total: **{rl['area']} m²** de laje · **{rl['vigotas_m']} m** de "
                    f"vigota · aço complementar **{rl['aco_barras']} kg**. "

@@ -259,3 +259,69 @@ def fig_lajes(data, lajes):
                  fontsize=12, fontweight="bold", color="#0f2b4c")
     fig.tight_layout()
     return fig
+
+
+def fig_lajes_plotly(data, lajes):
+    """Planta INTERATIVA (Plotly): clicar numa laje gira a direção da vigota.
+    O ÚNICO trace com pontos é o dos marcadores das lajes (customdata=nome);
+    vigas, direção e pilares são FORMAS — assim o clique cai sempre na laje."""
+    import plotly.graph_objects as go
+    shapes = []
+    for L in lajes:                                    # cômodos (retângulos)
+        c = L["comodo"]
+        manual = c.get("manual")
+        shapes.append(dict(type="rect", x0=c["x0"], y0=c["y0"], x1=c["x1"],
+                           y1=c["y1"], layer="below",
+                           line=dict(color=("#15803d" if manual else "#1d4ed8"),
+                                     width=1.2, dash=("dot" if manual else "solid")),
+                           fillcolor=("rgba(22,163,74,0.10)" if manual
+                                      else "rgba(59,130,246,0.10)")))
+    for v in data.get("vigas", []):                    # vigas (linhas amarelas)
+        shapes.append(dict(type="line", x0=v.get("x1_m"), y0=v.get("y1_m"),
+                           x1=v.get("x2_m"), y1=v.get("y2_m"), layer="below",
+                           line=dict(color="#d98a04", width=4)))
+    for p in data.get("pilares", []):                  # pilares (quadrados)
+        x, y = p.get("x_m"), p.get("y_m")
+        if x is None:
+            continue
+        shapes.append(dict(type="rect", x0=x - 0.16, y0=y - 0.16, x1=x + 0.16,
+                           y1=y + 0.16, fillcolor="#b91c1c", line=dict(width=0),
+                           layer="below"))
+    cxs, cys, txt, cd = [], [], [], []
+    for L in lajes:                                    # setas (direção) + centros
+        c = L["comodo"]
+        m = 0.20 * min(c["Lx"], c["Ly"])
+        if L["vigota"] == "H":
+            shapes.append(dict(type="line", x0=c["x0"] + m, y0=c["cy"],
+                               x1=c["x1"] - m, y1=c["cy"],
+                               line=dict(color="#1d4ed8", width=2.5)))
+            seta = "↔"
+        else:
+            shapes.append(dict(type="line", x0=c["cx"], y0=c["y0"] + m,
+                               x1=c["cx"], y1=c["y1"] - m,
+                               line=dict(color="#1d4ed8", width=2.5)))
+            seta = "↕"
+        cxs.append(c["cx"])
+        cys.append(c["cy"])
+        tel = " · telhado" if L.get("telhado") else ""
+        txt.append(f"<b>{L['nome']}</b> {seta} ({tipo_curto(L['tipo'])})<br>"
+                   f"{c['Lx']}×{c['Ly']} m · h{L['h']}{tel}")
+        cd.append(L["nome"])
+    fig = go.Figure(go.Scatter(
+        x=cxs, y=cys, mode="markers+text", customdata=cd, hovertext=txt,
+        hoverinfo="text", text=txt, textposition="middle center",
+        textfont=dict(size=11, color="#1e3a8a"), name="lajes", showlegend=False,
+        marker=dict(size=30, color="rgba(37,99,235,0.18)",
+                    line=dict(color="#1d4ed8", width=1))))
+    H = max((L["comodo"]["y1"] for L in lajes), default=15)
+    fig.update_layout(shapes=shapes, margin=dict(l=8, r=8, t=54, b=8),
+                      height=int(min(900, max(420, 42 * H))),
+                      plot_bgcolor="white", clickmode="event+select",
+                      dragmode="pan", showlegend=False,
+                      title=dict(text="Clique numa laje para GIRAR a direção da "
+                                 "vigota (seta). O padrão é o menor vão.",
+                                 font=dict(size=13, color="#0f2b4c")))
+    fig.update_yaxes(scaleanchor="x", scaleratio=1, title_text="y (m)",
+                     gridcolor="#eef2f7")
+    fig.update_xaxes(title_text="x (m)", gridcolor="#eef2f7")
+    return fig
