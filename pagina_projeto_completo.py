@@ -31,7 +31,6 @@ ss.setdefault("pc_planta", None)     # planta extraída do PDF (fundo do editor)
 ss.setdefault("pc_data", None)       # estrutura JSON (lançamento salvo)
 ss.setdefault("pc_proj", "projeto")
 ss.setdefault("pc_larg", 15.0)
-ss.setdefault("pc_json_id", None)    # id do último arquivo já processado
 
 
 def _vista(v):
@@ -92,22 +91,26 @@ if ss.pc_vista == "lancar":
     upj = st.file_uploader("Arquivo do editor (estrutura_*.json)",
                            type=["json"], key="pc_json")
     if upj is not None:
-        fid = getattr(upj, "file_id", None) or f"{upj.name}:{upj.size}"
-        if fid != ss.pc_json_id:            # só avança quando for arquivo NOVO
-            try:
-                d = json.loads(upj.getvalue().decode("utf-8"))
-            except Exception as e:
-                st.error(f"Arquivo inválido (não é um JSON): {e}")
-                st.stop()
-            if "pilares" not in d:
-                st.error("Use o arquivo do botão **ENVIAR** (estrutura_*.json).")
-                st.stop()
-            ss.pc_data = d
-            ss.pc_proj = d.get("projeto") or ss.pc_proj
-            ss.pc_json_id = fid
-            for k in ("pdf_completo", "pdf_reduzido"):
-                ss.pop(k, None)
-            _vista("conferir")
+        d = None
+        try:
+            d = json.loads(upj.getvalue().decode("utf-8"))
+        except Exception as e:
+            st.error(f"Arquivo inválido (não é um JSON): {e}")
+        if d is not None and "pilares" not in d:
+            st.error("Esse arquivo não é o do lançamento. Use o arquivo baixado "
+                     "pelo botão **ENVIAR** do editor (estrutura_*.json).")
+            d = None
+        if d is not None:
+            st.success(f"✅ Arquivo lido: **{len(d.get('pilares', []))} pilares** e "
+                       f"**{len(d.get('vigas', []))} trechos de viga**. "
+                       "Clique abaixo para ver a planta e conferir.")
+            if st.button("👁️ Ver a planta numerada para CONFERIR →",
+                         type="primary", width="stretch"):
+                ss.pc_data = d
+                ss.pc_proj = d.get("projeto") or ss.pc_proj
+                for k in ("pdf_completo", "pdf_reduzido", "pc_r"):
+                    ss.pop(k, None)
+                _vista("conferir")
 
 # ============================================================ 2) CONFERIR
 elif ss.pc_vista == "conferir":
@@ -142,11 +145,10 @@ else:
     if st.button("↩️ Voltar para conferir / editar a planta"):
         _vista("conferir")
 
-    if ss.get("pc_r") is None or ss.get("pc_r_id") != ss.pc_json_id:
+    if ss.get("pc_r") is None:
         with st.spinner("Rodando o cálculo NBR 6118 de todas as vigas, baldrames "
                         "e pilares…"):
             ss["pc_r"] = cp.calcular_projeto(ss.pc_data)
-            ss["pc_r_id"] = ss.pc_json_id
     r = ss["pc_r"]
 
     st.info("**Materiais adotados:** concreto **C25** (fck = 25 MPa) · aço "
