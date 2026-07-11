@@ -169,24 +169,24 @@ def fig_planta(r):
         return None
     W = max(1.0, max(xs) - min(xs))
     H = max(1.0, max(ys) - min(ys))
-    fig, ax = plt.subplots(figsize=(min(10.5, max(6.0, 0.62 * W + 1.5)),
-                                    min(13.5, max(5.0, 0.62 * H + 1.5))), dpi=150)
+    fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2.0)),
+                                    min(16.0, max(6.0, 0.7 * H + 2.0))), dpi=150)
     fig.patch.set_facecolor("white")
     for x1, y1, x2, y2, _ in seg:
-        ax.plot([x1, x2], [y1, y2], color=AMBAR, lw=3.2,
+        ax.plot([x1, x2], [y1, y2], color=AMBAR, lw=3.6,
                 solid_capstyle="round", zorder=2)
-    off = max(0.3, 0.025 * max(W, H))
+    off = max(0.45, 0.03 * max(W, H))
     for x1, y1, x2, y2, nome in seg:
         xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
-        if abs(x2 - x1) >= abs(y2 - y1):       # viga horizontal: rótulo acima
+        if abs(x2 - x1) >= abs(y2 - y1):       # viga horizontal: rótulo fora da linha
             ym -= off
-        else:                                   # viga vertical: rótulo à esquerda
+        else:                                   # viga vertical: rótulo ao lado
             xm -= off
-        ax.text(xm, ym, nome, fontsize=6.0, color="#78350F", fontweight="bold",
+        ax.text(xm, ym, nome, fontsize=11, color="#78350F", fontweight="bold",
                 ha="center", va="center", zorder=5,
-                bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
-                          alpha=0.85))
-    s = max(0.22, 0.02 * max(W, H))
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none",
+                          alpha=0.9))
+    s = max(0.28, 0.022 * max(W, H))
     for p in pilares:
         x, y = p.get("x_m"), p.get("y_m")
         if x is None:
@@ -194,16 +194,16 @@ def fig_planta(r):
         ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s,
                                    facecolor=VERMELHO, edgecolor="white",
                                    lw=0.8, zorder=6))
-        ax.text(x + s * 0.75, y, p["pilar"], fontsize=5.6, color=NAVY,
+        ax.text(x + s * 0.8, y, p["pilar"], fontsize=10.5, color=NAVY,
                 fontweight="bold", ha="left", va="center", zorder=7)
-    ax.set_aspect("equal")
-    ax.invert_yaxis()                      # o y do editor cresce para baixo
+    ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima como
+    #                                        no editor (mesma orientação do desenho)
     ax.set_xlabel("x (m)", fontsize=9)
     ax.set_ylabel("y (m)", fontsize=9)
     ax.tick_params(labelsize=8)
     ax.grid(alpha=0.15)
-    ax.set_title("PLANTA DE FORMA — vigas/baldrames (amarelo) e pilares "
-                 "(vermelho)", fontsize=11, fontweight="bold", color=NAVY)
+    ax.set_title("PLANTA DE FORMA — VIGAS/BALDRAMES (amarelo) e PILARES "
+                 "(vermelho)", fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
     return fig
 
