@@ -61,8 +61,8 @@ th{background:var(--soft);color:var(--azul);font-weight:800;position:sticky;top:
    <svg id="ov" viewBox="__X0__ __Y0__ __VW__ __VH__" preserveAspectRatio="none">
     <g id="axes"></g><g id="beams"></g><g id="sup"></g><g id="lbl"></g><g id="pil"></g><g id="pend"></g></svg></div>
   <div class="status" id="status"></div>
-  <div class="legc"><span><i style="background:#EAB308"></i>viga</span>
-   <span><i style="background:#16A34A"></i>movendo (verde)</span><span style="color:#B91C1C">&#9632; pilar fixo</span></div>
+  <div class="legc"><span><i style="background:#EAB308"></i>viga fixa (amarela)</span>
+   <span><i style="background:#16A34A"></i>selecionada / movendo (verde)</span><span style="color:#B91C1C">&#9632; pilar fixo</span></div>
  </div>
  <div class="right">
   <div class="card"><h2>Resumo</h2><div class="metrics">
@@ -76,7 +76,7 @@ th{background:var(--soft);color:var(--azul);font-weight:800;position:sticky;top:
    <p class="hint">Retangular 14&times;30 cresce p/ 14&times;40&hellip; se a carga passar (<b class="big">&acirc;mbar</b>). Quadrado 20&times;20&hellip; (garagem na divisa).</p></div>
   <div class="card"><h2>Atalhos</h2><div class="leg">
    <b>S</b> mover &middot; <b>P</b> +pilar &middot; <b>V</b> +viga &middot; <b>E</b> excluir &middot; <b>R/Q</b> retang./quadr. &middot; <b>G</b> girar<br>
-   <b>Setas</b> ajuste fino (Shift = passo maior) &middot; <b>Ctrl+Z</b> desfazer &middot; <b>Del</b> apaga &middot; <b>Enter</b> enviar
+   <b>Setas</b> ajuste fino (Shift = passo maior) &middot; <b>Ctrl+Z</b> desfazer &middot; <b>Del</b> apaga &middot; <b>Esc</b> fixa a viga (fica amarela) &middot; <b>Enter</b> enviar
    <div class="hint"><b>Alinhar</b> encaixa pilares nas paredes e endireita as vigas. <b>Renumerar</b> reordena P1&hellip;Pn. <b>In&iacute;cio m&iacute;n.</b> come&ccedil;a s&oacute; nos cantos/interse&ccedil;&otilde;es. <b>+Viga</b>: clique em pilares ou em <b>qualquer ponto</b> para marcar a viga onde quiser (Esc para parar) &mdash; sem regra. Para mover um <b>pilar</b>: clique nele e arraste, ou use as <b>setas</b> (n&atilde;o precisa apagar) &mdash; vale nos modos <b>Mover</b> e <b>+Pilar</b>. Para mover uma <b>viga</b>: clique nela (fica azul-clara, com al&ccedil;as) e arraste pelo <b>meio</b> ou pela <b>ponta</b>, ou use as <b>setas</b>. Nada trava.</div></div></div>
  </div>
 </div>
@@ -143,7 +143,7 @@ function panel(bd){let vmax=bd.length?Math.max(...bd.map(o=>o.L)):0;lastIssues=i
  npil.textContent=pillars.length;stot.textContent=cache?(Object.values(cache.Nt).reduce((a,b)=>a+b,0)/9.81).toFixed(0):'0';vmaxEl.textContent=vmax.toFixed(2);nav.textContent=lastIssues.length;
  wbox.innerHTML=lastIssues.length?lastIssues.slice(0,8).map(it=>{let bb=it.bid!=null?' <button class="wb k" onclick="manterViga('+it.bid+')">manter</button><button class="wb r" onclick="removerViga('+it.bid+')">remover</button>':'';return '<div class="warn">&#9888; '+it.msg+bb+'</div>';}).join('')+(lastIssues.length>8?`<div class="hint">&hellip;+${lastIssues.length-8} aviso(s)</div>`:''):'<div class="ok">&#10004; Tudo alinhado, sem avisos.</div>';
  if(cache)tbody.innerHTML=pillars.map((p,i)=>{let sc=secao(cache.Nt[p.id],p.shape);let base=p.shape=='quad'?"20x20":"14x30";return `<tr><td>P${i+1}</td><td><b>${cache.Nt[p.id].toFixed(0)}</b></td><td>${(cache.Nt[p.id]/9.81).toFixed(1)}</td><td class="${sc!==base?'big':''}">${sc}</td></tr>`;}).join('');}
-function setStatus(){let m={sel:'Mover/Selecionar',pilar:'+Pilar (clique na parede)',viga:'+Viga: clique numa VIGA = editar/mover; em pilar/vazio = desenhar nova (Esc para)',excluir:'Excluir (clique pilar/viga)'}[mode];statusEl.innerHTML='Modo: <b>'+m+'</b> &middot; padr&atilde;o: <b>'+(defShape=='quad'?'quadrado':'retangular')+'</b>';}
+function setStatus(){let m={sel:'Mover/Selecionar',pilar:'+Pilar (clique na parede)',viga:'+Viga: clique numa VIGA = editar/mover; em pilar/vazio = desenhar nova &middot; Esc = fixa a viga (amarela)',excluir:'Excluir (clique pilar/viga)'}[mode];statusEl.innerHTML='Modo: <b>'+m+'</b> &middot; padr&atilde;o: <b>'+(defShape=='quad'?'quadrado':'retangular')+'</b>';}
 function autoSaveFile(){if(!fileHandle)return;clearTimeout(fsTimer);fsTimer=setTimeout(writeFile,500);}
 function renderFull(){prune();let bd=beamData();cache=loads(bd);drawAxes();drawBeams(bd);drawPil();drawPending();panel(bd);setStatus();try{localStorage.setItem(LSKEY,JSON.stringify({pillars,beams,nextId,nextBid}));}catch(e){}autoSaveFile();}
 function renderLive(){let bd=beamData();drawBeams(bd);drawPil();drawPending();vmaxEl.textContent=(bd.length?Math.max(...bd.map(o=>o.L)):0).toFixed(2);}
@@ -231,7 +231,7 @@ window.manterViga=function(bid){let bm=byBid(bid);if(bm){snap();bm.ok=true;rende
 window.removerViga=function(bid){snap();beams=beams.filter(b=>b.id!=bid);selB=null;renderFull();};
 window.addEventListener('keydown',e=>{
  if(e.ctrlKey&&(e.key==='z'||e.key==='Z')){e.preventDefault();undo();return;}
- if(e.key==='Escape'){vigaStart=null;renderFull();return;}
+ if(e.key==='Escape'){vigaStart=null;selB=null;selP=null;renderFull();return;}
  if(e.target.tagName==='INPUT')return;
  if(e.key.startsWith('Arrow')&&(selP!=null||selB!=null)){e.preventDefault();let st=e.shiftKey?4:1;if(!e.repeat)snap();
    let dx=(e.key=='ArrowLeft'?-st:e.key=='ArrowRight'?st:0),dy=(e.key=='ArrowUp'?-st:e.key=='ArrowDown'?st:0);
