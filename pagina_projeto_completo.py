@@ -22,6 +22,7 @@ from ui_comum import aplicar_estilo, header, sec, seletor_pagina, tabela
 import editor_lancamento as el
 import calc_projeto as cp
 import calc_laje_projeto as cl
+import fechamento_auto as fa
 import relatorio_pdf as rpdf
 
 aplicar_estilo()
@@ -176,6 +177,74 @@ elif ss.pc_vista == "conferir":
     else:
         st.success("✅ Estrutura fechada: todas as áreas têm viga em volta e sem vão "
                    "excessivo para pré-moldada.")
+
+    # ---- fechamento AUTOMÁTICO das vigas (sugestão do programa)
+    sec(3, "Fechar os vãos automaticamente (sugestão — você aceita ou não)")
+    st.caption("O programa olha o seu projeto e sugere **vigas a 90°** (verde) para "
+               "**fechar** as áreas abertas e **dividir** os painéis grandes, e depois "
+               "**renumera os pilares**. Você **clica em cada viga verde** para tirá-la "
+               "ou pô-la de volta — e ajusta o resto no **Editar**.")
+    cfa1, cfa2 = st.columns(2)
+    _lv = cfa1.number_input("Vão máx. da vigota (menor lado da laje) — m",
+                            min_value=2.0, max_value=12.0,
+                            value=float(ss.get("fecha_lv", fa.LIM_VIGOTA)), step=0.5)
+    _lm = cfa2.number_input("Pôr viga no meio quando o outro lado passa de — m",
+                            min_value=2.0, max_value=12.0,
+                            value=float(ss.get("fecha_lm", fa.LIM_MEIO)), step=0.5)
+    if st.button("🔧 Sugerir o fechamento das vigas", width="stretch"):
+        ss["fecha_lv"], ss["fecha_lm"] = _lv, _lm
+        ss["fecha_novas"] = fa.fechar_vaos_auto(ss.pc_data, lim_vigota=_lv,
+                                                lim_meio=_lm)
+        ss["fecha_ok"] = set(range(len(ss["fecha_novas"])))
+        ss["fecha_plot"] = ss.get("fecha_plot", 0) + 1
+        st.rerun()
+
+    _novas = ss.get("fecha_novas")
+    if _novas is not None:
+        if not _novas:
+            st.success("👍 Nada a fechar — a estrutura já está fechada e sem vão "
+                       "grande demais para a pré-moldada.")
+        else:
+            ss.setdefault("fecha_ok", set(range(len(_novas))))
+            ss.setdefault("fecha_plot", 0)
+            _nf = sum(1 for n in _novas if n["motivo"] == "fechar")
+            st.caption(f"Sugeri **{len(_novas)} vigas**: **{_nf}** para fechar vão e "
+                       f"**{len(_novas) - _nf}** para dividir painel grande. "
+                       "🟢 verde = **vai entrar** · cinza pontilhada = recusada. "
+                       "👆 **clique na viga** para trocar.")
+            _evf = st.plotly_chart(
+                fa.fig_fechamento_plotly(ss.pc_data, _novas, ss["fecha_ok"]),
+                key=f"fechaplot_{ss['fecha_plot']}", on_select="rerun",
+                selection_mode="points", config={"displayModeBar": False})
+            try:
+                _ptsf = _evf["selection"]["points"]
+            except Exception:
+                _ptsf = None
+            if _ptsf:
+                _idx = _ptsf[0].get("customdata")
+                if isinstance(_idx, (list, tuple)):
+                    _idx = _idx[0] if _idx else None
+                if _idx is not None:
+                    _idx = int(_idx)
+                    if _idx in ss["fecha_ok"]:
+                        ss["fecha_ok"].discard(_idx)
+                    else:
+                        ss["fecha_ok"].add(_idx)
+                    ss["fecha_plot"] += 1
+                    st.rerun()
+            _nok = len(ss["fecha_ok"])
+            if st.button(f"✅ Aplicar as {_nok} viga(s) aceita(s) e renumerar os "
+                         "pilares", type="primary", width="stretch"):
+                _aceitas = [_novas[i] for i in sorted(ss["fecha_ok"])]
+                ss.pc_data = fa.aplicar_fechamento(ss.pc_data, _aceitas)
+                for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos",
+                          "laje_tipos", "laje_vigota", "laje_telhado",
+                          "laje_manuais", "laje_excluidas", "laje_mcount",
+                          "pdf_completo", "pdf_reduzido"):
+                    ss.pop(k, None)
+                st.success("Vigas aplicadas e pilares renumerados! Veja a planta "
+                           "atualizada no topo.")
+                _vista("conferir")
 
     st.write("")
     b1, b2 = st.columns(2)

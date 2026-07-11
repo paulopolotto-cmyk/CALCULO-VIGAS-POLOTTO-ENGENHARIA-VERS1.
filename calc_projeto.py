@@ -36,6 +36,8 @@ def _trib(pos, arr):
 
 
 def _peso(res):
+    if not res:                       # viga que não pôde ser detalhada (vão nulo)
+        return None
     q = res.get("quantitativo")
     return round(q["peso_total"], 1) if q and q.get("peso_total") else None
 
