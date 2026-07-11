@@ -39,16 +39,22 @@ def _vista(v):
 
 
 def _stepper():
+    """Barra de etapas CLICÁVEL — clique em '1 · Lançar' para voltar ao editor."""
     atual = ss.pc_vista
+    tem_dados = ss.get("pc_data") is not None
     cols = st.columns(3)
     for col, (v, txt) in zip(cols, [("lancar", "1 · Lançar"),
                                     ("conferir", "2 · Conferir"),
                                     ("calcular", "3 · Calcular")]):
-        cor = "#0f2b4c" if v == atual else "#94a3b8"
-        col.markdown(f"<div style='text-align:center;font-weight:800;color:{cor}'>"
-                     f"{'🔵' if v == atual else '⚪'} {txt}</div>",
-                     unsafe_allow_html=True)
-    st.write("")
+        with col:
+            rotulo = ("🔵 " if v == atual else "") + txt
+            if st.button(rotulo, key=f"step_{v}", width="stretch",
+                         type="primary" if v == atual else "secondary",
+                         disabled=(v != "lancar" and not tem_dados)):
+                if v != atual:
+                    _vista(v)
+    st.caption("↑ Clique em **1 · Lançar** para voltar ao editor e mexer nas "
+               "vigas/pilares.")
 
 
 _stepper()
