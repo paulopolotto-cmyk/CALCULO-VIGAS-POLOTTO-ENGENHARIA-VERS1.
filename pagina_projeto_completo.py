@@ -86,9 +86,18 @@ if ss.pc_vista == "lancar":
         lskey = "lanc_" + "".join(c for c in ss.pc_proj if c.isalnum())[:20]
         html = el.build_editor(d, S, proj=ss.pc_proj, lskey=lskey or "lanc_proj")
         components.html(html, height=820, scrolling=True)
+    elif ss.pc_data is not None:
+        st.success(f"✏️ Editando o seu projeto — **{len(ss.pc_data.get('pilares', []))} "
+                   f"pilares** e **{len(ss.pc_data.get('vigas', []))} vigas** já "
+                   "carregados. Fundo em branco; para ver a planta da casa atrás, "
+                   "suba o PDF acima.")
+        html = el.build_editor_from_data(ss.pc_data)
+        components.html(html, height=820, scrolling=True)
+        st.caption("Complete/ajuste as vigas e pilares e clique **ENVIAR** (baixa o "
+                   "arquivo). Depois suba o arquivo **abaixo** para conferir de novo.")
     else:
-        st.info("Suba o PDF para abrir o editor. Se já tem um desenho salvo, "
-                "pode subir direto o arquivo abaixo.")
+        st.info("Para desenhar do zero, suba o **PDF** acima. Se já tem o arquivo do "
+                "projeto salvo, suba ele **abaixo** — dá para editar mesmo sem o PDF.")
 
     sec(2, "Salvou? Suba o arquivo para CONFERIR a planta")
     st.caption("No editor, clique **ENVIAR** (baixa o `estrutura_*.json`). Depois "

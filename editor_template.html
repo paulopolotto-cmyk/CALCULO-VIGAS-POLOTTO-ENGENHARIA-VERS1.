@@ -90,7 +90,7 @@ const $=id=>document.getElementById(id);
 const svg=$('ov'),gA=$('axes'),gB=$('beams'),gS=$('sup'),gL=$('lbl'),gP=$('pil'),gPend=$('pend');
 const byId=id=>pillars.find(p=>p.id==id),byBid=b=>beams.find(x=>x.id==b);
 const inpool=(x,y)=>x>POOL[0]&&x<POOL[2]&&y>POOL[1]&&y<POOL[3];
-const dvx=x=>Math.min(...VX.map(a=>Math.abs(a-x))),dhy=y=>Math.min(...HY.map(a=>Math.abs(a-y)));
+const dvx=x=>VX.length?Math.min(...VX.map(a=>Math.abs(a-x))):0,dhy=y=>HY.length?Math.min(...HY.map(a=>Math.abs(a-y))):0;
 function snapVX(x){let b=x,bt=20;for(const a of VX){let d=Math.abs(a-x);if(d<bt){bt=d;b=a;}}return b;}
 function snapHY(y){let b=y,bt=20;for(const a of HY){let d=Math.abs(a-y);if(d<bt){bt=d;b=a;}}return b;}
 function snapVXt(x,t){let b=x,bt=t;for(const a of VX){let d=Math.abs(a-x);if(d<bt){bt=d;b=a;}}return b;}
@@ -243,5 +243,15 @@ window.addEventListener('keydown',e=>{
  else if(k==='r')setShape('ret');else if(k==='q')setShape('quad');else if(k==='g')girar();
  else if(e.key==='Delete'||e.key==='Backspace'){if(selP!=null)delPil(selP);else if(selB!=null){snap();beams=beams.filter(b=>b.id!=selB);selB=null;renderFull();}}
  else if(e.key==='Enter')enviar();});
-(function(){try{let s=localStorage.getItem(LSKEY);if(s){let d=JSON.parse(s);if(d.pillars&&d.pillars.length){pillars=d.pillars;beams=d.beams||[];nextId=d.nextId;nextBid=d.nextBid;migrateBeams();renderFull();return;}}}catch(e){}autobeams();renderFull();})();
+const LOADDATA=__LOADDATA__;
+(function(){
+ // 1) edições em andamento (localStorage desta sessão) têm prioridade
+ try{let s=localStorage.getItem(LSKEY);if(s){let d=JSON.parse(s);if(d.pillars&&d.pillars.length){pillars=d.pillars;beams=d.beams||[];nextId=d.nextId;nextBid=d.nextBid;migrateBeams();renderFull();return;}}}catch(e){}
+ // 2) senão, carrega o arquivo do projeto injetado (Editar sem PDF)
+ if(LOADDATA&&LOADDATA.pilares){
+   pillars=LOADDATA.pilares.map((q,i)=>({id:i+1,x:Math.round(X0+(+q.x_m||0)*S),y:Math.round(Y0+VH-(+q.y_m||0)*S),shape:q.forma=='quadrado'?'quad':'ret',ori:q.sentido=='vertical'?'v':'h'}));
+   let ep=(mx,my,nm)=>{if(mx!=null&&mx!==undefined)return{t:'xy',x:Math.round(X0+(+mx)*S),y:Math.round(Y0+VH-(+my)*S)};let i=parseInt(String(nm||'').replace('P',''))-1;let pp=pillars[i];return pp?{t:'xy',x:pp.x,y:pp.y}:{t:'xy',x:X0+VW/2,y:Y0+VH/2};};
+   beams=(LOADDATA.vigas||[]).map((o,i)=>({id:i+1,A:ep(o.x1_m,o.y1_m,o.de),B:ep(o.x2_m,o.y2_m,o.ate)}));
+   nextId=pillars.length+1;nextBid=beams.length+1;renderFull();return;}
+ autobeams();renderFull();})();
 </script></body></html>

@@ -3,10 +3,22 @@
 agrupamento de vigas continuas. NAO altera os modulos aprovados (Vigas/Pilares/
 Lajes/Pilares Previos); e um modulo NOVO usado so pela pagina 'Projeto Completo'.
 """
-import os, io, base64, json
+import os, io, base64, json, zlib, struct
 
 _DIR = os.path.dirname(os.path.abspath(__file__))
 _TEMPLATE = os.path.join(_DIR, "editor_template.html")
+
+
+def _png_branco():
+    """Devolve um data-uri de 1x1 pixel branco (fundo do editor sem PDF)."""
+    def _chunk(typ, data):
+        c = typ + data
+        return struct.pack(">I", len(data)) + c + struct.pack(">I", zlib.crc32(c) & 0xffffffff)
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = struct.pack(">IIBBBBB", 1, 1, 8, 6, 0, 0, 0)     # 1x1 RGBA 8 bits
+    idat = zlib.compress(b"\x00\xff\xff\xff\xff")            # filtro 0 + branco
+    png = sig + _chunk(b"IHDR", ihdr) + _chunk(b"IDAT", idat) + _chunk(b"IEND", b"")
+    return "data:image/png;base64," + base64.b64encode(png).decode()
 
 
 # ---------------------------------------------------------------- leitura do PDF
@@ -70,7 +82,8 @@ def estimar_escala(dados, largura_m):
 
 
 # ---------------------------------------------------------------- monta o editor
-def build_editor(dados, S, proj="Projeto", pillars=None, mins=None, lskey="lanc_proj"):
+def build_editor(dados, S, proj="Projeto", pillars=None, mins=None,
+                 lskey="lanc_proj", loaddata=None):
     tpl = open(_TEMPLATE, encoding="utf-8").read()
     rep = {
         "__IMG__": dados["img"],
@@ -82,10 +95,37 @@ def build_editor(dados, S, proj="Projeto", pillars=None, mins=None, lskey="lanc_
         "__VW__": str(dados["VW"]), "__VH__": str(dados["VH"]),
         "__S__": str(S), "__POOL__": "[0,0,0,0]",
         "__LSKEY__": lskey, "__PROJ__": proj,
+        "__LOADDATA__": json.dumps(loaddata) if loaddata else "null",
     }
     for k, v in rep.items():
         tpl = tpl.replace(k, v)
     return tpl
+
+
+def build_editor_from_data(data, margem_m=1.0, lskey=None):
+    """Monta o editor A PARTIR do estrutura_*.json (sem precisar do PDF): fundo
+    em branco dimensionado pela própria estrutura, com os pilares e vigas do
+    arquivo já carregados. Permite EDITAR o projeto mesmo depois de fechar a
+    página (o arquivo é a fonte da verdade)."""
+    S = float(data.get("escala_pt_por_m") or 39.0)
+    pil = data.get("pilares", [])
+    vg = data.get("vigas", [])
+    xs = [p.get("x_m", 0) or 0 for p in pil] + \
+         [v.get(k, 0) or 0 for v in vg for k in ("x1_m", "x2_m")]
+    ys = [p.get("y_m", 0) or 0 for p in pil] + \
+         [v.get(k, 0) or 0 for v in vg for k in ("y1_m", "y2_m")]
+    xmax = max(xs) if xs else 15.0
+    ymax = max(ys) if ys else 15.0
+    VW = round((xmax + 2 * margem_m) * S, 1)
+    VH = round((ymax + 2 * margem_m) * S, 1)
+    dados = dict(img=_png_branco(), VX=[], HY=[], X0=0.0, Y0=0.0,
+                 VW=VW, VH=VH, page_pt=(VW, VH))
+    proj = data.get("projeto") or "Projeto"
+    if lskey is None:                       # chave por conteúdo: arquivo novo
+        import hashlib                       # -> recarrega; mesmo arquivo -> mantém
+        h = hashlib.md5(json.dumps(data, sort_keys=True).encode()).hexdigest()[:8]
+        lskey = "lancd_" + h
+    return build_editor(dados, S, proj=proj, lskey=lskey, loaddata=data)
 
 
 # ---------------------------------------------------- vigas continuas (do JSON)
