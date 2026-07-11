@@ -94,6 +94,17 @@ def _mmax(res):
     return round(max(ms + [0.0]), 1)
 
 
+def planta_do_json(data):
+    """Geometria da planta (croqui) direto do JSON, SEM rodar o cálculo — para
+    a tela de conferência. Agrupa as vigas contínuas e nomeia VH/VV como no
+    detalhamento; devolve no mesmo formato que `fig_planta` consome."""
+    linhas = agrupar_vigas_continuas(data.get("vigas", []))
+    vigas = [dict(nome=f"{'VH' if l['dir'] == 'H' else 'VV'}{i+1}", dir=l["dir"],
+                  pos=l["pos"], ini=l["ini"], fim=l["fim"])
+             for i, l in enumerate(linhas)]
+    return dict(vigas=vigas, pilares=data.get("pilares", []))
+
+
 def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     """Roda o projeto inteiro a partir do JSON do editor."""
     vigas = data.get("vigas", [])
