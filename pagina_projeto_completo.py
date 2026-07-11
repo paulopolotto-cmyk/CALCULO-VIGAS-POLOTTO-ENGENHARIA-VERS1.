@@ -127,6 +127,7 @@ if ss.pc_vista == "lancar":
             if st.button("👁️ Ver a planta numerada para CONFERIR →",
                          type="primary", width="stretch"):
                 d_limpo, _stats = fa.limpar_lancamento(d)   # endireita + tira dup.
+                d_limpo = fa.renumerar_pilares(d_limpo)     # P1..Pn profissional
                 ss.pc_data = d_limpo
                 ss["pc_limpeza"] = _stats
                 ss.pc_proj = d.get("projeto") or ss.pc_proj

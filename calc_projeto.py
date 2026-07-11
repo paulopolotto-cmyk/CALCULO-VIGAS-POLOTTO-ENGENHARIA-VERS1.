@@ -96,12 +96,30 @@ def _mmax(res):
     return round(max(ms + [0.0]), 1)
 
 
+def _nomear_linhas(linhas):
+    """Numeração PROFISSIONAL das vigas contínuas: horizontais VH de cima→baixo
+    (maior y = VH1) e verticais VV de esq→dir (menor x = VV1), cada família
+    reiniciando em 1. Devolve (nomes_viga, nomes_baldrame) — dicts índice→nome."""
+    H = sorted((k for k, l in enumerate(linhas) if l["dir"] == "H"),
+               key=lambda k: -linhas[k]["pos"])
+    V = sorted((k for k, l in enumerate(linhas) if l["dir"] == "V"),
+               key=lambda k: linhas[k]["pos"])
+    nomes = {}
+    for n, k in enumerate(H, 1):
+        nomes[k] = f"VH{n}"
+    for n, k in enumerate(V, 1):
+        nomes[k] = f"VV{n}"
+    bnomes = {k: f"B{n}" for n, k in enumerate(H + V, 1)}
+    return nomes, bnomes
+
+
 def planta_do_json(data):
     """Geometria da planta (croqui) direto do JSON, SEM rodar o cálculo — para
     a tela de conferência. Agrupa as vigas contínuas e nomeia VH/VV como no
     detalhamento; devolve no mesmo formato que `fig_planta` consome."""
     linhas = agrupar_vigas_continuas(data.get("vigas", []))
-    vigas = [dict(nome=f"{'VH' if l['dir'] == 'H' else 'VV'}{i+1}", dir=l["dir"],
+    nomes, _ = _nomear_linhas(linhas)
+    vigas = [dict(nome=nomes[i], dir=l["dir"],
                   pos=l["pos"], ini=l["ini"], fim=l["fim"])
              for i, l in enumerate(linhas)]
     return dict(vigas=vigas, pilares=data.get("pilares", []))
@@ -112,6 +130,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     vigas = data.get("vigas", [])
     pilares = data.get("pilares", [])
     linhas = agrupar_vigas_continuas(vigas)
+    nomes, bnomes = _nomear_linhas(linhas)
     posH = sorted(set(l["pos"] for l in linhas if l["dir"] == "H"))
     posV = sorted(set(l["pos"] for l in linhas if l["dir"] == "V"))
     # direção principal (mais linhas = onde as vigotas se apoiam) recebe a laje;
@@ -123,7 +142,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     for i, l in enumerate(linhas):
         arr = posH if l["dir"] == "H" else posV
         w = round(q_cob * _trib(l["pos"], arr), 2) if l["dir"] == principal else 0.0
-        nome = f"{'VH' if l['dir'] == 'H' else 'VV'}{i+1}"
+        nome = nomes[i]
         res, h = _detalhar_viga(nome, l["vaos"], w)
         vigas_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
                               comp=l["comp"], vaos=l["vaos"], w=w, secao=f"{BW}x{h}",
@@ -134,7 +153,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     # ---- baldrames (mesmas linhas, carga de parede)
     baldr_det = []
     for i, l in enumerate(linhas):
-        nome = f"B{i+1}"
+        nome = bnomes[i]
         res, h = _detalhar_viga(nome, l["vaos"], wall)
         baldr_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
                               comp=l["comp"], vaos=l["vaos"], w=wall, secao=f"{BW}x{h}",
@@ -157,6 +176,13 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
                                      if opt else "—"),
                             peso=round(peso, 1), falha=opt is None,
                             res=rp, opt=opt))
+
+    # ---- ordena as listas na sequência dos nomes (tabelas em ordem)
+    def _num(n):
+        return int("".join(c for c in n if c.isdigit()) or 0)
+    vigas_det.sort(key=lambda v: (0 if v["nome"].startswith("VH") else 1, _num(v["nome"])))
+    baldr_det.sort(key=lambda b_: _num(b_["nome"]))
+    pil_det.sort(key=lambda p: _num(p["pilar"]))
 
     # ---- quantitativo de aço (a comprar) por etapa
     aco_vigas = round(sum(v["peso"] for v in vigas_det if v["peso"]) * 1.10, 1)

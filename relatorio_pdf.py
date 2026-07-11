@@ -240,7 +240,12 @@ def _mem_viga(v):
     L.append("")
     L.append("ESTRIBOS (2 ramos, CA-50A ou CA-60A):")
     for i, e in enumerate(res["estribos"]):
-        L.append(f"  Vão {i+1}: {e['texto']}  (Vsd={e['Vsd']:.1f} kN)")
+        if e.get("texto"):
+            L.append(f"  Vão {i+1}: {e['texto']}  (Vsd={e.get('Vsd', 0):.1f} kN)")
+        else:
+            L.append(f"  Vão {i+1}: SEÇÃO INSUFICIENTE na biela — Vsd="
+                     f"{e.get('Vsd', 0):.1f} > Vrd2={e.get('Vrd2', 0):.1f} kN "
+                     "(aumentar a seção)")
     if res.get("pele"):
         L.append(f"ARMADURA DE PELE: {res['pele']['texto']}")
     q = res.get("quantitativo")
@@ -332,7 +337,11 @@ def _mem_viga_red(v, nomes=None):
     L.append("")
     L.append("ESTRIBOS (2 ramos, CA-50A ou CA-60A):")
     for i, e in enumerate(res["estribos"]):
-        L.append(f"  Vão {i+1}: {e['texto']}")
+        if e.get("texto"):
+            L.append(f"  Vão {i+1}: {e['texto']}")
+        else:
+            L.append(f"  Vão {i+1}: SEÇÃO INSUFICIENTE na biela "
+                     f"(Vsd={e.get('Vsd', 0):.1f} > Vrd2={e.get('Vrd2', 0):.1f} kN)")
     q = res.get("quantitativo")
     if q:
         L.append("")

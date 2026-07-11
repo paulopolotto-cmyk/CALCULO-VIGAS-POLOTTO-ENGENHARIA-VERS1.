@@ -126,10 +126,19 @@ function issues(bd){let w=[];
  pillars.forEach((p,i)=>{if(dvx(p.x)>18&&dhy(p.y)>18)w.push({msg:'P'+(i+1)+' parece fora de parede'});});
  return w;}
 function drawAxes(){gA.innerHTML=VX.map(x=>`<line x1="${x}" y1="${Y0}" x2="${x}" y2="${Y0+VH}" stroke="#93C5FD" stroke-width="0.5" stroke-dasharray="4 5" opacity="0.3"/>`).join('')+HY.map(y=>`<line x1="${X0}" y1="${y}" x2="${X0+VW}" y2="${y}" stroke="#93C5FD" stroke-width="0.5" stroke-dasharray="4 5" opacity="0.3"/>`).join('');}
+function beamNames(bd){
+ let Hs=[],Vs=[];
+ for(const o of bd){let dx=Math.abs(o.a.x-o.c.x),dy=Math.abs(o.a.y-o.c.y);
+   if(dx>=dy)Hs.push({id:o.bm.id,pos:(o.a.y+o.c.y)/2});else Vs.push({id:o.bm.id,pos:(o.a.x+o.c.x)/2});}
+ function grp(arr){arr.sort((p,q)=>p.pos-q.pos);let L=[];for(const it of arr){let g=L.find(z=>Math.abs(z.pos-it.pos)<=9);if(!g){g={pos:it.pos,ids:[]};L.push(g);}g.ids.push(it.id);}return L;}
+ let nm={};grp(Hs).forEach((L,i)=>L.ids.forEach(id=>nm[id]='VH'+(i+1)));grp(Vs).forEach((L,i)=>L.ids.forEach(id=>nm[id]='VV'+(i+1)));return nm;}
 function drawBeams(bd){gB.innerHTML=bd.map(o=>{let sl=(selB&&o.bm.id==selB);let c=sl?'#16A34A':'#EAB308';let w=sl?6:3.6;let dash='';return `<line x1="${o.a.x}" y1="${o.a.y}" x2="${o.c.x}" y2="${o.c.y}" stroke="${c}" stroke-width="${w}" stroke-opacity="0.9" ${dash}/>`;}).join('');
  if(selB){let sb=byBid(selB);if(sb)for(const ep of[sb.A,sb.B])if(ep.t=='xy')gB.innerHTML+='<circle cx="'+ep.x+'" cy="'+ep.y+'" r="5.5" fill="#16A34A" stroke="#fff" stroke-width="1.4"/>';}
  gS.innerHTML=bd.map(o=>{let t='';for(const ep of [o.bm.A,o.bm.B]){if(ep.t=='b'){let q=epXY(ep);if(q)t+=`<path d="M ${q.x} ${q.y-3} L ${q.x-4} ${q.y+4} L ${q.x+4} ${q.y+4} Z" fill="#15803D" stroke="#fff" stroke-width="0.6"/>`;}}return t;}).join('');
- gL.innerHTML='';}
+ let nm=beamNames(bd),best={};                       // 1 etiqueta por nome (viga mais comprida)
+ for(const o of bd){let n=nm[o.bm.id];if(!n)continue;let L=Math.hypot(o.c.x-o.a.x,o.c.y-o.a.y);if(!best[n]||L>best[n].L)best[n]={o,L};}
+ gL.innerHTML=Object.values(best).map(({o})=>{let mx=(o.a.x+o.c.x)/2,my=(o.a.y+o.c.y)/2,dx=o.c.x-o.a.x,dy=o.c.y-o.a.y,L=Math.hypot(dx,dy)||1;let ox=-dy/L*8,oy=dx/L*8;let c=(selB&&o.bm.id==selB)?'#16A34A':'#B45309';
+   return `<text x="${mx+ox}" y="${my+oy}" text-anchor="middle" dominant-baseline="central" font-size="9" font-weight="800" fill="${c}" stroke="#fff" stroke-width="2.4" style="paint-order:stroke">${nm[o.bm.id]||''}</text>`;}).join('');}
 function drawPil(){gP.innerHTML=pillars.map((p,i)=>{let sc=cache?secao(cache.Nt[p.id],p.shape):"14x30";let base=p.shape=='quad'?"20x20":"14x30";let big=sc!==base;let off=(dvx(p.x)>18&&dhy(p.y)>18);
    let c=(p.id===selP)?'#16A34A':(big?'#B45309':'#B91C1C');let r;
    if(p.shape=='quad')r=`<rect x="${p.x-6}" y="${p.y-6}" width="12" height="12" fill="${c}" stroke="#fff" stroke-width="1.6"/>`;
@@ -143,7 +152,7 @@ function panel(bd){let vmax=bd.length?Math.max(...bd.map(o=>o.L)):0;lastIssues=i
  npil.textContent=pillars.length;stot.textContent=cache?(Object.values(cache.Nt).reduce((a,b)=>a+b,0)/9.81).toFixed(0):'0';vmaxEl.textContent=vmax.toFixed(2);nav.textContent=lastIssues.length;
  wbox.innerHTML=lastIssues.length?lastIssues.slice(0,8).map(it=>{let bb=it.bid!=null?' <button class="wb k" onclick="manterViga('+it.bid+')">manter</button><button class="wb r" onclick="removerViga('+it.bid+')">remover</button>':'';return '<div class="warn">&#9888; '+it.msg+bb+'</div>';}).join('')+(lastIssues.length>8?`<div class="hint">&hellip;+${lastIssues.length-8} aviso(s)</div>`:''):'<div class="ok">&#10004; Tudo alinhado, sem avisos.</div>';
  if(cache)tbody.innerHTML=pillars.map((p,i)=>{let sc=secao(cache.Nt[p.id],p.shape);let base=p.shape=='quad'?"20x20":"14x30";return `<tr><td>P${i+1}</td><td><b>${cache.Nt[p.id].toFixed(0)}</b></td><td>${(cache.Nt[p.id]/9.81).toFixed(1)}</td><td class="${sc!==base?'big':''}">${sc}</td></tr>`;}).join('');}
-function setStatus(){let m={sel:'Mover/Selecionar',pilar:'+Pilar (clique na parede)',viga:'+Viga: clique numa VIGA = editar/mover; em pilar/vazio = desenhar nova &middot; Esc = fixa a viga (amarela)',excluir:'Excluir (clique pilar/viga)'}[mode];statusEl.innerHTML='Modo: <b>'+m+'</b> &middot; padr&atilde;o: <b>'+(defShape=='quad'?'quadrado':'retangular')+'</b>';}
+function setStatus(){let m={sel:'Mover/Selecionar',pilar:'+Pilar (clique na parede)',viga:'+Viga: 2 cliques desenham a viga (fica verde, j&aacute; numerada) &middot; clique no <b>vazio</b> = FIXA (amarela) &middot; clique numa viga = editar',excluir:'Excluir (clique pilar/viga)'}[mode];statusEl.innerHTML='Modo: <b>'+m+'</b> &middot; padr&atilde;o: <b>'+(defShape=='quad'?'quadrado':'retangular')+'</b>';}
 function autoSaveFile(){if(!fileHandle)return;clearTimeout(fsTimer);fsTimer=setTimeout(writeFile,500);}
 function renderFull(){prune();let bd=beamData();cache=loads(bd);drawAxes();drawBeams(bd);drawPil();drawPending();panel(bd);setStatus();try{localStorage.setItem(LSKEY,JSON.stringify({pillars,beams,nextId,nextBid}));}catch(e){}autoSaveFile();}
 function renderLive(){let bd=beamData();drawBeams(bd);drawPil();drawPending();vmaxEl.textContent=(bd.length?Math.max(...bd.map(o=>o.L)):0).toFixed(2);}
@@ -157,10 +166,10 @@ function sameEP(a,b){if(!a||!b)return false;let qa=epXY(a),qb=epXY(b);return qa&
 function addPil(pt){snap();let p=snapAxis({id:nextId++,x:Math.round(pt.x),y:Math.round(pt.y),shape:defShape,ori:'h'});pillars.push(p);selP=p.id;renderFull();}
 function delPil(id){snap();pillars=pillars.filter(p=>p.id!=id);selP=null;renderFull();}
 function vigaClick(pt){let ep=epAt(pt);
- if(vigaStart==null){vigaStart=ep;renderFull();return;}
+ if(vigaStart==null){vigaStart=ep;selB=null;renderFull();return;}        // 1º ponto: solta a anterior (vira amarela)
  if(Math.hypot(vigaStart.x-ep.x,vigaStart.y-ep.y)<8){vigaStart=null;renderFull();return;}
  if(Math.abs(ep.x-vigaStart.x)>=Math.abs(ep.y-vigaStart.y))ep={t:'xy',x:ep.x,y:vigaStart.y};else ep={t:'xy',x:vigaStart.x,y:ep.y};
- snap();let nb={id:nextBid++,A:vigaStart,B:ep};beams.push(nb);selB=nb.id;selP=null;vigaStart=ep;renderFull();}
+ snap();let nb={id:nextBid++,A:vigaStart,B:ep};beams.push(nb);selB=nb.id;selP=null;vigaStart=null;renderFull();}  // 2º ponto: cria e FIXA (verde; sem encadear)
 svg.addEventListener('pointerdown',e=>{e.preventDefault();try{svg.setPointerCapture(e.pointerId);}catch(_){}let pt=toPt(e);
  if(mode==='sel'){
    let hbm=selB!=null?byBid(selB):null,hp=null;
@@ -178,7 +187,8 @@ svg.addEventListener('pointerdown',e=>{e.preventDefault();try{svg.setPointerCapt
    if(vigaStart==null&&hitPil(pt)<0){let hb=hitBeam(pt);if(hb.id!=null){selB=hb.id;selP=null;let bm=byBid(hb.id),a=epXY(bm.A),c=epXY(bm.B);snap();moved=false;
      if(bm.A.t=='xy'&&Math.hypot(a.x-pt.x,a.y-pt.y)<9)dragBeam={id:hb.id,part:'A'};
      else if(bm.B.t=='xy'&&Math.hypot(c.x-pt.x,c.y-pt.y)<9)dragBeam={id:hb.id,part:'B'};
-     else{dragBeam={id:hb.id,part:'mid'};dragLast=pt;}renderFull();return;}}
+     else{dragBeam={id:hb.id,part:'mid'};dragLast=pt;}renderFull();return;}
+     if(selB!=null){selB=null;renderFull();return;}}     // vazio + viga selecionada = FIXA ela (amarela)
    vigaClick(pt);}
  else if(mode==='excluir'){let i=hitPil(pt);if(i>=0)delPil(pillars[i].id);else{let hb=hitBeam(pt);if(hb.id!=null){snap();beams=beams.filter(b=>b.id!=hb.id);selB=null;renderFull();}}}});
 svg.addEventListener('pointermove',e=>{
