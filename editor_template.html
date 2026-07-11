@@ -203,7 +203,8 @@ $('alinhar').onclick=()=>alinhar();$('renum').onclick=()=>{snap();renumber();ren
 $('min').onclick=()=>{if(!confirm('Reiniciar com apenas cantos/interseções? (você completa o resto)'))return;snap();pillars=MIN.map((c,i)=>snapAxis({id:i+1,x:c[0],y:c[1],shape:'ret',ori:'h'}));nextId=MIN.length+1;nextBid=1;autobeams();selP=null;selB=null;renderFull();};
 $('auto').onclick=()=>{snap();autobeams();renderFull();};$('undo').onclick=undo;
 $('reset').onclick=()=>{if(!confirm('Restaurar o lançamento inicial? (perde as alterações não salvas)'))return;snap();try{localStorage.removeItem(LSKEY);}catch(e){}pillars=JSON.parse(JSON.stringify(INIT));pillars.forEach(p=>snapAxis(p));nextId=Math.max(0,...pillars.map(p=>p.id))+1;nextBid=1;autobeams();selP=null;selB=null;renderFull();};
-function salvar(){let data={_tipo:'lancamento_caldeira',pillars,beams,nextId,nextBid};let bl=new Blob([JSON.stringify(data)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='lancamento_caldeira.json';a.click();alert('Lançamento SALVO em lancamento_caldeira.json (Downloads).\nDepois use "Editar" para reabrir e continuar.');}
+function stamp(){let d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+'h'+p(d.getMinutes());}
+function salvar(){let data={_tipo:'lancamento_caldeira',pillars,beams,nextId,nextBid};let bl=new Blob([JSON.stringify(data)],{type:'application/json'});let a=document.createElement('a');let fn='lancamento_caldeira_'+stamp()+'.json';a.href=URL.createObjectURL(bl);a.download=fn;a.click();alert('Lançamento SALVO em '+fn+' (Downloads).\nDepois use "Editar" para reabrir e continuar.');}
 $('salvar').onclick=salvar;
 $('editar').onclick=()=>$('file').click();
 $('file').onchange=ev=>{let fl=ev.target.files[0];if(!fl)return;let rd=new FileReader();rd.onload=()=>{try{let d=JSON.parse(rd.result);
@@ -224,8 +225,8 @@ function enviar(){let bd=beamData();let w=issues(bd);
   pilares:pillars.map((p,i)=>({pilar:"P"+(i+1),x_m:+((p.x-X0)/m).toFixed(2),y_m:+((Y0+VH-p.y)/m).toFixed(2),forma:p.shape=='quad'?'quadrado':'retangular',sentido:p.shape=='quad'?'-':(p.ori=='v'?'vertical':'horizontal'),carga_kN:+cache.Nt[p.id].toFixed(0),carga_tf:+(cache.Nt[p.id]/9.81).toFixed(1),secao:secao(cache.Nt[p.id],p.shape)})),
   vigas:bd.map(o=>({de:pilName(o.a),ate:pilName(o.c),x1_m:+((o.a.x-X0)/m).toFixed(2),y1_m:+((Y0+VH-o.a.y)/m).toFixed(2),x2_m:+((o.c.x-X0)/m).toFixed(2),y2_m:+((Y0+VH-o.c.y)/m).toFixed(2),vao_m:+o.L.toFixed(2),aviso:o.L>7})),
   total_tf:+(Object.values(cache.Nt).reduce((a,b)=>a+b,0)/9.81).toFixed(0)};
- let bl=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download='estrutura_caldeira.json';a.click();
- alert('Estrutura ENVIADA!\n\nBaixei estrutura_caldeira.json (pasta Downloads).\nMande esse arquivo no chat que eu gero o relatorio completo.');}
+ let bl=new Blob([JSON.stringify(data,null,1)],{type:'application/json'});let a=document.createElement('a');let fn='estrutura_caldeira_'+stamp()+'.json';a.href=URL.createObjectURL(bl);a.download=fn;a.click();
+ alert('Estrutura ENVIADA!\n\nBaixei '+fn+' (pasta Downloads).\nAgora suba esse arquivo na tela para CONFERIR a planta.');}
 $('send').onclick=enviar;
 window.manterViga=function(bid){let bm=byBid(bid);if(bm){snap();bm.ok=true;renderFull();}};
 window.removerViga=function(bid){snap();beams=beams.filter(b=>b.id!=bid);selB=null;renderFull();};
