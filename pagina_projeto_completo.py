@@ -89,7 +89,8 @@ else:
             r = cp.calcular_projeto(data)
 
         st.info("**Materiais adotados:** concreto **C25** (fck = 25 MPa) · aço "
-                "**CA-50A** (fyk = 500 MPa) · γc = 1,4 · γs = 1,15 · γf = 1,4 — NBR 6118.")
+                "longitudinal **CA-50A** (fyk = 500 MPa) · **estribos CA-50A ou "
+                "CA-60A** · γc = 1,4 · γs = 1,15 · γf = 1,4 — NBR 6118.")
 
         # ---- vigas de cobertura
         sec(3, "Vigas de cobertura (viga contínua NBR 6118)")

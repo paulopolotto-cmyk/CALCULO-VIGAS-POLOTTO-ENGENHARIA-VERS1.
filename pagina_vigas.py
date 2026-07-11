@@ -120,7 +120,8 @@ cob = c4.number_input(
 g_pp_disp = 25.0 * b * h / 1e4 * fu
 pp = st.checkbox("Incluir peso próprio automaticamente "
                  f"(g = {g_pp_disp:.{_cf(2)}f} {un_fm})", value=True)
-st.caption("Aço: CA-50A (longitudinal e estribos) · γf=1,4 · γc=1,4 · γs=1,15")
+st.caption("Aço: longitudinal CA-50A · estribos CA-50A ou CA-60A · "
+           "γf=1,4 · γc=1,4 · γs=1,15")
 
 dados_g = {'b': b, 'h': h, 'fck': fck, 'cob': cob, 'peso_proprio': pp}
 
@@ -365,7 +366,7 @@ def gerar_memorial(res, nomes_lista):
             ln.append(f"  Vão {i + 1} (pos.):  As = "
                       f"{(fx['As'] or 0):.2f} cm² -> {fx['sel']['texto']}")
     ln.append("")
-    ln.append("ESTRIBOS (2 ramos, CA-50A):")
+    ln.append("ESTRIBOS (2 ramos, CA-50A ou CA-60A):")
     for i, e in enumerate(res['estribos']):
         ln.append(f"  Vão {i + 1}: {e['texto']}  "
                   f"(Vsd = {e['Vsd'] * fu:.{_cf(1)}f} {un_f})")

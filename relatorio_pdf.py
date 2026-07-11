@@ -172,7 +172,7 @@ def _mem_viga(v):
             L.append(f"  Vão {i+1} (pos.): As={(fx['As'] or 0):.2f} cm²  ->  "
                      f"{fx['sel']['texto']}")
     L.append("")
-    L.append("ESTRIBOS (2 ramos, CA-50A):")
+    L.append("ESTRIBOS (2 ramos, CA-50A ou CA-60A):")
     for i, e in enumerate(res["estribos"]):
         L.append(f"  Vão {i+1}: {e['texto']}  (Vsd={e['Vsd']:.1f} kN)")
     if res.get("pele"):
@@ -227,7 +227,7 @@ def _mem_pilar(p, nomes=None):
     if opt:
         L.append(f"ARMADURA ADOTADA: {opt['texto']}  (As={opt['As_ef']:.2f} cm² · "
                  f"mín {rp['As_min']:.2f} · máx {rp['As_max']:.2f})")
-        L.append(f"ESTRIBOS: ø{opt['phi_t']:.1f} c/{opt['s_est']:.0f} cm — "
+        L.append(f"ESTRIBOS (CA-50A ou CA-60A): ø{opt['phi_t']:.1f} c/{opt['s_est']:.0f} cm — "
                  f"{opt['n_est']} un × {opt['comp_est']:.2f} m")
         L.append(f"PESO DE AÇO: long {opt['peso_long']:.2f} + estribos "
                  f"{opt['peso_est']:.2f} = {opt['peso_total']:.2f} kg")

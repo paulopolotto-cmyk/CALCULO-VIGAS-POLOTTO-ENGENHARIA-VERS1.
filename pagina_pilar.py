@@ -100,7 +100,8 @@ Nk_disp = c6.number_input(
          "aplica γf=1,4 e γn automaticamente; não digite o valor já "
          "majorado.")
 Nk = (Nk_disp or 0.0) / fu          # -> kN (interno)
-st.caption("Aço CA-50A · γf=1,4 · γc=1,4 · γs=1,15 · "
+st.caption("Aço: long. CA-50A · estribos CA-50A ou CA-60A · "
+           "γf=1,4 · γc=1,4 · γs=1,15 · "
            "pilar interno de estrutura contraventada")
 
 with st.expander("ℹ️ Classe de agressividade (CAA) — qual escolher?"):
@@ -170,7 +171,7 @@ def gerar_memorial(res, opt):
     ln.append(f"  Folga de capacidade: direção x = {opt['folga_x']:.2f} | "
               f"direção y = {opt['folga_y']:.2f}")
     ln.append(f"  Corte por barra: {opt['comp_barra']:.2f} m")
-    ln.append(f"ESTRIBOS: ø{opt['phi_t']:.1f} mm c/{opt['s_est']:.0f} cm — "
+    ln.append(f"ESTRIBOS (CA-50A ou CA-60A): ø{opt['phi_t']:.1f} mm c/{opt['s_est']:.0f} cm — "
               f"{opt['n_est']} un x {opt['comp_est']:.2f} m")
     ln.append(f"PESO DE AÇO: longitudinal {opt['peso_long']:.2f} kg + "
               f"estribos {opt['peso_est']:.2f} kg = "
