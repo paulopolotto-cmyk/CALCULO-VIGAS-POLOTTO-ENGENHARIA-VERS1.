@@ -102,7 +102,7 @@ def _capa(pdf, r, proj, nv, nb, npil):
              ha="center", fontsize=13, color=CINZA_TXT)
     fig.text(0.5, 0.83, f"Projeto: {proj}", ha="center", fontsize=12,
              fontweight="bold", color="#0f172a")
-    fig.text(0.5, 0.80, "NBR 6118 · concreto C25 · aço CA-50A · "
+    fig.text(0.5, 0.80, "NBR 6118 · concreto C25 (fck 25 MPa) · aço CA-50A · "
              "elementos iguais agrupados", ha="center", fontsize=10,
              color=CINZA_TXT)
 
@@ -147,8 +147,8 @@ def _mem_viga(v):
     res = v["res"]
     d = res["dados"]
     est = res["estatica"]
-    L = [f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CA-50 · "
-         f"c={d['cob']:.1f} cm · d={d['d']:.1f} cm",
+    L = [f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} (fck {d['fck']:.0f} "
+         f"MPa) · aço CA-50A · c={d['cob']:.1f} cm · d={d['d']:.1f} cm",
          f"Carga da laje q = {v['w']:.2f} kN/m" +
          (f"  ·  peso próprio g = {d['g_pp']:.2f} kN/m" if d.get("g_pp", 0) > 0 else ""),
          ""]
@@ -172,7 +172,7 @@ def _mem_viga(v):
             L.append(f"  Vão {i+1} (pos.): As={(fx['As'] or 0):.2f} cm²  ->  "
                      f"{fx['sel']['texto']}")
     L.append("")
-    L.append("ESTRIBOS (2 ramos, CA-50):")
+    L.append("ESTRIBOS (2 ramos, CA-50A):")
     for i, e in enumerate(res["estribos"]):
         L.append(f"  Vão {i+1}: {e['texto']}  (Vsd={e['Vsd']:.1f} kN)")
     if res.get("pele"):
@@ -213,8 +213,8 @@ def _mem_pilar(p, nomes=None):
         L.append(f"Pilar {p['pilar']}: seção {p['secao']} — não foi possível "
                  f"dimensionar (Nk={p.get('Nk')} kN). Revisar manualmente.")
         return "\n".join(L)
-    L += [f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CAA {d['caa']} "
-          f"(c={d['cob']:.1f} cm)",
+    L += [f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} (fck {d['fck']:.0f} "
+          f"MPa) · aço CA-50A · CAA {d['caa']} (c={d['cob']:.1f} cm)",
           f"l0={d['l0']:.2f} m · Nk={p['Nk']} kN (carga {p['carga_tf']} tf) · "
           f"Nd={rp['Nd']:.0f} kN · γn={rp['gamma_n']:.2f} · ν={rp['ni']:.3f}",
           "",

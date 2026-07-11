@@ -22,7 +22,7 @@ from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas e Pilares",
-       "Concreto armado · NBR 6118 · CA-50")
+       "Concreto armado · NBR 6118 · CA-50A")
 
 seletor_pagina("vigas")
 
@@ -120,7 +120,7 @@ cob = c4.number_input(
 g_pp_disp = 25.0 * b * h / 1e4 * fu
 pp = st.checkbox("Incluir peso próprio automaticamente "
                  f"(g = {g_pp_disp:.{_cf(2)}f} {un_fm})", value=True)
-st.caption("Aço: CA-50 (longitudinal e estribos) · γf=1,4 · γc=1,4 · γs=1,15")
+st.caption("Aço: CA-50A (longitudinal e estribos) · γf=1,4 · γc=1,4 · γs=1,15")
 
 dados_g = {'b': b, 'h': h, 'fck': fck, 'cob': cob, 'peso_proprio': pp}
 
@@ -329,7 +329,7 @@ def gerar_memorial(res, nomes_lista):
     ln.append("Polotto Engenharia")
     ln.append("=" * 62)
     ln.append(f"Seção: {d['b']:.0f} x {d['h']:.0f} cm | fck = {d['fck']:.0f} "
-              f"MPa | Aço CA-50 | c = {d['cob']:.1f} cm | d = {d['d']:.1f} cm")
+              f"MPa | Aço CA-50A | c = {d['cob']:.1f} cm | d = {d['d']:.1f} cm")
     if d['g_pp'] > 0:
         ln.append(f"Peso próprio incluído: g = {d['g_pp'] * fu:.{_cf(2)}f} "
                   f"{un_fm}")
@@ -365,7 +365,7 @@ def gerar_memorial(res, nomes_lista):
             ln.append(f"  Vão {i + 1} (pos.):  As = "
                       f"{(fx['As'] or 0):.2f} cm² -> {fx['sel']['texto']}")
     ln.append("")
-    ln.append("ESTRIBOS (2 ramos, CA-50):")
+    ln.append("ESTRIBOS (2 ramos, CA-50A):")
     for i, e in enumerate(res['estribos']):
         ln.append(f"  Vão {i + 1}: {e['texto']}  "
                   f"(Vsd = {e['Vsd'] * fu:.{_cf(1)}f} {un_f})")

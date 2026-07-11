@@ -88,6 +88,9 @@ else:
         with st.spinner("Rodando o cálculo NBR 6118 de todas as vigas, baldrames e pilares…"):
             r = cp.calcular_projeto(data)
 
+        st.info("**Materiais adotados:** concreto **C25** (fck = 25 MPa) · aço "
+                "**CA-50A** (fyk = 500 MPa) · γc = 1,4 · γs = 1,15 · γf = 1,4 — NBR 6118.")
+
         # ---- vigas de cobertura
         sec(3, "Vigas de cobertura (viga contínua NBR 6118)")
         st.caption(f"Laje lançada na direção "
@@ -107,7 +110,7 @@ else:
                  "Aço (kg)": b["peso"] if b["peso"] else "—"} for b in r["baldrames"]])
 
         # ---- pilares
-        sec(5, "Pilares (pré-dimensionamento — casa térrea)")
+        sec(5, "Pilares (NBR 6118 — 14×30, seção cresce pela norma)")
         tabela([{"Pilar": p["pilar"], "Seção (cm)": p["secao"],
                  "Carga (tf)": p["carga_tf"], "Armadura": p["armadura"],
                  "Aço (kg)": p["peso"]} for p in r["pilares"]])
@@ -127,10 +130,10 @@ else:
         q3.metric("Baldrames", f"{r['aco_baldrames']} kg")
         q4.metric("TOTAL", f"{r['aco_total']} kg")
         tabela([
-            {"Etapa": "Vigas de cobertura", "Aço CA-50/60 (kg)": r["aco_vigas"]},
-            {"Etapa": "Pilares", "Aço CA-50/60 (kg)": r["aco_pilares"]},
-            {"Etapa": "Baldrames", "Aço CA-50/60 (kg)": r["aco_baldrames"]},
-            {"Etapa": "TOTAL A COMPRAR", "Aço CA-50/60 (kg)": r["aco_total"]},
+            {"Etapa": "Vigas de cobertura", "Aço CA-50A (kg)": r["aco_vigas"]},
+            {"Etapa": "Pilares", "Aço CA-50A (kg)": r["aco_pilares"]},
+            {"Etapa": "Baldrames", "Aço CA-50A (kg)": r["aco_baldrames"]},
+            {"Etapa": "TOTAL A COMPRAR", "Aço CA-50A (kg)": r["aco_total"]},
         ])
         st.caption("Inclui ~10% de perdas/emendas em vigas e baldrames e ~8% nos pilares.")
         if r["falhas"]:

@@ -18,7 +18,7 @@ from ui_comum import (NAVY, AMBAR, CINZA_TXT, CONCRETO,
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas e Pilares",
-       "Concreto armado · NBR 6118 · CA-50")
+       "Concreto armado · NBR 6118 · CA-50A")
 
 seletor_pagina("pilar")
 
@@ -100,7 +100,7 @@ Nk_disp = c6.number_input(
          "aplica γf=1,4 e γn automaticamente; não digite o valor já "
          "majorado.")
 Nk = (Nk_disp or 0.0) / fu          # -> kN (interno)
-st.caption("Aço CA-50 · γf=1,4 · γc=1,4 · γs=1,15 · "
+st.caption("Aço CA-50A · γf=1,4 · γc=1,4 · γs=1,15 · "
            "pilar interno de estrutura contraventada")
 
 with st.expander("ℹ️ Classe de agressividade (CAA) — qual escolher?"):

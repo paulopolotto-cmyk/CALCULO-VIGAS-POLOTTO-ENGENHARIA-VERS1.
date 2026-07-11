@@ -207,7 +207,7 @@ tr:nth-child(even) td{{background:#f6f9fc}}
 @media print{{body{{background:#fff;padding:0}}.card{{box-shadow:none}}}}
 </style></head><body>
 <h1>Polotto Engenharia — Projeto Completo</h1>
-<p class="sub">Projeto: <b>{proj}</b> · Detalhamento automático NBR 6118 · concreto {int(FCK)} MPa · aço CA-50/60</p>
+<p class="sub">Projeto: <b>{proj}</b> · Detalhamento automático NBR 6118 · concreto C{int(FCK)} (fck = {int(FCK)} MPa) · aço CA-50A · γc=1,4 · γs=1,15</p>
 
 <h2>Aço a comprar (por etapa e total)</h2>
 <div class="cards">

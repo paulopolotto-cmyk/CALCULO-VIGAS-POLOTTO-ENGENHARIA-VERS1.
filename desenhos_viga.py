@@ -505,7 +505,7 @@ def fig_corte_longitudinal(res):
     ax.text(0.0, 2.08, "CORTE LONGITUDINAL — ARMAÇÃO", ha='left',
             va='bottom', fontsize=11, fontweight='bold', color=NAVY)
     ax.text(L_tot, 2.08,
-            f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CA-50",
+            f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · CA-50A",
             ha='right', va='bottom', fontsize=9.5, fontweight='bold',
             color=CINZA_TXT)
     # legenda
