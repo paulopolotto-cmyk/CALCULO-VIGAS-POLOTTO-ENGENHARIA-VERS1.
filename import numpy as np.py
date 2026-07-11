@@ -7,23 +7,12 @@ Ponto de entrada do app: navegação entre Vigas e Pilares.
 deploy do Streamlit Cloud. As páginas ficam em pagina_vigas.py e
 pagina_pilar.py; os motores de cálculo em motor_viga.py e motor_pilar.py.)
 """
-import importlib
-import sys
-
 import streamlit as st
 
-# Recarrega os módulos auxiliares do disco a cada execução. Evita que o
-# Streamlit Cloud fique preso numa versão antiga em cache de um módulo
-# importado (motor_viga/motor_pilar/ui_comum) após um deploy que muda ao
-# mesmo tempo um módulo e uma página — causa comum de ImportError/AttributeError.
-for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje", "editor_lancamento",
-           "desenhos_viga", "desenhos_pilar", "calc_projeto", "calc_laje_projeto",
-           "relatorio_pdf"):
-    if _m in sys.modules:
-        try:
-            importlib.reload(sys.modules[_m])
-        except Exception:
-            pass
+# (Removido o laço de importlib.reload por execução: no Streamlit Cloud cada
+# deploy já sobe um processo NOVO com o código fresco, então recarregar módulos
+# a cada rerun era desnecessário e — no Python 3.14 — corrompia módulos
+# interdependentes, causando "cannot import name ... from 'ui_comum'".)
 
 st.set_page_config(page_title="Polotto Engenharia — Cálculo Estrutural",
                    page_icon="🏗️", layout="centered")
