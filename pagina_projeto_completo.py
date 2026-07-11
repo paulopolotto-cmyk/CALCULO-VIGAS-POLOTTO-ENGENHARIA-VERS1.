@@ -159,19 +159,36 @@ else:
                            data=html_rel.encode("utf-8"),
                            file_name=f"relatorio_{proj}.html", mime="text/html")
 
-        # ---- detalhamento COMPLETO em PDF (cada viga e cada pilar) — sob demanda
-        st.markdown("**Detalhamento completo (PDF):** o mesmo que sai no modo "
-                    "manual — esquema, diagramas, cortes e memorial — para **cada "
-                    "viga e cada pilar**. Gera um PDF grande (leva ~1 minuto).")
+        # ---- detalhamento em PDF — dois níveis (sob demanda, ~1 min cada)
+        st.markdown("**Detalhamento em PDF de cada viga e cada pilar** — escolha o "
+                    "nível (gera sob demanda, leva cerca de 1 minuto):")
         n_el = len(r["vigas"]) + len(r["baldrames"]) + len(r["pilares"])
-        if st.button(f"🛠️ Gerar detalhamento completo em PDF ({n_el} elementos)"):
-            st.session_state.pop("pdf_projeto", None)
-            with st.spinner("Desenhando cada viga e cada pilar (esquema, diagramas, "
-                            "cortes e memorial)… isso leva cerca de 1 minuto."):
-                st.session_state["pdf_projeto"] = rpdf.gerar_pdf(r, proj)
-            st.success("PDF pronto! Baixe abaixo.")
-        if st.session_state.get("pdf_projeto"):
-            st.download_button("📥 Baixar detalhamento completo (PDF)",
-                               data=st.session_state["pdf_projeto"],
-                               file_name=f"detalhamento_{proj}.pdf",
-                               mime="application/pdf")
+        cpdf1, cpdf2 = st.columns(2)
+        with cpdf1:
+            st.markdown("**🛠️ Completo** — esquema de cargas, diagramas de momento e "
+                        "cortante, cortes de armação e memorial completo.")
+            if st.button(f"Gerar COMPLETO ({n_el} elem.)", width="stretch"):
+                st.session_state.pop("pdf_completo", None)
+                with st.spinner("Desenhando tudo (esquema, diagramas, cortes e "
+                                "memorial)…"):
+                    st.session_state["pdf_completo"] = rpdf.gerar_pdf(r, proj)
+                st.success("PDF completo pronto!")
+            if st.session_state.get("pdf_completo"):
+                st.download_button("📥 Baixar COMPLETO (PDF)",
+                                   data=st.session_state["pdf_completo"],
+                                   file_name=f"detalhamento_{proj}.pdf",
+                                   mime="application/pdf", width="stretch")
+        with cpdf2:
+            st.markdown("**📄 Reduzido** — só as **armações** (cortes + quantitativo), "
+                        "**sem** os diagramas de momento/cortante. PDF bem menor.")
+            if st.button(f"Gerar REDUZIDO ({n_el} elem.)", width="stretch"):
+                st.session_state.pop("pdf_reduzido", None)
+                with st.spinner("Desenhando só as armações…"):
+                    st.session_state["pdf_reduzido"] = rpdf.gerar_pdf(
+                        r, proj, reduzido=True)
+                st.success("PDF reduzido pronto!")
+            if st.session_state.get("pdf_reduzido"):
+                st.download_button("📥 Baixar REDUZIDO (PDF)",
+                                   data=st.session_state["pdf_reduzido"],
+                                   file_name=f"detalhamento_reduzido_{proj}.pdf",
+                                   mime="application/pdf", width="stretch")

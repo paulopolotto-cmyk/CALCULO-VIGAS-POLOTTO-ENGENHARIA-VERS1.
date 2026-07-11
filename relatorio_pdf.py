@@ -93,13 +93,18 @@ def _pag_texto(pdf, texto, titulo=None, mono=True, fs=9):
     plt.close(fig)
 
 
-def _capa(pdf, r, proj, nv, nb, npil):
+def _capa(pdf, r, proj, nv, nb, npil, reduzido=False):
     fig = plt.figure(figsize=A4)
     fig.patch.set_facecolor("white")
     fig.text(0.5, 0.90, "POLOTTO ENGENHARIA", ha="center", fontsize=20,
              fontweight="bold", color=NAVY)
-    fig.text(0.5, 0.865, "Projeto Completo — Detalhamento estrutural",
+    fig.text(0.5, 0.865, ("Projeto Completo — Relatório REDUZIDO (só armações)"
+                          if reduzido else
+                          "Projeto Completo — Detalhamento estrutural"),
              ha="center", fontsize=13, color=CINZA_TXT)
+    if reduzido:
+        fig.text(0.5, 0.842, "sem diagramas de momento/cortante — ver o completo",
+                 ha="center", fontsize=9, color=CINZA_TXT, style="italic")
     fig.text(0.5, 0.83, f"Projeto: {proj}", ha="center", fontsize=12,
              fontweight="bold", color="#0f172a")
     fig.text(0.5, 0.80, "NBR 6118 · concreto C25 (fck 25 MPa) · aço CA-50A · "
@@ -302,6 +307,72 @@ def _mem_pilar(p, nomes=None):
     return "\n".join(L)
 
 
+def _mem_viga_red(v, nomes=None):
+    """Memorial REDUZIDO da viga: só armadura + quantitativo (sem momentos,
+    reações, cortantes ou flecha)."""
+    res = v["res"]
+    d = res["dados"]
+    L = []
+    if nomes and len(nomes) > 1:
+        L.append(f"IGUAIS ({len(nomes)}): " + ", ".join(nomes))
+        L.append("Mesmo desenho e ferragem para todas.")
+        L.append("")
+    L.append(f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} (fck "
+             f"{d['fck']:.0f} MPa) · aço CA-50A · c={d['cob']:.1f} cm")
+    L.append("")
+    L.append("ARMADURA LONGITUDINAL:")
+    for j, fx in enumerate(res["flex_apoios"]):
+        if fx["sel"] and not fx["sel"].get("construtiva"):
+            L.append(f"  Apoio {chr(65+j)} (neg.): {fx['sel']['texto']}")
+    for i, fx in enumerate(res["flex_vaos"]):
+        if fx["sel"]:
+            L.append(f"  Vão {i+1} (pos.): {fx['sel']['texto']}")
+    if res.get("pele"):
+        L.append(f"  Pele: {res['pele']['texto']}")
+    L.append("")
+    L.append("ESTRIBOS (2 ramos, CA-50A ou CA-60A):")
+    for i, e in enumerate(res["estribos"]):
+        L.append(f"  Vão {i+1}: {e['texto']}")
+    q = res.get("quantitativo")
+    if q:
+        L.append("")
+        L.append("QUANTITATIVO DE AÇO DESTA VIGA:")
+        for p in q["posicoes"]:
+            L.append(f"  {p['pos']:<4} {p['descr']:<26} ø{p['phi']:>4.1f}  "
+                     f"{p['qtd']:>3} un × {p['comp_unit']:6.2f} m = "
+                     f"{p['peso']:7.2f} kg")
+        L.append(f"  PESO: {q['peso_total']:.1f} kg  ·  COMPRA (+10%): "
+                 f"{q.get('peso_compra', q['peso_total']*1.1):.1f} kg")
+    return "\n".join(L)
+
+
+def _mem_pilar_red(p, nomes=None):
+    """Memorial REDUZIDO do pilar: só armadura (sem esbeltez/2ª ordem)."""
+    rp = p.get("res") or {}
+    opt = p.get("opt")
+    d = rp.get("dados")
+    L = []
+    if nomes and len(nomes) > 1:
+        L.append(f"IGUAIS ({len(nomes)}): " + ", ".join(nomes))
+        L.append("Mesmo detalhe; dimensionado para o mais carregado.")
+        L.append("")
+    if not d:
+        L.append(f"Pilar {p['pilar']}: seção {p['secao']} — não foi possível "
+                 f"dimensionar (Nk={p.get('Nk')} kN). Revisar manualmente.")
+        return "\n".join(L)
+    L.append(f"Seção {d['b']:.0f}×{d['h']:.0f} cm · C{d['fck']:.0f} · aço "
+             f"CA-50A · CAA {d['caa']} (c={d['cob']:.1f} cm)")
+    L.append(f"Carga Nk = {p['Nk']} kN ({p['carga_tf']} tf)")
+    L.append("")
+    if opt:
+        L.append(f"ARMADURA: {opt['texto']}")
+        L.append(f"ESTRIBOS (CA-50A ou CA-60A): ø{opt['phi_t']:.1f} "
+                 f"c/{opt['s_est']:.0f} cm — {opt['n_est']} un × "
+                 f"{opt['comp_est']:.2f} m")
+        L.append(f"PESO DE AÇO: {opt['peso_total']:.2f} kg")
+    return "\n".join(L)
+
+
 def _corte_args(res):
     est = res["estatica"]
     ms = [abs(m) for m in est["M_apoios"]]
@@ -319,61 +390,68 @@ def _salva(pdf, fig, titulo=None):
 
 
 # ------------------------------------------------------------ elementos
-def _elemento_viga(pdf, v, membros):
+def _elemento_viga(pdf, v, membros, reduzido=False):
     res = v["res"]
     nomes = [m["nome"] for m in membros]
     cab = _rotulo("VIGA", nomes) + f" — {v['secao']} cm — {v['nvaos']} vão(s)"
     if not res or "estatica" not in res:
         _pag_texto(pdf, "Não foi possível calcular esta viga.", titulo=cab)
         return
-    _salva(pdf, dv.fig_esquema(res), cab + "  ·  Esquema de cargas")
-    _salva(pdf, dv.fig_diagramas(res), "Diagramas de momento e cortante")
+    if not reduzido:
+        _salva(pdf, dv.fig_esquema(res), cab + "  ·  Esquema de cargas")
+        _salva(pdf, dv.fig_diagramas(res), "Diagramas de momento e cortante")
     if res.get("quantitativo"):
-        _salva(pdf, dv.fig_corte_longitudinal(res))   # já se autointitula
+        _salva(pdf, dv.fig_corte_longitudinal(res), cab if reduzido else None)
         tipo, idx, tit = _corte_args(res)
         _salva(pdf, dv.fig_corte_estribo(res, tipo, idx, tit),
                "Corte transversal e estribo")
-    mem = _mem_viga(v)
-    if len(nomes) > 1:
-        mem = (f"IGUAIS ({len(nomes)}): " + ", ".join(nomes)
-               + "\nMesmo desenho e ferragem para todas.\n\n" + mem)
+    if reduzido:
+        mem = _mem_viga_red(v, nomes)
+    else:
+        mem = _mem_viga(v)
+        if len(nomes) > 1:
+            mem = (f"IGUAIS ({len(nomes)}): " + ", ".join(nomes)
+                   + "\nMesmo desenho e ferragem para todas.\n\n" + mem)
     _pag_texto(pdf, mem, titulo="Memorial — " + _rotulo("Viga", nomes))
 
 
-def _elemento_pilar(pdf, p, membros):
+def _elemento_pilar(pdf, p, membros, reduzido=False):
     rp = p["res"]
     opt = p["opt"]
     nomes = [m["pilar"] for m in membros]
     cab = _rotulo("PILAR", nomes) + f" — {p['secao']} cm"
+    memf = _mem_pilar_red if reduzido else _mem_pilar
     if not rp or not opt:
-        _pag_texto(pdf, _mem_pilar(p, nomes), titulo=cab)
+        _pag_texto(pdf, memf(p, nomes), titulo=cab)
         return
     _salva(pdf, dp.fig_secao(rp, opt), cab + "  ·  Corte transversal")
     _salva(pdf, dp.fig_pilar_longitudinal(rp, opt))   # já se autointitula
-    _pag_texto(pdf, _mem_pilar(p, nomes), titulo="Memorial — " + _rotulo("Pilar", nomes))
+    _pag_texto(pdf, memf(p, nomes), titulo="Memorial — " + _rotulo("Pilar", nomes))
 
 
-def gerar_pdf(r, proj="projeto"):
-    """Monta o PDF completo (elementos iguais agrupados) e devolve os bytes."""
+def gerar_pdf(r, proj="projeto", reduzido=False):
+    """Monta o PDF (elementos iguais agrupados) e devolve os bytes.
+    reduzido=True: só armações (cortes + quantitativo), sem os diagramas de
+    momento/cortante nem os memoriais de esforços."""
     gv = _agrupar(r["vigas"], _kv)
     gb = _agrupar(r["baldrames"], _kv)
     gp = _agrupar(r["pilares"], _kp, repfn=lambda p: p.get("Nk", 0))
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        _capa(pdf, r, proj, len(gv), len(gb), len(gp))
+        _capa(pdf, r, proj, len(gv), len(gb), len(gp), reduzido=reduzido)
         planta = fig_planta(r)
         if planta is not None:
             _salva(pdf, planta)
         _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
                    f"{len(r['vigas'])} vigas)")
         for g in gv:
-            _elemento_viga(pdf, g["rep"], g["membros"])
+            _elemento_viga(pdf, g["rep"], g["membros"], reduzido=reduzido)
         _divisoria(pdf, f"BALDRAMES\n({_tipos(len(gb))} · "
                    f"{len(r['baldrames'])} baldrames)")
         for g in gb:
-            _elemento_viga(pdf, g["rep"], g["membros"])
+            _elemento_viga(pdf, g["rep"], g["membros"], reduzido=reduzido)
         _divisoria(pdf, f"PILARES\n({_tipos(len(gp))} · "
                    f"{len(r['pilares'])} pilares)")
         for g in gp:
-            _elemento_pilar(pdf, g["rep"], g["membros"])
+            _elemento_pilar(pdf, g["rep"], g["membros"], reduzido=reduzido)
     return buf.getvalue()
