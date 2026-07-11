@@ -92,8 +92,19 @@ else:
                 "longitudinal **CA-50A** (fyk = 500 MPa) · **estribos CA-50A ou "
                 "CA-60A** · γc = 1,4 · γs = 1,15 · γf = 1,4 — NBR 6118.")
 
+        # ---- planta (localização de vigas e pilares)
+        sec(3, "Planta do projeto (onde fica cada viga e pilar)")
+        _planta = rpdf.fig_planta(r)
+        if _planta is not None:
+            st.pyplot(_planta, width="stretch")
+            st.caption("Vigas/baldrames em **amarelo** (VH…, VV…) e pilares em "
+                       "**vermelho** (P…) — a mesma numeração do detalhamento. "
+                       "Vai também no PDF completo.")
+        else:
+            st.caption("Sem coordenadas na planta para desenhar o croqui.")
+
         # ---- vigas de cobertura
-        sec(3, "Vigas de cobertura (viga contínua NBR 6118)")
+        sec(4, "Vigas de cobertura (viga contínua NBR 6118)")
         st.caption(f"Laje lançada na direção "
                    f"**{'horizontal' if r['principal']=='H' else 'vertical'}** "
                    f"(cobertura q ≈ {r['q_cob']} kN/m²). A seção cresce sozinha se o vão exigir.")
@@ -103,7 +114,7 @@ else:
                  "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
 
         # ---- baldrames
-        sec(4, "Baldrames (vigas de fundação sob as paredes)")
+        sec(5, "Baldrames (vigas de fundação sob as paredes)")
         st.caption(f"Carga de parede ≈ {r['wall']} kN/m sobre cada linha de baldrame.")
         tabela([{"Baldrame": b["nome"], "Seção": b["secao"], "Nº vãos": b["nvaos"],
                  "Vãos (m)": " + ".join(f"{x:.2f}" for x in b["vaos"]),
@@ -111,20 +122,20 @@ else:
                  "Aço (kg)": b["peso"] if b["peso"] else "—"} for b in r["baldrames"]])
 
         # ---- pilares
-        sec(5, "Pilares (NBR 6118 — 14×30, seção cresce pela norma)")
+        sec(6, "Pilares (NBR 6118 — 14×30, seção cresce pela norma)")
         tabela([{"Pilar": p["pilar"], "Seção (cm)": p["secao"],
                  "Carga (tf)": p["carga_tf"], "Armadura": p["armadura"],
                  "Aço (kg)": p["peso"]} for p in r["pilares"]])
 
         # ---- fundação
-        sec(6, "Cargas na fundação")
+        sec(7, "Cargas na fundação")
         st.metric("Carga total à fundação (cobertura + alvenaria/baldrames)",
                   f"{r['fund_tf']} tf")
         st.caption("A carga de cada sapata/estaca é a carga do pilar correspondente na "
                    "tabela acima. O dimensionamento das fundações depende do SPT do terreno.")
 
         # ---- QUANTITATIVO de aço a comprar
-        sec(7, "Relação de aço a comprar (por etapa e total)", destaque=True)
+        sec(8, "Relação de aço a comprar (por etapa e total)", destaque=True)
         q1, q2, q3, q4 = st.columns(4)
         q1.metric("Vigas", f"{r['aco_vigas']} kg")
         q2.metric("Pilares", f"{r['aco_pilares']} kg")
@@ -142,7 +153,7 @@ else:
                        + ", ".join(r["falhas"]))
 
         # ---- relatório resumido em HTML (rápido)
-        sec(8, "Baixar os relatórios")
+        sec(9, "Baixar os relatórios")
         html_rel = cp.relatorio_html(r, proj)
         st.download_button("📥 Relatório resumido (HTML — abre no navegador)",
                            data=html_rel.encode("utf-8"),

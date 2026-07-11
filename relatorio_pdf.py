@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 
 import motor_viga as mv
-from ui_comum import NAVY, AMBAR, CINZA_TXT
+from ui_comum import NAVY, AMBAR, VERMELHO, CINZA_TXT
 import desenhos_viga as dv
 import desenhos_pilar as dp
 
@@ -140,6 +140,67 @@ def _divisoria(pdf, titulo):
              fontweight="bold", color=NAVY)
     pdf.savefig(fig)
     plt.close(fig)
+
+
+def fig_planta(r):
+    """Planta de forma: eixos de vigas/baldrames (amarelo) e pilares (vermelho),
+    com a MESMA numeração do detalhamento (VH1…, VV…, P1…). Permite localizar
+    cada elemento no projeto."""
+    pilares = r.get("pilares", [])
+    seg = []
+    for v in r.get("vigas", []):
+        if v.get("ini") is None:
+            continue
+        if v["dir"] == "H":
+            seg.append((v["ini"], v["pos"], v["fim"], v["pos"], v["nome"]))
+        else:
+            seg.append((v["pos"], v["ini"], v["pos"], v["fim"], v["nome"]))
+    xs = [p["x_m"] for p in pilares if p.get("x_m") is not None]
+    ys = [p["y_m"] for p in pilares if p.get("y_m") is not None]
+    for x1, y1, x2, y2, _ in seg:
+        xs += [x1, x2]
+        ys += [y1, y2]
+    if not xs or not ys:
+        return None
+    W = max(1.0, max(xs) - min(xs))
+    H = max(1.0, max(ys) - min(ys))
+    fig, ax = plt.subplots(figsize=(min(10.5, max(6.0, 0.62 * W + 1.5)),
+                                    min(13.5, max(5.0, 0.62 * H + 1.5))), dpi=150)
+    fig.patch.set_facecolor("white")
+    for x1, y1, x2, y2, _ in seg:
+        ax.plot([x1, x2], [y1, y2], color=AMBAR, lw=3.2,
+                solid_capstyle="round", zorder=2)
+    off = max(0.3, 0.025 * max(W, H))
+    for x1, y1, x2, y2, nome in seg:
+        xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
+        if abs(x2 - x1) >= abs(y2 - y1):       # viga horizontal: rótulo acima
+            ym -= off
+        else:                                   # viga vertical: rótulo à esquerda
+            xm -= off
+        ax.text(xm, ym, nome, fontsize=6.0, color="#78350F", fontweight="bold",
+                ha="center", va="center", zorder=5,
+                bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none",
+                          alpha=0.85))
+    s = max(0.22, 0.02 * max(W, H))
+    for p in pilares:
+        x, y = p.get("x_m"), p.get("y_m")
+        if x is None:
+            continue
+        ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s,
+                                   facecolor=VERMELHO, edgecolor="white",
+                                   lw=0.8, zorder=6))
+        ax.text(x + s * 0.75, y, p["pilar"], fontsize=5.6, color=NAVY,
+                fontweight="bold", ha="left", va="center", zorder=7)
+    ax.set_aspect("equal")
+    ax.invert_yaxis()                      # o y do editor cresce para baixo
+    ax.set_xlabel("x (m)", fontsize=9)
+    ax.set_ylabel("y (m)", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.grid(alpha=0.15)
+    ax.set_title("PLANTA DE FORMA — vigas/baldrames (amarelo) e pilares "
+                 "(vermelho)", fontsize=11, fontweight="bold", color=NAVY)
+    fig.tight_layout()
+    return fig
 
 
 # ------------------------------------------------------------ memoriais
@@ -300,6 +361,9 @@ def gerar_pdf(r, proj="projeto"):
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
         _capa(pdf, r, proj, len(gv), len(gb), len(gp))
+        planta = fig_planta(r)
+        if planta is not None:
+            _salva(pdf, planta)
         _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
                    f"{len(r['vigas'])} vigas)")
         for g in gv:

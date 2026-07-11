@@ -114,6 +114,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
         res, h = _detalhar_viga(nome, l["vaos"], w)
         vigas_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
                               comp=l["comp"], vaos=l["vaos"], w=w, secao=f"{BW}x{h}",
+                              pos=l["pos"], ini=l["ini"], fim=l["fim"],
                               mmax=_mmax(res), peso=_peso(res),
                               falha=bool(res and (res.get("falha_flexao") or res.get("falha_biela"))),
                               res=res))
@@ -137,6 +138,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
         peso = opt["peso_total"] if opt else 0.0
         aco_pil += peso
         pil_det.append(dict(pilar=nome, secao=secao, carga_tf=carga, Nk=Nk,
+                            x_m=p.get("x_m"), y_m=p.get("y_m"),
                             armadura=(opt["texto"] if opt else "SEÇÃO INSUFICIENTE"),
                             estribo=(f"ø{opt['phi_t']:.1f} c/{opt['s_est']:.0f}"
                                      if opt else "—"),
