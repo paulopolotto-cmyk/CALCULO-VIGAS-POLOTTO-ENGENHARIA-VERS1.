@@ -323,7 +323,7 @@ def fig_lajes(data, lajes):
         tel = " · telhado" if L.get("telhado") else ""
         ax.text(c["cx"], c["cy"],
                 f"{L['nome']}  ({tipo_curto(L['tipo'])})\n{c['Lx']}×{c['Ly']} m · "
-                f"h{L['h']}{tel}", ha="center", va="center", fontsize=8.5,
+                f"h{L['h']}{tel}", ha="center", va="center", fontsize=12,
                 fontweight="bold", color="#1e3a8a", zorder=6,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.88))
     for p in pilares:                                  # pilares
@@ -386,14 +386,15 @@ def fig_lajes_plotly(data, lajes):
         cxs.append(c["cx"])
         cys.append(c["cy"])
         tel = " · telhado" if L.get("telhado") else ""
-        txt.append(f"<b>{L['nome']}</b> {seta} ({tipo_curto(L['tipo'])})<br>"
-                   f"{c['Lx']}×{c['Ly']} m · h{L['h']}{tel}")
+        txt.append(f"<b>{L['nome']} {seta} ({tipo_curto(L['tipo'])})<br>"
+                   f"{c['Lx']}×{c['Ly']} m · h{L['h']}{tel}</b>")
         cd.append(L["nome"])
     fig = go.Figure(go.Scatter(
         x=cxs, y=cys, mode="markers+text", customdata=cd, hovertext=txt,
         hoverinfo="text", text=txt, textposition="middle center",
-        textfont=dict(size=11, color="#1e3a8a"), name="lajes", showlegend=False,
-        marker=dict(size=30, color="rgba(37,99,235,0.18)",
+        textfont=dict(size=15, color="#12245a", family="Arial Black, Arial"),
+        name="lajes", showlegend=False,
+        marker=dict(size=34, color="rgba(37,99,235,0.18)",
                     line=dict(color="#1d4ed8", width=1))))
     H = max((L["comodo"]["y1"] for L in lajes), default=15)
     fig.update_layout(shapes=shapes, margin=dict(l=8, r=8, t=54, b=8),
@@ -428,14 +429,14 @@ def fig_diagnostico(data, comodos, abertas):
                                    facecolor="#ef4444", alpha=0.22, edgecolor="#b91c1c",
                                    lw=0.7, hatch="//", zorder=1))
         ax.text(a["cx"], a["cy"], "SEM VIGA\nfechando", ha="center", va="center",
-                fontsize=8.5, fontweight="bold", color="#b91c1c", zorder=6)
+                fontsize=12, fontweight="bold", color="#b91c1c", zorder=6)
     for c in comodos:                                  # cômodos (verde / laranja)
         grande = c["menor"] > VAO_GRANDE
         cor = "#f59e0b" if grande else "#16a34a"
         ax.add_patch(Rectangle((c["x0"], c["y0"]), c["Lx"], c["Ly"], facecolor=cor,
                                alpha=0.16, edgecolor=cor, lw=1.2, zorder=1))
         ax.text(c["cx"], c["cy"], c["nome"] + (f"\nvão {c['menor']:.1f} m" if grande
-                else ""), ha="center", va="center", fontsize=8, fontweight="bold",
+                else ""), ha="center", va="center", fontsize=13, fontweight="bold",
                 color=("#92400e" if grande else "#14532d"), zorder=6)
     for v in vigas:                                    # vigas amarelas
         ax.plot([v.get("x1_m"), v.get("x2_m")], [v.get("y1_m"), v.get("y2_m")],

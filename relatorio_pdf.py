@@ -182,10 +182,10 @@ def fig_planta(r):
             ym -= off
         else:                                   # viga vertical: rótulo ao lado
             xm -= off
-        ax.text(xm, ym, nome, fontsize=11, color="#78350F", fontweight="bold",
+        ax.text(xm, ym, nome, fontsize=14, color="#78350F", fontweight="bold",
                 ha="center", va="center", zorder=5,
-                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none",
-                          alpha=0.9))
+                bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="none",
+                          alpha=0.92))
     s = max(0.28, 0.022 * max(W, H))
     for p in pilares:
         x, y = p.get("x_m"), p.get("y_m")
@@ -194,7 +194,7 @@ def fig_planta(r):
         ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s,
                                    facecolor=VERMELHO, edgecolor="white",
                                    lw=0.8, zorder=6))
-        ax.text(x + s * 0.8, y, p["pilar"], fontsize=10.5, color=NAVY,
+        ax.text(x + s * 0.8, y, p["pilar"], fontsize=13, color=NAVY,
                 fontweight="bold", ha="left", va="center", zorder=7)
     ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima como
     #                                        no editor (mesma orientação do desenho)
