@@ -17,7 +17,8 @@ import streamlit as st
 # importado (motor_viga/motor_pilar/ui_comum) após um deploy que muda ao
 # mesmo tempo um módulo e uma página — causa comum de ImportError/AttributeError.
 for _m in ("ui_comum", "motor_viga", "motor_pilar", "motor_laje", "editor_lancamento",
-           "desenhos_viga", "desenhos_pilar", "calc_projeto", "relatorio_pdf"):
+           "desenhos_viga", "desenhos_pilar", "calc_projeto", "calc_laje_projeto",
+           "relatorio_pdf"):
     if _m in sys.modules:
         try:
             importlib.reload(sys.modules[_m])

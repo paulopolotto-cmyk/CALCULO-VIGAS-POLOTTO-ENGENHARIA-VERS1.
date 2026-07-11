@@ -15,9 +15,12 @@ import json
 import streamlit as st
 import streamlit.components.v1 as components
 
+import pandas as pd
+
 from ui_comum import aplicar_estilo, header, sec, seletor_pagina, tabela
 import editor_lancamento as el
 import calc_projeto as cp
+import calc_laje_projeto as cl
 import relatorio_pdf as rpdf
 
 aplicar_estilo()
@@ -123,7 +126,8 @@ if ss.pc_vista == "lancar":
                          type="primary", width="stretch"):
                 ss.pc_data = d
                 ss.pc_proj = d.get("projeto") or ss.pc_proj
-                for k in ("pdf_completo", "pdf_reduzido", "pc_r"):
+                for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
+                          "laje_tipos", "laje_vigota"):
                     ss.pop(k, None)
                 _vista("conferir")
 
@@ -170,8 +174,60 @@ else:
             "longitudinal **CA-50A** (fyk = 500 MPa) · **estribos CA-50A ou "
             "CA-60A** · γc = 1,4 · γs = 1,15 · γf = 1,4 — NBR 6118.")
 
+    # ---- LAJES pré-moldadas (cômodos, direção, tipo de uso)
+    sec(1, "Lajes pré-moldadas — cômodos, direção e tipo de uso")
+    if ss.get("pc_comodos") is None:
+        ss["pc_comodos"] = cl.detectar_comodos(ss.pc_data.get("vigas", []))
+    comodos = ss["pc_comodos"]
+    ss.setdefault("laje_tipos", {})
+    ss.setdefault("laje_vigota", {})
+    if not comodos:
+        st.info("Não encontrei cômodos fechados por vigas para lançar as lajes.")
+        lajes = []
+        rl = {"aco_barras": 0.0, "vigotas_m": 0.0, "area": 0.0, "falhas": []}
+    else:
+        st.caption(f"Encontrei **{len(comodos)} cômodos**. A vigota já vem no **menor "
+                   "vão** (seta azul). Ajuste o **tipo de uso** (define a sobrecarga, "
+                   "NBR 6120) e, se quiser, troque a **direção** na tabela — o cálculo "
+                   "atualiza sozinho.")
+        _rows = [{"Laje": c["nome"], "Dimensões (m)": f"{c['Lx']}×{c['Ly']}",
+                  "Área (m²)": c["area"],
+                  "Vigotas": ss["laje_vigota"].get(c["nome"], c["vigota"]),
+                  "Tipo de uso (sobrecarga)":
+                      ss["laje_tipos"].get(c["nome"], cl.TIPO_PADRAO)}
+                 for c in comodos]
+        _ed = st.data_editor(
+            pd.DataFrame(_rows), hide_index=True, width="stretch", key="laje_editor",
+            column_config={
+                "Laje": st.column_config.TextColumn(disabled=True),
+                "Dimensões (m)": st.column_config.TextColumn(disabled=True),
+                "Área (m²)": st.column_config.NumberColumn(disabled=True, format="%.2f"),
+                "Vigotas": st.column_config.SelectboxColumn(
+                    options=["H", "V"],
+                    help="H = vigotas na horizontal · V = na vertical"),
+                "Tipo de uso (sobrecarga)": st.column_config.SelectboxColumn(
+                    options=cl.tipos_disponiveis()),
+            })
+        for _, _r in _ed.iterrows():
+            ss["laje_tipos"][_r["Laje"]] = _r["Tipo de uso (sobrecarga)"]
+            ss["laje_vigota"][_r["Laje"]] = _r["Vigotas"]
+        lajes = cl.calcular_lajes(comodos, ss["laje_tipos"], ss["laje_vigota"])
+        _fl = cl.fig_lajes(ss.pc_data, lajes)
+        if _fl is not None:
+            st.pyplot(_fl, width="stretch")
+        tabela([{"Laje": L["nome"], "Cômodo": cl.tipo_curto(L["tipo"]),
+                 "Dim (m)": f"{L['comodo']['Lx']}×{L['comodo']['Ly']}",
+                 "Vigota": ("→ horizontal" if L["vigota"] == "H" else "↑ vertical"),
+                 "Sobrec. (kN/m²)": L["q_uso"], "Altura": f"h {L['h']}",
+                 "Aço barras (kg)": L["aco_barras"]} for L in lajes])
+        rl = cl.resumo_lajes(lajes)
+        st.caption(f"Total das lajes: **{rl['area']} m²** · **{rl['vigotas_m']} m** de "
+                   f"vigota · aço complementar **{rl['aco_barras']} kg**. (As vigotas "
+                   "pré-moldadas já trazem a treliça; o aço acima é o de reforço/"
+                   "distribuição a comprar em barras.)")
+
     # ---- vigas de cobertura
-    sec(1, "Vigas de cobertura (viga contínua NBR 6118)")
+    sec(2, "Vigas de cobertura (viga contínua NBR 6118)")
     st.caption(f"Laje lançada na direção "
                f"**{'horizontal' if r['principal']=='H' else 'vertical'}** "
                f"(cobertura q ≈ {r['q_cob']} kN/m²). A seção cresce sozinha se o "
@@ -182,7 +238,7 @@ else:
              "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
 
     # ---- baldrames
-    sec(2, "Baldrames (vigas de fundação sob as paredes)")
+    sec(3, "Baldrames (vigas de fundação sob as paredes)")
     st.caption(f"Carga de parede ≈ {r['wall']} kN/m sobre cada linha de baldrame.")
     tabela([{"Baldrame": b["nome"], "Seção": b["secao"], "Nº vãos": b["nvaos"],
              "Vãos (m)": " + ".join(f"{x:.2f}" for x in b["vaos"]),
@@ -190,38 +246,43 @@ else:
              "Aço (kg)": b["peso"] if b["peso"] else "—"} for b in r["baldrames"]])
 
     # ---- pilares
-    sec(3, "Pilares (NBR 6118 — 14×30, seção cresce pela norma)")
+    sec(4, "Pilares (NBR 6118 — 14×30, seção cresce pela norma)")
     tabela([{"Pilar": p["pilar"], "Seção (cm)": p["secao"],
              "Carga (tf)": p["carga_tf"], "Armadura": p["armadura"],
              "Aço (kg)": p["peso"]} for p in r["pilares"]])
 
     # ---- fundação
-    sec(4, "Cargas na fundação")
+    sec(5, "Cargas na fundação")
     st.metric("Carga total à fundação (cobertura + alvenaria/baldrames)",
               f"{r['fund_tf']} tf")
     st.caption("A carga de cada sapata/estaca é a carga do pilar correspondente na "
                "tabela acima. O dimensionamento das fundações depende do SPT do terreno.")
 
     # ---- QUANTITATIVO de aço a comprar
-    sec(5, "Relação de aço a comprar (por etapa e total)", destaque=True)
-    q1, q2, q3, q4 = st.columns(4)
+    sec(6, "Relação de aço a comprar (por etapa e total)", destaque=True)
+    aco_lajes = rl["aco_barras"]
+    total_geral = round(r["aco_total"] + aco_lajes, 1)
+    q1, q2, q3, q4, q5 = st.columns(5)
     q1.metric("Vigas", f"{r['aco_vigas']} kg")
     q2.metric("Pilares", f"{r['aco_pilares']} kg")
     q3.metric("Baldrames", f"{r['aco_baldrames']} kg")
-    q4.metric("TOTAL", f"{r['aco_total']} kg")
+    q4.metric("Lajes", f"{aco_lajes} kg")
+    q5.metric("TOTAL", f"{total_geral} kg")
     tabela([
         {"Etapa": "Vigas de cobertura", "Aço CA-50A (kg)": r["aco_vigas"]},
         {"Etapa": "Pilares", "Aço CA-50A (kg)": r["aco_pilares"]},
         {"Etapa": "Baldrames", "Aço CA-50A (kg)": r["aco_baldrames"]},
-        {"Etapa": "TOTAL A COMPRAR", "Aço CA-50A (kg)": r["aco_total"]},
+        {"Etapa": "Lajes (reforço + distribuição)", "Aço CA-50A (kg)": aco_lajes},
+        {"Etapa": "TOTAL A COMPRAR", "Aço CA-50A (kg)": total_geral},
     ])
-    st.caption("Inclui ~10% de perdas/emendas em vigas e baldrames e ~8% nos pilares.")
-    if r["falhas"]:
-        st.warning("Verificar manualmente (não passaram nem no maior perfil): "
-                   + ", ".join(r["falhas"]))
+    st.caption(f"Inclui ~10% de perdas/emendas. Lajes: além do aço, prever "
+               f"**{rl['vigotas_m']} m de vigota** e **{rl['area']} m² de laje** "
+               "(EPS + capa). As vigotas já trazem a treliça (CA-60).")
+    if r["falhas"] or rl["falhas"]:
+        st.warning("Verificar manualmente: " + ", ".join(r["falhas"] + rl["falhas"]))
 
     # ---- relatório resumido em HTML (rápido)
-    sec(6, "Baixar os relatórios")
+    sec(7, "Baixar os relatórios")
     html_rel = cp.relatorio_html(r, proj)
     st.download_button("📥 Relatório resumido (HTML — abre no navegador)",
                        data=html_rel.encode("utf-8"),
