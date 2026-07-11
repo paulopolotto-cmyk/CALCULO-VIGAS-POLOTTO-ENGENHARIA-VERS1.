@@ -126,17 +126,27 @@ if ss.pc_vista == "lancar":
                        "Clique abaixo para ver a planta e conferir.")
             if st.button("👁️ Ver a planta numerada para CONFERIR →",
                          type="primary", width="stretch"):
-                ss.pc_data = d
+                d_limpo, _stats = fa.limpar_lancamento(d)   # endireita + tira dup.
+                ss.pc_data = d_limpo
+                ss["pc_limpeza"] = _stats
                 ss.pc_proj = d.get("projeto") or ss.pc_proj
                 for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
-                          "laje_manuais", "laje_excluidas", "laje_mcount"):
+                          "laje_manuais", "laje_excluidas", "laje_mcount",
+                          "fecha_novas", "fecha_ok"):
                     ss.pop(k, None)
                 _vista("conferir")
 
 # ============================================================ 2) CONFERIR
 elif ss.pc_vista == "conferir":
     sec(1, "Confira a planta com o seu desenho")
+    _lz = ss.get("pc_limpeza")
+    if _lz and (_lz["endireitadas"] or _lz["duplicadas"] or _lz["tocos"]):
+        st.info(f"🧹 **Limpei o seu lançamento ao carregar:** endireitei "
+                f"**{_lz['endireitadas']}** viga(s) tortas (para 90°), removi "
+                f"**{_lz['duplicadas']}** viga(s) em duplicidade e **{_lz['tocos']}** "
+                "toco(s). As diagonais de verdade foram mantidas. Se sumiu algo que "
+                "você queria, é só ir em **Editar**.")
     st.caption("Compare este croqui com a planta que você lançou. **Faltou ou "
                "sobrou** alguma viga ou pilar?")
     planta = rpdf.fig_planta(cp.planta_do_json(ss.pc_data))
@@ -240,7 +250,7 @@ elif ss.pc_vista == "conferir":
                 for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "pdf_completo", "pdf_reduzido"):
+                          "pdf_completo", "pdf_reduzido", "pc_limpeza"):
                     ss.pop(k, None)
                 st.success("Vigas aplicadas e pilares renumerados! Veja a planta "
                            "atualizada no topo.")

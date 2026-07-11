@@ -243,6 +243,87 @@ def dedup_vigas(vigas, tol=0.15):
     return [v for k, v in enumerate(vigas) if k not in remove]
 
 
+STRAIGHT_ANG = 15.0    # graus — abaixo disso endireita p/ 90°; acima o Paulo ajusta
+SNAP_LINHA = 0.20      # m — junta vigas paralelas coladas numa linha só (= tol do agrupar)
+STUB_MIN = 0.30        # m — viga menor que isso é toco (lixo do desenho)
+
+
+def endireitar_vigas(data, ang=STRAIGHT_ANG, stub=STUB_MIN):
+    """Endireita as vigas quase-ortogonais (jitter < ang graus) para 90° exato e
+    remove tocos (< stub m). Diagonal DE VERDADE (ângulo grande) é mantida — o
+    engenheiro ajusta à mão. Devolve (data, n_endireitadas, n_tocos)."""
+    d = copy.deepcopy(data)
+    out, n_end, n_stub = [], 0, 0
+    for v in d.get("vigas", []):
+        x1, y1, x2, y2 = v.get("x1_m"), v.get("y1_m"), v.get("x2_m"), v.get("y2_m")
+        if None in (x1, y1, x2, y2):
+            out.append(v)
+            continue
+        dx, dy = x2 - x1, y2 - y1
+        if math.hypot(dx, dy) < stub:                 # toco / lixo
+            n_stub += 1
+            continue
+        menor, maior = min(abs(dx), abs(dy)), max(abs(dx), abs(dy))
+        if menor > 0.01 and maior > 0.01 and math.degrees(math.atan2(menor, maior)) <= ang:
+            if abs(dx) >= abs(dy):                     # horizontal
+                ym = round((y1 + y2) / 2, 2)
+                v = dict(v, y1_m=ym, y2_m=ym)
+            else:                                       # vertical
+                xm = round((x1 + x2) / 2, 2)
+                v = dict(v, x1_m=xm, x2_m=xm)
+            n_end += 1
+        out.append(v)
+    d["vigas"] = out
+    return d, n_end, n_stub
+
+
+def _merge_pos(vals, tol):
+    """Agrupa posições próximas (≤ tol) e mapeia cada uma p/ a média do grupo."""
+    rep = {}
+    grupos = []
+    for x in sorted(vals):
+        if grupos and x - grupos[-1][-1] <= tol:
+            grupos[-1].append(x)
+        else:
+            grupos.append([x])
+    for g in grupos:
+        r = round(sum(g) / len(g), 2)
+        for x in g:
+            rep[round(x, 2)] = r
+    return rep
+
+
+def snap_linhas(data, tol=SNAP_LINHA):
+    """Cola as vigas paralelas quase-coincidentes (jitter ≤ tol) numa linha só —
+    tira as 'linhas duplas' que aparecem no desenho à mão. Só mexe no eixo fixo."""
+    d = copy.deepcopy(data)
+    Hy = [s[1] for v in d.get("vigas", []) if (s := _seg(v)) and s[0] == "H"]
+    Vx = [s[1] for v in d.get("vigas", []) if (s := _seg(v)) and s[0] == "V"]
+    repH, repV = _merge_pos(Hy, tol), _merge_pos(Vx, tol)
+    for v in d.get("vigas", []):
+        s = _seg(v)
+        if s is None:
+            continue
+        if s[0] == "H":
+            ym = repH.get(round(s[1], 2), s[1])
+            v["y1_m"] = v["y2_m"] = ym
+        else:
+            xm = repV.get(round(s[1], 2), s[1])
+            v["x1_m"] = v["x2_m"] = xm
+    return d
+
+
+def limpar_lancamento(data):
+    """Faxina no lançamento à mão: endireita (90°), cola linhas paralelas coladas,
+    tira tocos e DUPLICATAS exatas. NÃO restrutura apoios (calc estável).
+    Devolve (data_limpo, stats)."""
+    d, n_end, n_stub = endireitar_vigas(data)
+    d = snap_linhas(d)
+    antes = len(d.get("vigas", []))
+    d["vigas"] = dedup_vigas(d.get("vigas", []))
+    return d, dict(endireitadas=n_end, tocos=n_stub, duplicadas=antes - len(d["vigas"]))
+
+
 def renumerar_pilares(data):
     """Renumera P1..Pn (cima→baixo, esq→dir) e atualiza o de/ate das vigas."""
     d = copy.deepcopy(data)
@@ -268,9 +349,11 @@ def _viga_limpa(n):
 
 
 def aplicar_fechamento(data, novas_aceitas):
-    """Junta as vigas aceitas, tira duplicidade e renumera os pilares."""
+    """Limpa a base (endireita/cola/dedup), junta as vigas aceitas e renumera."""
     d = copy.deepcopy(data)
-    d["vigas"] = dedup_vigas(list(d.get("vigas", []))
+    d, _, _ = endireitar_vigas(d)
+    d = snap_linhas(d)
+    d["vigas"] = dedup_vigas(d.get("vigas", [])
                              + [_viga_limpa(n) for n in novas_aceitas])
     return renumerar_pilares(d)
 
