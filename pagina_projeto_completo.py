@@ -16,6 +16,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 import pandas as pd
+import matplotlib.pyplot as plt
 
 from ui_comum import aplicar_estilo, header, sec, seletor_pagina, tabela
 import editor_lancamento as el
@@ -140,6 +141,7 @@ elif ss.pc_vista == "conferir":
     planta = rpdf.fig_planta(cp.planta_do_json(ss.pc_data))
     if planta is not None:
         st.pyplot(planta, width="stretch")
+        plt.close(planta)                      # libera memória (evita vazamento)
         st.caption("Vigas/baldrames em **amarelo** (VH…, VV…) e pilares em "
                    "**vermelho** (P…) — a mesma numeração que vai no detalhamento.")
     else:
@@ -241,6 +243,7 @@ else:
         _fl = cl.fig_lajes(ss.pc_data, lajes)
         if _fl is not None:
             st.pyplot(_fl, width="stretch")
+            plt.close(_fl)                     # libera memória (evita vazamento)
         rl = cl.resumo_lajes(lajes)
         st.caption(f"Total: **{rl['area']} m²** de laje · **{rl['vigotas_m']} m** de "
                    f"vigota · aço complementar **{rl['aco_barras']} kg**. "
