@@ -129,6 +129,73 @@ def detectar_comodos(vigas, tol=0.30, area_min=1.5, lado_min=0.6):
     return comodos
 
 
+def regioes_abertas(vigas, tol=0.30, area_min=2.0):
+    """Áreas cercadas mas SEM viga fechando todos os lados (a laje não teria onde
+    apoiar). Devolve os retângulos dessas aberturas internas — o engenheiro lança
+    viga para fechar. Exclui o exterior da construção."""
+    H, V = _segmentos(vigas)
+    Xs = sorted(set(round(x, 2) for x, _, _ in V))
+    Ys = sorted(set(round(y, 2) for y, _, _ in H))
+    if len(Xs) < 2 or len(Ys) < 2:
+        return []
+
+    def bh(y, x0, x1):
+        return any(abs(yy - y) <= tol and a <= x0 + tol and b >= x1 - tol
+                   for yy, a, b in H)
+
+    def bv(x, y0, y1):
+        return any(abs(xx - x) <= tol and a <= y0 + tol and b >= y1 - tol
+                   for xx, a, b in V)
+
+    nX, nY = len(Xs) - 1, len(Ys) - 1
+    parent = {(i, j): (i, j) for i in range(nX) for j in range(nY)}
+
+    def find(c):
+        r = c
+        while parent[r] != r:
+            r = parent[r]
+        while parent[c] != r:
+            parent[c], c = r, parent[c]
+        return r
+
+    for i in range(nX):
+        for j in range(nY):
+            if i + 1 < nX and not bv(Xs[i + 1], Ys[j], Ys[j + 1]):
+                parent[find((i, j))] = find((i + 1, j))
+            if j + 1 < nY and not bh(Ys[j + 1], Xs[i], Xs[i + 1]):
+                parent[find((i, j))] = find((i, j + 1))
+    grupos = {}
+    for i in range(nX):
+        for j in range(nY):
+            grupos.setdefault(find((i, j)), []).append((i, j))
+    ab = []
+    for cells in grupos.values():
+        cset = set(cells)
+        fechado = all(
+            ((i - 1, j) in cset or bv(Xs[i], Ys[j], Ys[j + 1]))
+            and ((i + 1, j) in cset or bv(Xs[i + 1], Ys[j], Ys[j + 1]))
+            and ((i, j - 1) in cset or bh(Ys[j], Xs[i], Xs[i + 1]))
+            and ((i, j + 1) in cset or bh(Ys[j + 1], Xs[i], Xs[i + 1]))
+            for (i, j) in cells)
+        if fechado:
+            continue
+        x0 = min(Xs[i] for i, j in cells)
+        x1 = max(Xs[i + 1] for i, j in cells)
+        y0 = min(Ys[j] for i, j in cells)
+        y1 = max(Ys[j + 1] for i, j in cells)
+        area = sum((Xs[i + 1] - Xs[i]) * (Ys[j + 1] - Ys[j]) for i, j in cells)
+        borda = any(i == 0 or i == nX - 1 or j == 0 or j == nY - 1 for i, j in cells)
+        ab.append(dict(x0=x0, x1=x1, y0=y0, y1=y1, cx=round((x0 + x1) / 2, 2),
+                       cy=round((y0 + y1) / 2, 2), area=round(area, 2), borda=borda,
+                       celulas=[(Xs[i], Ys[j], Xs[i + 1], Ys[j + 1])
+                                for (i, j) in cells]))
+    ext = [a for a in ab if a["borda"]]                # exterior = maior da borda
+    if ext:
+        maior = max(ext, key=lambda a: a["area"])
+        ab = [a for a in ab if a is not maior]
+    return [a for a in ab if a["area"] >= area_min]
+
+
 # ------------------------------------------------------------ cálculo da laje
 def altura_laje(menor_m, continua=False):
     """Menor altura tabelada que atende o pré-dimensionamento (flecha)."""
@@ -339,4 +406,52 @@ def fig_lajes_plotly(data, lajes):
     fig.update_yaxes(scaleanchor="x", scaleratio=1, title_text="y (m)",
                      gridcolor="#eef2f7")
     fig.update_xaxes(title_text="x (m)", gridcolor="#eef2f7")
+    return fig
+
+
+VAO_GRANDE = 5.0     # m — vão da vigota acima disso pede protendida ou viga no meio
+
+
+def fig_diagnostico(data, comodos, abertas):
+    """Planta de diagnóstico das vigas: 🟩 laje OK · 🟧 vão grande · 🟥 sem viga
+    fechando (o engenheiro vê onde precisa lançar/fechar viga)."""
+    vigas = data.get("vigas", [])
+    xs = [v.get(k) for v in vigas for k in ("x1_m", "x2_m") if v.get(k) is not None]
+    ys = [v.get(k) for v in vigas for k in ("y1_m", "y2_m") if v.get(k) is not None]
+    W, H = (max(xs) if xs else 15), (max(ys) if ys else 15)
+    fig, ax = plt.subplots(figsize=(min(12, max(7, 0.7 * W + 2)),
+                                    min(16, max(6, 0.7 * H + 2))), dpi=140)
+    fig.patch.set_facecolor("white")
+    for a in abertas:                                  # aberturas — só as células abertas
+        for (cx0, cy0, cx1, cy1) in a.get("celulas", []):
+            ax.add_patch(Rectangle((cx0, cy0), cx1 - cx0, cy1 - cy0,
+                                   facecolor="#ef4444", alpha=0.22, edgecolor="#b91c1c",
+                                   lw=0.7, hatch="//", zorder=1))
+        ax.text(a["cx"], a["cy"], "SEM VIGA\nfechando", ha="center", va="center",
+                fontsize=8.5, fontweight="bold", color="#b91c1c", zorder=6)
+    for c in comodos:                                  # cômodos (verde / laranja)
+        grande = c["menor"] > VAO_GRANDE
+        cor = "#f59e0b" if grande else "#16a34a"
+        ax.add_patch(Rectangle((c["x0"], c["y0"]), c["Lx"], c["Ly"], facecolor=cor,
+                               alpha=0.16, edgecolor=cor, lw=1.2, zorder=1))
+        ax.text(c["cx"], c["cy"], c["nome"] + (f"\nvão {c['menor']:.1f} m" if grande
+                else ""), ha="center", va="center", fontsize=8, fontweight="bold",
+                color=("#92400e" if grande else "#14532d"), zorder=6)
+    for v in vigas:                                    # vigas amarelas
+        ax.plot([v.get("x1_m"), v.get("x2_m")], [v.get("y1_m"), v.get("y2_m")],
+                color="#d98a04", lw=3.0, solid_capstyle="round", zorder=2)
+    for p in data.get("pilares", []):                  # pilares
+        x, y = p.get("x_m"), p.get("y_m")
+        if x is None:
+            continue
+        ax.add_patch(Rectangle((x - 0.16, y - 0.16), 0.32, 0.32,
+                               facecolor="#7f1d1d", zorder=7))
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.15)
+    ax.set_xlabel("x (m)", fontsize=9)
+    ax.set_ylabel("y (m)", fontsize=9)
+    ax.set_title("DIAGNÓSTICO — verde: laje OK · laranja: vão grande (>5 m) · "
+                 "vermelho: SEM viga fechando", fontsize=11, fontweight="bold",
+                 color="#0f2b4c")
+    fig.tight_layout()
     return fig

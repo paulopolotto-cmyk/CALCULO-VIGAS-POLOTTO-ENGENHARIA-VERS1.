@@ -153,6 +153,30 @@ elif ss.pc_vista == "conferir":
     c2.metric("Vigas (trechos)", rr["n_vigas"])
     c3.metric("Vigas contínuas", rr["n_continuas"])
 
+    # ---- diagnóstico das vigas: onde não fecha / vão grande
+    sec(2, "Diagnóstico das vigas (fechamento das lajes e vãos)")
+    _com = cl.detectar_comodos(ss.pc_data.get("vigas", []))
+    _ab = cl.regioes_abertas(ss.pc_data.get("vigas", []))
+    _grandes = [c for c in _com if c["menor"] > cl.VAO_GRANDE]
+    if _ab or _grandes:
+        _fd = cl.fig_diagnostico(ss.pc_data, _com, _ab)
+        st.pyplot(_fd, width="stretch")
+        plt.close(_fd)
+        if _ab:
+            st.warning(f"⚠️ **{len(_ab)} área(s) NÃO estão fechadas por vigas** "
+                       "(vermelho hachurado) — a laje não teria onde se apoiar. Volte "
+                       "em **Editar** e lance uma viga fechando esses lados.")
+        if _grandes:
+            st.warning("⚠️ **Vão grande** (laranja): " + ", ".join(
+                f"{c['nome']} = {c['menor']:.1f} m" for c in _grandes)
+                + " — a vigota passa de ~5 m; considere uma **viga intermediária** "
+                "(divide a laje) ou **vigota protendida**.")
+        st.caption("Você é o engenheiro — decida o melhor jeito de lançar. Corrija no "
+                   "**Editar** ou siga assim (as áreas vermelhas ficam sem laje).")
+    else:
+        st.success("✅ Estrutura fechada: todas as áreas têm viga em volta e sem vão "
+                   "excessivo para pré-moldada.")
+
     st.write("")
     b1, b2 = st.columns(2)
     if b1.button("✏️ Editar (faltou/sobrou algo)", width="stretch"):
