@@ -139,9 +139,11 @@ def altura_laje(menor_m, continua=False):
     return 25
 
 
-def calcular_laje(comodo, tipo=TIPO_PADRAO, vigota=None, fck=FCK):
-    """Roda uma laje treliçada no motor_laje. `vigota` (H/V) permite forçar a
-    direção; se None usa a do cômodo (menor vão)."""
+def calcular_laje(comodo, tipo=TIPO_PADRAO, vigota=None, fck=FCK,
+                  telhado=False, g_telhado=0.5):
+    """Roda uma laje treliçada no motor_laje. `vigota` (H/V) força a direção;
+    `telhado`=True soma o peso do telhado (g_telhado kN/m²) à carga permanente.
+    O peso próprio da laje já é incluído pelo motor."""
     d = dict(comodo)
     if vigota:
         d["vigota"] = vigota
@@ -151,26 +153,45 @@ def calcular_laje(comodo, tipo=TIPO_PADRAO, vigota=None, fck=FCK):
     else:                              # vigotas correm em y -> vencem Ly
         lx, ly = d["Ly"], d["Lx"]
     q = ml.CARGAS_USO.get(tipo, 1.5)
+    g_extra = float(g_telhado) if telhado else 0.0    # peso do telhado (kN/m²)
     h = altura_laje(min(lx, ly))
     dados = {"lx": lx, "ly": ly, "h": h, "enchimento": "EPS",
-             "continuidade": "biapoiada", "fck": fck, "g_rev": 1.0, "q_uso": q}
+             "continuidade": "biapoiada", "fck": fck, "g_rev": 1.0,
+             "g_parede": g_extra, "q_uso": q}
     r = ml.calcular_laje_trelicada(dados)
     det = None if r.get("erros") else ml.detalhar_armadura_trelica(r)
     aco = sum(x["peso"] for x in det["quadro"] if x["kind"] == "barra") if det else 0.0
     vig = (r.get("quant") or {}).get("comp_vigotas", 0.0)
     return dict(nome=comodo["nome"], comodo=comodo, tipo=tipo, q_uso=q,
-                vigota=d["vigota"], h=h, res=r, det=det,
-                aco_barras=round(aco, 1), vigotas_m=round(vig, 1),
+                vigota=d["vigota"], h=h, telhado=telhado, g_telhado=g_extra,
+                res=r, det=det, aco_barras=round(aco, 1), vigotas_m=round(vig, 1),
                 area=comodo["area"], falha=bool(r.get("erros")))
 
 
-def calcular_lajes(comodos, tipos=None, vigotas=None, fck=FCK):
-    """Calcula todas as lajes. `tipos`/`vigotas` = dicts {nome: valor} p/ ajuste."""
+def calcular_lajes(comodos, tipos=None, vigotas=None, telhados=None,
+                   fck=FCK, g_telhado=0.5):
+    """Calcula todas as lajes. tipos/vigotas/telhados = dicts {nome: valor}."""
     tipos = tipos or {}
     vigotas = vigotas or {}
+    telhados = telhados or {}
     return [calcular_laje(c, tipo=tipos.get(c["nome"], TIPO_PADRAO),
-                          vigota=vigotas.get(c["nome"]), fck=fck)
+                          vigota=vigotas.get(c["nome"]),
+                          telhado=bool(telhados.get(c["nome"], False)),
+                          g_telhado=g_telhado, fck=fck)
             for c in comodos]
+
+
+def comodo_manual(x0, x1, y0, y1, nome):
+    """Cria um cômodo (laje) lançado à mão pelo engenheiro, a partir dos limites."""
+    x0, x1 = sorted((float(x0), float(x1)))
+    y0, y1 = sorted((float(y0), float(y1)))
+    Lx, Ly = round(x1 - x0, 2), round(y1 - y0, 2)
+    return dict(x0=x0, x1=x1, y0=y0, y1=y1,
+                cx=round((x0 + x1) / 2, 2), cy=round((y0 + y1) / 2, 2),
+                Lx=Lx, Ly=Ly, area=round(Lx * Ly, 2),
+                menor=min(Lx, Ly), maior=max(Lx, Ly),
+                vigota=("H" if Lx <= Ly else "V"), retangular=True,
+                nome=nome, manual=True)
 
 
 def tipos_disponiveis():
@@ -205,9 +226,11 @@ def fig_lajes(data, lajes):
                 color="#d98a04", lw=3.0, solid_capstyle="round", zorder=2)
     for L in lajes:                                    # cômodos + direção
         c = L["comodo"]
+        manual = c.get("manual")
         ax.add_patch(Rectangle((c["x0"], c["y0"]), c["Lx"], c["Ly"],
-                               facecolor="#3b82f6", alpha=0.12,
-                               edgecolor="#1d4ed8", lw=1.0, zorder=1))
+                               facecolor=("#16a34a" if manual else "#3b82f6"),
+                               alpha=0.12, edgecolor=("#15803d" if manual else "#1d4ed8"),
+                               lw=1.2, ls=("--" if manual else "-"), zorder=1))
         m = 0.18 * min(c["Lx"], c["Ly"])
         if L["vigota"] == "H":
             ax.annotate("", xy=(c["x1"] - m, c["cy"]), xytext=(c["x0"] + m, c["cy"]),
@@ -215,9 +238,10 @@ def fig_lajes(data, lajes):
         else:
             ax.annotate("", xy=(c["cx"], c["y1"] - m), xytext=(c["cx"], c["y0"] + m),
                         arrowprops=dict(arrowstyle="<->", color="#1d4ed8", lw=1.4))
+        tel = " · telhado" if L.get("telhado") else ""
         ax.text(c["cx"], c["cy"],
                 f"{L['nome']}  ({tipo_curto(L['tipo'])})\n{c['Lx']}×{c['Ly']} m · "
-                f"h{L['h']}", ha="center", va="center", fontsize=8.5,
+                f"h{L['h']}{tel}", ha="center", va="center", fontsize=8.5,
                 fontweight="bold", color="#1e3a8a", zorder=6,
                 bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="none", alpha=0.88))
     for p in pilares:                                  # pilares

@@ -127,7 +127,8 @@ if ss.pc_vista == "lancar":
                 ss.pc_data = d
                 ss.pc_proj = d.get("projeto") or ss.pc_proj
                 for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
-                          "laje_tipos", "laje_vigota"):
+                          "laje_tipos", "laje_vigota", "laje_telhado",
+                          "laje_manuais", "laje_excluidas", "laje_mcount"):
                     ss.pop(k, None)
                 _vista("conferir")
 
@@ -174,57 +175,101 @@ else:
             "longitudinal **CA-50A** (fyk = 500 MPa) · **estribos CA-50A ou "
             "CA-60A** · γc = 1,4 · γs = 1,15 · γf = 1,4 — NBR 6118.")
 
-    # ---- LAJES pré-moldadas (cômodos, direção, tipo de uso)
-    sec(1, "Lajes pré-moldadas — cômodos, direção e tipo de uso")
+    # ---- LAJES pré-moldadas — lançamento (direção, tipo, telhado, add/excluir)
+    sec(1, "Lajes pré-moldadas — direção, tipo de uso e telhado")
     if ss.get("pc_comodos") is None:
         ss["pc_comodos"] = cl.detectar_comodos(ss.pc_data.get("vigas", []))
-    comodos = ss["pc_comodos"]
+    ss.setdefault("laje_manuais", [])
+    ss.setdefault("laje_excluidas", [])
     ss.setdefault("laje_tipos", {})
     ss.setdefault("laje_vigota", {})
-    if not comodos:
-        st.info("Não encontrei cômodos fechados por vigas para lançar as lajes.")
-        lajes = []
-        rl = {"aco_barras": 0.0, "vigotas_m": 0.0, "area": 0.0, "falhas": []}
-    else:
-        st.caption(f"Encontrei **{len(comodos)} cômodos**. A vigota já vem no **menor "
-                   "vão** (seta azul). Ajuste o **tipo de uso** (define a sobrecarga, "
-                   "NBR 6120) e, se quiser, troque a **direção** na tabela — o cálculo "
-                   "atualiza sozinho.")
-        _rows = [{"Laje": c["nome"], "Dimensões (m)": f"{c['Lx']}×{c['Ly']}",
-                  "Área (m²)": c["area"],
-                  "Vigotas": ss["laje_vigota"].get(c["nome"], c["vigota"]),
-                  "Tipo de uso (sobrecarga)":
-                      ss["laje_tipos"].get(c["nome"], cl.TIPO_PADRAO)}
-                 for c in comodos]
+    ss.setdefault("laje_telhado", {})
+    ss.setdefault("laje_mcount", 0)
+    ss.setdefault("g_telhado", 0.5)
+
+    comodos = ([c for c in ss["pc_comodos"] if c["nome"] not in ss["laje_excluidas"]]
+               + ss["laje_manuais"])
+
+    ss["g_telhado"] = st.number_input(
+        "Peso do telhado (kN/m²) — aplicado nas lajes marcadas com telhado",
+        min_value=0.0, max_value=5.0, value=float(ss["g_telhado"]), step=0.1,
+        format="%.2f")
+    st.caption("O programa acha os cômodos fechados por vigas; **complete com "
+               "➕ Adicionar laje** o que faltou e **exclua** o que não for laje. A "
+               "**direção** já vem no menor vão (troque H/V). Marque **Telhado** onde a "
+               "cobertura apoia. O **peso próprio** de cada laje já entra (NBR 6120).")
+
+    if comodos:
+        _rows = [{"Laje": c["nome"], "Origem": "à mão" if c.get("manual") else "auto",
+                  "Dim (m)": f"{c['Lx']}×{c['Ly']}", "Área": c["area"],
+                  "Direção": ss["laje_vigota"].get(c["nome"], c["vigota"]),
+                  "Uso (sobrecarga NBR 6120)":
+                      ss["laje_tipos"].get(c["nome"], cl.TIPO_PADRAO),
+                  "Telhado": bool(ss["laje_telhado"].get(c["nome"], False)),
+                  "Excluir": False} for c in comodos]
         _ed = st.data_editor(
-            pd.DataFrame(_rows), hide_index=True, width="stretch", key="laje_editor",
+            pd.DataFrame(_rows), hide_index=True, width="stretch",
+            key=f"laje_ed_{len(comodos)}_{len(ss['laje_excluidas'])}",
             column_config={
-                "Laje": st.column_config.TextColumn(disabled=True),
-                "Dimensões (m)": st.column_config.TextColumn(disabled=True),
-                "Área (m²)": st.column_config.NumberColumn(disabled=True, format="%.2f"),
-                "Vigotas": st.column_config.SelectboxColumn(
-                    options=["H", "V"],
-                    help="H = vigotas na horizontal · V = na vertical"),
-                "Tipo de uso (sobrecarga)": st.column_config.SelectboxColumn(
-                    options=cl.tipos_disponiveis()),
+                "Laje": st.column_config.TextColumn(disabled=True, width="small"),
+                "Origem": st.column_config.TextColumn(disabled=True, width="small"),
+                "Dim (m)": st.column_config.TextColumn(disabled=True),
+                "Área": st.column_config.NumberColumn(disabled=True, format="%.2f"),
+                "Direção": st.column_config.SelectboxColumn(
+                    options=["H", "V"], help="H = vigotas na horizontal · V = na vertical"),
+                "Uso (sobrecarga NBR 6120)": st.column_config.SelectboxColumn(
+                    options=cl.tipos_disponiveis(), width="large"),
+                "Telhado": st.column_config.CheckboxColumn(help="Recebe o peso do telhado?"),
+                "Excluir": st.column_config.CheckboxColumn(help="Marque para remover"),
             })
+        _rem = []
         for _, _r in _ed.iterrows():
-            ss["laje_tipos"][_r["Laje"]] = _r["Tipo de uso (sobrecarga)"]
-            ss["laje_vigota"][_r["Laje"]] = _r["Vigotas"]
-        lajes = cl.calcular_lajes(comodos, ss["laje_tipos"], ss["laje_vigota"])
+            nm = _r["Laje"]
+            ss["laje_tipos"][nm] = _r["Uso (sobrecarga NBR 6120)"]
+            ss["laje_vigota"][nm] = _r["Direção"]
+            ss["laje_telhado"][nm] = bool(_r["Telhado"])
+            if _r["Excluir"]:
+                _rem.append(nm)
+        if _rem:
+            ss["laje_excluidas"] = list(set(ss["laje_excluidas"])
+                                        | {n for n in _rem if not n.startswith("M")})
+            ss["laje_manuais"] = [c for c in ss["laje_manuais"]
+                                  if c["nome"] not in _rem]
+            st.rerun()
+        lajes = cl.calcular_lajes(comodos, ss["laje_tipos"], ss["laje_vigota"],
+                                  ss["laje_telhado"], g_telhado=ss["g_telhado"])
         _fl = cl.fig_lajes(ss.pc_data, lajes)
         if _fl is not None:
             st.pyplot(_fl, width="stretch")
-        tabela([{"Laje": L["nome"], "Cômodo": cl.tipo_curto(L["tipo"]),
-                 "Dim (m)": f"{L['comodo']['Lx']}×{L['comodo']['Ly']}",
-                 "Vigota": ("→ horizontal" if L["vigota"] == "H" else "↑ vertical"),
-                 "Sobrec. (kN/m²)": L["q_uso"], "Altura": f"h {L['h']}",
-                 "Aço barras (kg)": L["aco_barras"]} for L in lajes])
         rl = cl.resumo_lajes(lajes)
-        st.caption(f"Total das lajes: **{rl['area']} m²** · **{rl['vigotas_m']} m** de "
-                   f"vigota · aço complementar **{rl['aco_barras']} kg**. (As vigotas "
-                   "pré-moldadas já trazem a treliça; o aço acima é o de reforço/"
-                   "distribuição a comprar em barras.)")
+        st.caption(f"Total: **{rl['area']} m²** de laje · **{rl['vigotas_m']} m** de "
+                   f"vigota · aço complementar **{rl['aco_barras']} kg**. "
+                   "🟦 detectada · 🟩 tracejada = lançada à mão.")
+    else:
+        st.info("Nenhuma laje ainda — use **➕ Adicionar laje** abaixo para lançar.")
+        lajes = []
+        rl = {"aco_barras": 0.0, "vigotas_m": 0.0, "area": 0.0, "falhas": []}
+
+    with st.expander("➕ Adicionar laje (onde a detecção não pegou)"):
+        st.caption("Informe os limites do cômodo em metros (os mesmos eixos x/y da "
+                   "planta acima). A laje sai retangular entre esses limites.")
+        a1, a2, a3, a4 = st.columns(4)
+        _x0 = a1.number_input("x de", value=0.0, step=0.1, format="%.2f", key="nl_x0")
+        _x1 = a2.number_input("x até", value=3.0, step=0.1, format="%.2f", key="nl_x1")
+        _y0 = a3.number_input("y de", value=0.0, step=0.1, format="%.2f", key="nl_y0")
+        _y1 = a4.number_input("y até", value=3.0, step=0.1, format="%.2f", key="nl_y1")
+        _tp = st.selectbox("Tipo de uso", cl.tipos_disponiveis(), key="nl_tp")
+        _tl = st.checkbox("Recebe telhado", key="nl_tl")
+        if st.button("Adicionar laje", type="primary"):
+            if abs(_x1 - _x0) < 0.3 or abs(_y1 - _y0) < 0.3:
+                st.warning("Cômodo muito pequeno — confira os limites.")
+            else:
+                ss["laje_mcount"] += 1
+                _nm = f"M{ss['laje_mcount']}"
+                ss["laje_manuais"].append(cl.comodo_manual(_x0, _x1, _y0, _y1, _nm))
+                ss["laje_tipos"][_nm] = _tp
+                ss["laje_telhado"][_nm] = _tl
+                st.rerun()
 
     # ---- vigas de cobertura
     sec(2, "Vigas de cobertura (viga contínua NBR 6118)")
