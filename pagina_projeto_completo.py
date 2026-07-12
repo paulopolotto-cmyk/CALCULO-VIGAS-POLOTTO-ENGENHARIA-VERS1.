@@ -320,6 +320,17 @@ else:
     ss.setdefault("laje_flip", 0)
     ss.setdefault("g_telhado", 0.5)
 
+    # sentido lançado no EDITOR (botão +Laje) vira o padrão do cômodo onde a seta caiu
+    for _L in ss.pc_data.get("lajes", []):
+        _xm, _ym = _L.get("x_m"), _L.get("y_m")
+        if _xm is None or _ym is None:
+            continue
+        for _c in ss["pc_comodos"]:
+            if (_c["nome"] not in ss["laje_vigota"]
+                    and _c["x0"] <= _xm <= _c["x1"] and _c["y0"] <= _ym <= _c["y1"]):
+                ss["laje_vigota"][_c["nome"]] = "V" if _L.get("dir") == "V" else "H"
+                break
+
     comodos = ([c for c in ss["pc_comodos"] if c["nome"] not in ss["laje_excluidas"]]
                + ss["laje_manuais"])
 
