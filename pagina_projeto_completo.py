@@ -404,9 +404,9 @@ else:
     comodos = ([c for c in ss["pc_comodos"] if c["nome"] not in ss["laje_excluidas"]]
                + ss["laje_manuais"])
 
-    st.caption(f"Telhado adotado: **{ss['g_telhado']:.2f} kN/m²** "
-               f"({ss.get('telhado_tipo', '')}) — definido lá em cima; aqui ele entra "
-               "nas lajes marcadas com **Telhado**.")
+    st.caption(f"Telhado adotado: **{round(ss['g_telhado']*101.97)} kgf/m²** "
+               f"({ss['g_telhado']:.2f} kN/m² · {ss.get('telhado_tipo', '')}) — definido "
+               "lá em cima; aqui ele entra nas lajes marcadas com **Telhado**.")
     st.caption("O programa acha os cômodos fechados por vigas; **complete com "
                "➕ Adicionar laje** o que faltou e **exclua** o que não for laje. A "
                "**direção** já vem no menor vão (troque H/V). Marque **Telhado** onde a "
@@ -520,7 +520,7 @@ else:
              "Carga (kgf/m)": round((v["w"] + rpdf._pp_viga(v["secao"])) * 101.97),
              "M máx (kN·m)": v["mmax"],
              "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
-    st.markdown("**📊 Planta de CARGAS NAS VIGAS** (kN/m — laje + telhado + peso próprio):")
+    st.markdown("**📊 Planta de CARGAS NAS VIGAS** (kgf/m — laje + telhado + peso próprio):")
     _fcv = rpdf.fig_cargas_vigas(r)
     if _fcv is not None:
         st.pyplot(_fcv, width="stretch")
