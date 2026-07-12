@@ -147,9 +147,41 @@ def _divisoria(pdf, titulo):
     plt.close(fig)
 
 
-def _planta(vigas, pilares, lajes, titulo):
-    """Desenha UMA planta: vigas (amarelo, rotuladas), pilares (vermelho) e, se
-    houver, as setas das LAJES (azul). `vigas` = lista com nome/dir/pos/ini/fim."""
+def _sec_dims(secao, sentido):
+    """Dimensões REAIS (m) do pilar a partir da seção ('14x30') e do sentido."""
+    import re
+    n = re.findall(r"\d+\.?\d*", str(secao or ""))
+    if len(n) >= 2:
+        a, b = float(n[0]) / 100.0, float(n[1]) / 100.0
+    else:
+        a, b = 0.14, 0.30
+    lo, hi = min(a, b), max(a, b)
+    if sentido == "vertical":
+        return lo, hi          # lado curto no x, longo no y
+    if sentido == "horizontal":
+        return hi, lo          # longo no x, curto no y
+    return a, b                # quadrado / indefinido
+
+
+def _laje_span(lx, ly, hbs, vbs, dirn, default, tol=0.20):
+    """Vão do painel na direção da seta (p/ a seta caber dentro da laje)."""
+    if dirn == "V":
+        top = [y for (y, xa, xb) in hbs if y > ly + 0.05 and xa - tol <= lx <= xb + tol]
+        bot = [y for (y, xa, xb) in hbs if y < ly - 0.05 and xa - tol <= lx <= xb + tol]
+        if top and bot:
+            return min(top) - max(bot)
+    else:
+        rit = [x for (x, ya, yb) in vbs if x > lx + 0.05 and ya - tol <= ly <= yb + tol]
+        lef = [x for (x, ya, yb) in vbs if x < lx - 0.05 and ya - tol <= ly <= yb + tol]
+        if rit and lef:
+            return min(rit) - max(lef)
+    return default
+
+
+def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
+    """Desenha UMA planta: vigas (cor_viga, rotuladas fora da linha), pilares no
+    TAMANHO REAL da seção (cor_pilar) com P# e dimensão, e as setas das LAJES
+    (azul) cabendo dentro do painel. `vigas` = lista com nome/dir/pos/ini/fim."""
     seg = []
     for v in vigas:
         if v.get("ini") is None:
@@ -170,75 +202,91 @@ def _planta(vigas, pilares, lajes, titulo):
     fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2.0)),
                                     min(16.0, max(6.0, 0.7 * H + 2.0))), dpi=150)
     fig.patch.set_facecolor("white")
-    for x1, y1, x2, y2, _ in seg:
-        ax.plot([x1, x2], [y1, y2], color=AMBAR, lw=3.6,
+    for x1, y1, x2, y2, _ in seg:                         # vigas — cor viva e grossa
+        ax.plot([x1, x2], [y1, y2], color=cor_viga, lw=4.6,
                 solid_capstyle="round", zorder=2)
-    off = max(0.45, 0.03 * max(W, H))
-    for x1, y1, x2, y2, nome in seg:
+    off = max(0.42, 0.03 * max(W, H))
+    for x1, y1, x2, y2, nome in seg:                      # rótulo AFASTADO da viga
         xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
-        if abs(x2 - x1) >= abs(y2 - y1):       # viga horizontal: rótulo fora da linha
-            ym -= off
-        else:                                   # viga vertical: rótulo ao lado
-            xm -= off
-        ax.text(xm, ym, nome, fontsize=14, color="#78350F", fontweight="bold",
+        if abs(x2 - x1) >= abs(y2 - y1):
+            ym += off
+        else:
+            xm += off
+        ax.text(xm, ym, nome, fontsize=12, color="#0F172A", fontweight="bold",
                 ha="center", va="center", zorder=5,
-                bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="none",
-                          alpha=0.92))
-    s = max(0.28, 0.022 * max(W, H))
-    for p in pilares:
+                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=cor_viga,
+                          lw=0.7))
+    hbs = [(y1, min(x1, x2), max(x1, x2)) for x1, y1, x2, y2, _ in seg
+           if abs(y1 - y2) < abs(x1 - x2)]
+    vbs = [(x1, min(y1, y2), max(y1, y2)) for x1, y1, x2, y2, _ in seg
+           if abs(x1 - x2) <= abs(y1 - y2)]
+    lo = max(0.34, 0.028 * max(W, H))
+    for p in pilares:                                     # pilar no TAMANHO real
         x, y = p.get("x_m"), p.get("y_m")
         if x is None:
             continue
-        ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s,
-                                   facecolor=VERMELHO, edgecolor="white",
-                                   lw=0.8, zorder=6))
-        ax.text(x + s * 0.8, y, p["pilar"], fontsize=13, color=NAVY,
-                fontweight="bold", ha="left", va="center", zorder=7)
-    # setas das LAJES (sentido da vigota) lançadas no editor — azul
-    a = max(0.45, 0.05 * max(W, H))
-    for i, L in enumerate(lajes or [], 1):
+        wx, hy = _sec_dims(p.get("secao", "14x30"), p.get("sentido"))
+        ax.add_patch(plt.Rectangle((x - wx / 2, y - hy / 2), wx, hy,
+                                   facecolor=cor_pilar, edgecolor="white",
+                                   lw=1.0, zorder=6))
+        ax.text(x + lo, y + lo * 0.35, p.get("pilar", "P"), fontsize=11,
+                color=cor_pilar, fontweight="bold", ha="left", va="center",
+                zorder=7, bbox=dict(boxstyle="round,pad=0.12", fc="white",
+                                    ec="none", alpha=0.9))
+        if p.get("secao"):                                # dimensão do pilar
+            ax.text(x + lo, y - lo * 0.5, str(p["secao"]), fontsize=8,
+                    color="#475569", fontweight="bold", ha="left", va="center",
+                    zorder=7)
+    for i, L in enumerate(lajes or [], 1):                # setas das LAJES (azul)
         x, y = L.get("x_m"), L.get("y_m")
         if x is None or y is None:
             continue
+        span = _laje_span(x, y, hbs, vbs, L.get("dir"), default=1.4)
+        a = min(1.1, max(0.30, 0.34 * span))              # cabe no painel
         if L.get("dir") == "V":
             ax.annotate("", xy=(x, y + a), xytext=(x, y - a),
-                        arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.4),
+                        arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.2),
                         zorder=8)
-            lox, loy = a * 0.4, 0
+            lox, loy = max(0.3, a * 0.5), 0
         else:
             ax.annotate("", xy=(x + a, y), xytext=(x - a, y),
-                        arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.4),
+                        arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.2),
                         zorder=8)
-            lox, loy = 0, a * 0.45
-        ax.text(x + lox, y + loy, L.get("nome", f"L{i}"), fontsize=10.5,
+            lox, loy = 0, max(0.3, a * 0.55)
+        ax.text(x + lox, y + loy, L.get("nome", f"L{i}"), fontsize=9.5,
                 color="#1D4ED8", fontweight="bold", ha="center", va="center",
-                zorder=9, bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                zorder=9, bbox=dict(boxstyle="round,pad=0.12", fc="white",
                                     ec="none", alpha=0.9))
-    ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima como
-    #                                        no editor (mesma orientação do desenho)
+    ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima
     ax.set_xlabel("x (m)", fontsize=9)
     ax.set_ylabel("y (m)", fontsize=9)
     ax.tick_params(labelsize=8)
-    ax.grid(alpha=0.15)
+    ax.grid(alpha=0.12)
     ax.set_title(titulo, fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
     return fig
 
 
+COR_FORMA = "#F5B301"       # amarelo bem vivo (planta de forma)
+COR_FUND = "#E11D2E"        # vermelho bem vivo (planta de fundação)
+COR_PIL_FORMA = "#1E3A8A"   # pilar na forma = azul-marinho
+COR_PIL_FUND = "#111827"    # pilar na fundação = quase preto (diferencia)
+
+
 def fig_planta(r):
-    """PLANTA DE FORMA — vigas de cobertura (VH/VV) + LAJES (setas) + pilares."""
-    tit = "PLANTA DE FORMA — VIGAS de cobertura (amarelo) e PILARES (vermelho)"
+    """PLANTA DE FORMA — vigas de cobertura (VH/VV, AMARELO) + LAJES + pilares."""
+    tit = "PLANTA DE FORMA — VIGAS de cobertura (amarelo) e PILARES (azul)"
     if r.get("lajes"):
         tit += " · SETAS das LAJES (azul)"
-    return _planta(r.get("vigas", []), r.get("pilares", []), r.get("lajes", []), tit)
+    return _planta(r.get("vigas", []), r.get("pilares", []), r.get("lajes", []),
+                   tit, COR_FORMA, COR_PIL_FORMA)
 
 
 def fig_planta_fundacao(r):
-    """PLANTA DE FUNDAÇÃO — vigas BALDRAMES (VB) + pilares, SEM lajes (o baldrame
-    fica sob a parede; não recebe laje, então não precisa de fechamento)."""
+    """PLANTA DE FUNDAÇÃO — vigas BALDRAMES (VB, VERMELHO) + pilares, SEM lajes."""
     return _planta(r.get("baldrames", []), r.get("pilares", []), [],
-                   "PLANTA DE FUNDAÇÃO — VIGAS BALDRAMES VB (amarelo) e "
-                   "PILARES (vermelho)")
+                   "PLANTA DE FUNDAÇÃO — VIGAS BALDRAMES VB (vermelho) e "
+                   "PILARES (preto)", COR_FUND, COR_PIL_FUND)
 
 
 # ------------------------------------------------------------ memoriais
