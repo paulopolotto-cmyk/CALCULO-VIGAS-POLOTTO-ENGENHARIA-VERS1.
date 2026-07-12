@@ -10,6 +10,7 @@ Fluxo em 3 telas encadeadas:
 O cálculo só roda DEPOIS que o usuário confere a planta e confirma. Módulo NOVO
 e independente: NÃO altera as telas aprovadas (Vigas/Pilares/Lajes/Prévios).
 """
+import copy
 import json
 
 import streamlit as st
@@ -152,7 +153,7 @@ if ss.pc_vista == "lancar":
                 for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "fecha_novas", "fecha_ok"):
+                          "fecha_novas", "fecha_ok", "fecha_backup"):
                     ss.pop(k, None)
                 _vista("conferir")
 
@@ -201,28 +202,53 @@ elif ss.pc_vista == "conferir":
     _com = cl.detectar_comodos(ss.pc_data.get("vigas", []))
     _ab = cl.regioes_abertas(ss.pc_data.get("vigas", []))
     _grandes = [c for c in _com if c["menor"] > cl.VAO_GRANDE]
+    def _dir_laje(c):
+        dr = c["vigota"]
+        for L in ss.pc_data.get("lajes", []):
+            xm, ym = L.get("x_m"), L.get("y_m")
+            if xm is not None and ym is not None \
+                    and c["x0"] <= xm <= c["x1"] and c["y0"] <= ym <= c["y1"]:
+                dr = L.get("dir", dr)
+                break
+        return "↔ horizontal" if dr == "H" else "↕ vertical"
+
     if _ab or _grandes:
         _fd = cl.fig_diagnostico(ss.pc_data, _com, _ab)
         st.pyplot(_fd, width="stretch")
         plt.close(_fd)
-        if _ab:
-            st.warning(f"⚠️ **{len(_ab)} área(s) da FORMA sem viga fechando** "
-                       "(vermelho hachurado) — se puser laje ali, ela não teria apoio. "
-                       "Volte "
-                       "em **Editar** e lance uma viga fechando esses lados.")
-        if _grandes:
-            st.warning("⚠️ **Vão grande** (laranja): " + ", ".join(
-                f"{c['nome']} = {c['menor']:.1f} m" for c in _grandes)
-                + " — a vigota passa de ~5 m; considere uma **viga intermediária** "
-                "(divide a laje) ou **vigota protendida**.")
-        st.caption("Você é o engenheiro — decida o melhor jeito de lançar. Corrija no "
-                   "**Editar** ou siga assim (as áreas vermelhas ficam sem laje).")
+    if _ab:
+        st.warning(f"⚠️ **{len(_ab)} área(s) da FORMA ainda SEM viga fechando** "
+                   "(vermelho hachurado) — a laje não teria apoio. Muitas vezes falta "
+                   "só **um pedacinho de viga** até o pilar ou a viga vizinha. Use o "
+                   "**Fechar automático** logo abaixo (o programa completa), ou feche à "
+                   "mão no **Editar**.")
     else:
-        st.success("✅ Estrutura fechada: todas as áreas têm viga em volta e sem vão "
-                   "excessivo para pré-moldada.")
+        st.success(f"✅ **Lajes FECHADAS e prontas para o cálculo!** As **{len(_com)} "
+                   "laje(s)** têm viga em volta e a direção definida — pode seguir para "
+                   "o cálculo.")
+        if _com:
+            st.caption("Cada laje fechada, com o sentido da vigota: "
+                       + " · ".join(f"**{c['nome']}** {_dir_laje(c)}" for c in _com))
+    if _grandes:
+        st.warning("⚠️ **Vão grande** (laranja): " + ", ".join(
+            f"{c['nome']} = {c['menor']:.1f} m" for c in _grandes)
+            + " — a laje está fechada, mas a vigota passa de ~5 m; considere uma "
+            "**viga no meio** (divide a laje) ou **vigota protendida**.")
 
     # ---- fechamento AUTOMÁTICO das vigas (sugestão do programa)
     sec(3, "Fechar os vãos automaticamente (sugestão — você aceita ou não)")
+    if ss.get("fecha_backup") is not None:
+        st.info("O **fechamento automático foi aplicado**. Se preferir completar à "
+                "mão, dá para **desfazer** e voltar ao seu lançamento original:")
+        if st.button("↩️ Desfazer o fechamento automático (voltar ao meu lançamento)",
+                     width="stretch"):
+            ss.pc_data = ss.pop("fecha_backup")
+            for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos", "laje_tipos",
+                      "laje_vigota", "laje_telhado", "laje_manuais", "laje_excluidas",
+                      "laje_mcount", "pdf_completo", "pdf_reduzido"):
+                ss.pop(k, None)
+            st.toast("Fechamento desfeito — voltei ao seu lançamento.")
+            _vista("conferir")
     st.caption("O programa olha o seu projeto e sugere **vigas a 90°** (verde) para "
                "**fechar** as áreas abertas e **dividir** os painéis grandes, e depois "
                "**renumera os pilares**. Você **clica em cada viga verde** para tirá-la "
@@ -278,6 +304,7 @@ elif ss.pc_vista == "conferir":
             _nok = len(ss["fecha_ok"])
             if st.button(f"✅ Aplicar as {_nok} viga(s) aceita(s) e renumerar os "
                          "pilares", type="primary", width="stretch"):
+                ss["fecha_backup"] = copy.deepcopy(ss.pc_data)   # p/ poder desfazer
                 _aceitas = [_novas[i] for i in sorted(ss["fecha_ok"])]
                 ss.pc_data = fa.aplicar_fechamento(ss.pc_data, _aceitas)
                 for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos",
