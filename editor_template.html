@@ -280,7 +280,7 @@ $('projpasta').onclick=pickRoot;$('projnovo').onclick=novoProjeto;$('projcont').
 function enviar(){let bd=beamData();let w=issues(bd);
  if(w.length&&!confirm('Nota: '+w.length+' pilar(es) parecem fora de parede.\n\nVocê é o engenheiro — deseja ENVIAR assim mesmo?'))return;
  cache=loads(bd);let m=S;
- let data={projeto:"Caldeira",escala_pt_por_m:S,avisos:w,
+ let data={projeto:(projName||"Caldeira"),escala_pt_por_m:S,avisos:w,
   pilares:pillars.map((p,i)=>({pilar:"P"+(i+1),x_m:+((p.x-X0)/m).toFixed(2),y_m:+((Y0+VH-p.y)/m).toFixed(2),forma:p.shape=='quad'?'quadrado':'retangular',sentido:p.shape=='quad'?'-':(p.ori=='v'?'vertical':'horizontal'),carga_kN:+cache.Nt[p.id].toFixed(0),carga_tf:+(cache.Nt[p.id]/9.81).toFixed(1),secao:secao(cache.Nt[p.id],p.shape)})),
   vigas:bd.map(o=>({de:pilName(o.a),ate:pilName(o.c),x1_m:+((o.a.x-X0)/m).toFixed(2),y1_m:+((Y0+VH-o.a.y)/m).toFixed(2),x2_m:+((o.c.x-X0)/m).toFixed(2),y2_m:+((Y0+VH-o.c.y)/m).toFixed(2),vao_m:+o.L.toFixed(2),aviso:o.L>7})),
   lajes:lajes.map((L,i)=>({nome:"L"+(i+1),x_m:+((L.x-X0)/m).toFixed(2),y_m:+((Y0+VH-L.y)/m).toFixed(2),dir:L.dir})),

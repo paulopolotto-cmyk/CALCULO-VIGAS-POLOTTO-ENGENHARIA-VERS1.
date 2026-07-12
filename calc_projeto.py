@@ -68,9 +68,11 @@ def _altura_viga(vaos):
 
 
 def _detalhar_viga(nome, vaos, w, b=BW):
-    """Detalha a partir de h = 10% do maior vão; só cresce se ainda falhar."""
-    h0 = _altura_viga(vaos)
-    res = None
+    """Detalha a partir de h = 10% do maior vão; só cresce se ainda falhar.
+    Se o vão for tão grande que h0 já passa de 100 cm, ainda tenta (uma vez) para
+    o resultado ser AVALIADO — nunca some silencioso (vão enorme => marca falha)."""
+    h0 = min(100, _altura_viga(vaos))    # teto de 100 cm: acima disso é vão demais
+    res = None                            # (sai com falha p/ o engenheiro dividir o vão)
     for h in range(h0, 105, 5):
         res = _detalhar(nome, vaos, w, b=b, h=h)
         if res is None:
@@ -207,7 +209,8 @@ def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0):
                               comp=l["comp"], vaos=l["vaos"], w=w, secao=f"{BW}x{h}",
                               pos=l["pos"], ini=l["ini"], fim=l["fim"],
                               mmax=_mmax(res), peso=_peso(res),
-                              falha=bool(res and (res.get("falha_flexao") or res.get("falha_biela"))),
+                              falha=(res is None or bool(res.get("falha_flexao")
+                                     or res.get("falha_biela"))),
                               res=res))
     # ---- baldrames (mesmas linhas, carga de parede)
     baldr_det = []
@@ -218,7 +221,8 @@ def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0):
                               comp=l["comp"], vaos=l["vaos"], w=wall, secao=f"{BW}x{h}",
                               pos=l["pos"], ini=l["ini"], fim=l["fim"],
                               mmax=_mmax(res), peso=_peso(res),
-                              falha=bool(res and (res.get("falha_flexao") or res.get("falha_biela"))),
+                              falha=(res is None or bool(res.get("falha_flexao")
+                                     or res.get("falha_biela"))),
                               res=res))
     # ---- pilares (dimensionados no motor_pilar; 14×30 crescendo pela norma)
     pil_det = []
