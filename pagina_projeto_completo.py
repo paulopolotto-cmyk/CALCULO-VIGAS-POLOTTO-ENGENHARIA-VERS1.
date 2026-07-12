@@ -11,6 +11,7 @@ O cálculo só roda DEPOIS que o usuário confere a planta e confirma. Módulo N
 e independente: NÃO altera as telas aprovadas (Vigas/Pilares/Lajes/Prévios).
 """
 import copy
+import io
 import json
 
 import streamlit as st
@@ -60,6 +61,30 @@ ss.setdefault("pc_larg", 15.0)
 def _vista(v):
     ss.pc_vista = v
     st.rerun()
+
+
+def _img_planta(chave, criar):
+    """Renderiza a figura UMA vez e guarda o PNG (o rerun não re-renderiza — deixa
+    a tela rápida mesmo com o afastamento dos rótulos). Invalida por `chave`."""
+    cache = ss.setdefault("_img_cache", {})
+    if chave not in cache:
+        fig = criar()
+        if fig is None:
+            cache[chave] = None
+        else:
+            buf = io.BytesIO()
+            fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+            plt.close(fig)
+            cache[chave] = buf.getvalue()
+    return cache[chave]
+
+
+def _chave_dados():
+    """Hash do lançamento atual (p/ invalidar as plantas quando ele muda)."""
+    try:
+        return str(abs(hash(json.dumps(ss.pc_data, sort_keys=True, default=str))))
+    except Exception:
+        return "0"
 
 
 def _stepper():
@@ -171,7 +196,7 @@ if ss.pc_vista == "lancar":
                 for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "fecha_novas", "fecha_ok", "fecha_backup"):
+                          "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache"):
                     ss.pop(k, None)
                 _vista("conferir")
 
@@ -190,20 +215,19 @@ elif ss.pc_vista == "conferir":
     st.caption("Compare os croquis com a planta que você lançou. **Faltou ou "
                "sobrou** alguma viga, pilar ou laje?")
     _pj = cp.planta_do_json(ss.pc_data)
+    _dh = _chave_dados()
     st.markdown("**① Planta de FORMA** — vigas de cobertura (**VH/VV**) + as "
                 "**lajes** (setas azuis do sentido da vigota).")
-    _pf = rpdf.fig_planta(_pj)
+    _pf = _img_planta("forma_" + _dh, lambda: rpdf.fig_planta(_pj))
     if _pf is not None:
-        st.pyplot(_pf, width="stretch")
-        plt.close(_pf)
+        st.image(_pf, width="stretch")
     else:
         st.warning("Sem coordenadas para desenhar a planta.")
     st.markdown("**② Planta de FUNDAÇÃO** — vigas **baldrames (VB)** sob as paredes. "
                 "**Não tem laje** e **não precisa de fechamento**.")
-    _pfu = rpdf.fig_planta_fundacao(_pj)
+    _pfu = _img_planta("fund_" + _dh, lambda: rpdf.fig_planta_fundacao(_pj))
     if _pfu is not None:
-        st.pyplot(_pfu, width="stretch")
-        plt.close(_pfu)
+        st.image(_pfu, width="stretch")
     st.caption("Amarelo = vigas (forma **VH/VV** · fundação **VB**) · vermelho = "
                "pilares (**P**) · azul = **lajes** (sentido da vigota). Mesma "
                "numeração do detalhamento — as **duas** plantas vão para o cálculo.")
@@ -330,7 +354,7 @@ elif ss.pc_vista == "conferir":
                 for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "pdf_completo", "pdf_reduzido", "pc_limpeza"):
+                          "pdf_completo", "pdf_reduzido", "pc_limpeza", "_img_cache"):
                     ss.pop(k, None)
                 st.success("Vigas aplicadas e pilares renumerados! Veja a planta "
                            "atualizada no topo.")
@@ -541,10 +565,10 @@ else:
              "M máx (kN·m)": v["mmax"],
              "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
     st.markdown("**📊 Planta de CARGAS NAS VIGAS** (kgf/m — laje + telhado + peso próprio):")
-    _fcv = rpdf.fig_cargas_vigas(r)
+    _kc = f"{_chave_dados()}_{ss.get('g_telhado', 0.3):.2f}"
+    _fcv = _img_planta("cvig_" + _kc, lambda: rpdf.fig_cargas_vigas(r))
     if _fcv is not None:
-        st.pyplot(_fcv, width="stretch")
-        plt.close(_fcv)
+        st.image(_fcv, width="stretch")
     st.caption("Carga total de cada viga (**reação real da laje** + peso próprio). Cada "
                "laje descarrega q·(vão/2) nas **duas vigas que a sustentam** "
                "(perpendiculares às vigotas) — por isso as vigas dos **dois sentidos** "
@@ -573,10 +597,9 @@ else:
               f"{r['fund_tf']} tf")
     st.markdown("**📊 Planta de CARGAS NOS PILARES** (tf) — a carga de cada pilar em "
                 "número grande, para você projetar a fundação:")
-    _fcp = rpdf.fig_cargas_pilares(r)
+    _fcp = _img_planta("cpil_" + _chave_dados(), lambda: rpdf.fig_cargas_pilares(r))
     if _fcp is not None:
-        st.pyplot(_fcp, width="stretch")
-        plt.close(_fcp)
+        st.image(_fcp, width="stretch")
     st.caption("Relação de cargas por pilar (carga do pilar = carga na fundação "
                "correspondente):")
     tabela([{"Pilar": p["pilar"], "Carga (kgf)": round((p.get("carga_tf") or 0) * 1000),

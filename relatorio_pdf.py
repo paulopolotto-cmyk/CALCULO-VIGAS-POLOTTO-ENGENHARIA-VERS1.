@@ -219,6 +219,48 @@ def _laje_span(lx, ly, hbs, vbs, dirn, default, tol=0.20):
     return default
 
 
+def _deoverlap(fig, ax, texts, passos=8):
+    """Afasta os rótulos que se sobrepõem — empurra cada par no eixo de MENOR
+    sobreposição, usando as caixas REAIS já renderizadas. Deixa os nomes legíveis
+    em áreas densas (sem biblioteca externa)."""
+    texts = [t for t in texts if t and t.get_text()]
+    if len(texts) < 2:
+        return
+    try:
+        fig.canvas.draw()
+        rend = fig.canvas.get_renderer()
+    except Exception:
+        return
+    inv = ax.transData.inverted()
+    for _ in range(passos):
+        boxes = [t.get_window_extent(rend) for t in texts]
+        moveu = False
+        for i in range(len(texts)):
+            for j in range(i + 1, len(texts)):
+                a, b = boxes[i], boxes[j]
+                ox = min(a.x1, b.x1) - max(a.x0, b.x0)
+                oy = min(a.y1, b.y1) - max(a.y0, b.y0)
+                if ox <= 0 or oy <= 0:
+                    continue                       # não se tocam
+                cia, cja = (a.y0 + a.y1), (b.y0 + b.y1)
+                cxa, cxb = (a.x0 + a.x1), (b.x0 + b.x1)
+                if oy <= ox:                        # separa na vertical (menos desloc.)
+                    s = oy / 2 + 1.0
+                    di = (0, s) if cia >= cja else (0, -s)
+                else:                               # separa na horizontal
+                    s = ox / 2 + 1.0
+                    di = (s, 0) if cxa >= cxb else (-s, 0)
+                for t, sgn in ((texts[i], 1.0), (texts[j], -1.0)):
+                    x, y = t.get_position()
+                    px, py = ax.transData.transform((x, y))
+                    nx, ny = inv.transform((px + sgn * di[0], py + sgn * di[1]))
+                    t.set_position((nx, ny))
+                moveu = True
+        if not moveu:
+            break
+        fig.canvas.draw()
+
+
 def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     """Desenha UMA planta: vigas (cor_viga, rotuladas fora da linha), pilares no
     TAMANHO REAL da seção (cor_pilar) com P# e dimensão, e as setas das LAJES
@@ -247,16 +289,17 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
         ax.plot([x1, x2], [y1, y2], color=cor_viga, lw=4.6,
                 solid_capstyle="round", zorder=2)
     off = max(0.42, 0.03 * max(W, H))
+    labs = []
     for x1, y1, x2, y2, nome in seg:                      # rótulo AFASTADO da viga
         xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
         if abs(x2 - x1) >= abs(y2 - y1):
             ym += off
         else:
             xm += off
-        ax.text(xm, ym, nome, fontsize=12, color="#0F172A", fontweight="bold",
-                ha="center", va="center", zorder=5,
-                bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=cor_viga,
-                          lw=0.7))
+        labs.append(ax.text(xm, ym, nome, fontsize=12, color="#0F172A",
+                    fontweight="bold", ha="center", va="center", zorder=5,
+                    bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=cor_viga,
+                              lw=0.7)))
     hbs = [(y1, min(x1, x2), max(x1, x2)) for x1, y1, x2, y2, _ in seg
            if abs(y1 - y2) < abs(x1 - x2)]
     vbs = [(x1, min(y1, y2), max(y1, y2)) for x1, y1, x2, y2, _ in seg
@@ -270,14 +313,14 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
         ax.add_patch(plt.Rectangle((x - wx / 2, y - hy / 2), wx, hy,
                                    facecolor=cor_pilar, edgecolor="white",
                                    lw=1.0, zorder=6))
-        ax.text(x + lo, y + lo * 0.35, p.get("pilar", "P"), fontsize=11,
-                color=cor_pilar, fontweight="bold", ha="left", va="center",
-                zorder=7, bbox=dict(boxstyle="round,pad=0.12", fc="white",
-                                    ec="none", alpha=0.9))
+        labs.append(ax.text(x + lo, y + lo * 0.35, p.get("pilar", "P"), fontsize=11,
+                    color=cor_pilar, fontweight="bold", ha="left", va="center",
+                    zorder=7, bbox=dict(boxstyle="round,pad=0.12", fc="white",
+                                        ec="none", alpha=0.9)))
         if p.get("secao"):                                # dimensão do pilar
-            ax.text(x + lo, y - lo * 0.5, str(p["secao"]), fontsize=8,
-                    color="#475569", fontweight="bold", ha="left", va="center",
-                    zorder=7)
+            labs.append(ax.text(x + lo, y - lo * 0.5, str(p["secao"]), fontsize=8,
+                        color="#475569", fontweight="bold", ha="left", va="center",
+                        zorder=7))
     for i, L in enumerate(lajes or [], 1):                # setas das LAJES (azul)
         x, y = L.get("x_m"), L.get("y_m")
         if x is None or y is None:
@@ -294,10 +337,10 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
                         arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.2),
                         zorder=8)
             lox, loy = 0, max(0.3, a * 0.55)
-        ax.text(x + lox, y + loy, L.get("nome", f"L{i}"), fontsize=9.5,
-                color="#1D4ED8", fontweight="bold", ha="center", va="center",
-                zorder=9, bbox=dict(boxstyle="round,pad=0.12", fc="white",
-                                    ec="none", alpha=0.9))
+        labs.append(ax.text(x + lox, y + loy, L.get("nome", f"L{i}"), fontsize=9.5,
+                    color="#1D4ED8", fontweight="bold", ha="center", va="center",
+                    zorder=9, bbox=dict(boxstyle="round,pad=0.12", fc="white",
+                                        ec="none", alpha=0.9)))
     ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima
     ax.set_xlabel("x (m)", fontsize=9)
     ax.set_ylabel("y (m)", fontsize=9)
@@ -305,6 +348,7 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     ax.grid(alpha=0.12)
     ax.set_title(titulo, fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
+    _deoverlap(fig, ax, labs)              # afasta os nomes que se sobrepõem
     return fig
 
 
@@ -373,6 +417,7 @@ def fig_cargas_pilares(r):
     for x1, y1, x2, y2, _ in seg:                    # vigas de fundo (cinza claro)
         ax.plot([x1, x2], [y1, y2], color="#CBD5E1", lw=2.4, zorder=1)
     s = max(0.16, 0.014 * max(W, H))
+    labs = []
     for p in pilares:
         x, y = p.get("x_m"), p.get("y_m")
         if x is None:
@@ -380,12 +425,12 @@ def fig_cargas_pilares(r):
         ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s, facecolor=VERMELHO,
                                    edgecolor="white", lw=0.8, zorder=6))
         carga = p.get("carga_tf", 0) or 0
-        ax.text(x, y + 1.4 * s, f"{carga:.1f}", fontsize=14, color="#B91C1C",
-                fontweight="bold", ha="center", va="bottom", zorder=8,
-                bbox=dict(boxstyle="round,pad=0.16", fc="#FEF3C7", ec="#B45309",
-                          lw=0.7))
-        ax.text(x, y - 1.2 * s, p.get("pilar", ""), fontsize=8.5, color=NAVY,
-                fontweight="bold", ha="center", va="top", zorder=8)
+        labs.append(ax.text(x, y + 1.4 * s, f"{carga:.1f}", fontsize=14,
+                    color="#B91C1C", fontweight="bold", ha="center", va="bottom",
+                    zorder=8, bbox=dict(boxstyle="round,pad=0.16", fc="#FEF3C7",
+                                        ec="#B45309", lw=0.7)))
+        labs.append(ax.text(x, y - 1.2 * s, p.get("pilar", ""), fontsize=8.5,
+                    color=NAVY, fontweight="bold", ha="center", va="top", zorder=8))
     ax.set_aspect("equal")
     ax.grid(alpha=0.12)
     ax.set_xlabel("x (m)", fontsize=9)
@@ -394,6 +439,7 @@ def fig_cargas_pilares(r):
     ax.set_title("PLANTA DE CARGAS NOS PILARES — carga (tf) para a FUNDAÇÃO",
                  fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
+    _deoverlap(fig, ax, labs)
     return fig
 
 
@@ -407,15 +453,16 @@ def fig_cargas_vigas(r):
     fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2)),
                                     min(16.0, max(6.0, 0.7 * H + 2))), dpi=150)
     fig.patch.set_facecolor("white")
+    labs = []
     for x1, y1, x2, y2, v in seg:
         wt = round(((v.get("w", 0) or 0) + _pp_viga(v.get("secao"))) * KGF)  # kgf/m
         ax.plot([x1, x2], [y1, y2], color=COR_FORMA, lw=4.4,
                 solid_capstyle="round", zorder=2)
         xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
-        ax.text(xm, ym, f"{v.get('nome', '')}\n{wt} kgf/m", fontsize=9,
-                color="#0F172A", fontweight="bold", ha="center", va="center",
-                zorder=6, bbox=dict(boxstyle="round,pad=0.18", fc="white",
-                                    ec=COR_FORMA, lw=0.7))
+        labs.append(ax.text(xm, ym, f"{v.get('nome', '')}\n{wt} kgf/m", fontsize=9,
+                    color="#0F172A", fontweight="bold", ha="center", va="center",
+                    zorder=6, bbox=dict(boxstyle="round,pad=0.18", fc="white",
+                                        ec=COR_FORMA, lw=0.7)))
     s = max(0.14, 0.012 * max(W, H))
     for p in pilares:
         x, y = p.get("x_m"), p.get("y_m")
@@ -431,6 +478,7 @@ def fig_cargas_vigas(r):
     ax.set_title("PLANTA DE CARGAS NAS VIGAS — kgf/m (laje + telhado + peso próprio)",
                  fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
+    _deoverlap(fig, ax, labs)
     return fig
 
 
