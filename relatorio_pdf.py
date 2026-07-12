@@ -269,13 +269,14 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     for v in vigas:
         if v.get("ini") is None:
             continue
+        esp = v.get("parede", 0.15)
         if v["dir"] == "H":
-            seg.append((v["ini"], v["pos"], v["fim"], v["pos"], v["nome"]))
+            seg.append((v["ini"], v["pos"], v["fim"], v["pos"], v["nome"], esp))
         else:
-            seg.append((v["pos"], v["ini"], v["pos"], v["fim"], v["nome"]))
+            seg.append((v["pos"], v["ini"], v["pos"], v["fim"], v["nome"], esp))
     xs = [p["x_m"] for p in pilares if p.get("x_m") is not None]
     ys = [p["y_m"] for p in pilares if p.get("y_m") is not None]
-    for x1, y1, x2, y2, _ in seg:
+    for x1, y1, x2, y2, _, _ in seg:
         xs += [x1, x2]
         ys += [y1, y2]
     if not xs or not ys:
@@ -285,19 +286,18 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2.0)),
                                     min(16.0, max(6.0, 0.7 * H + 2.0))), dpi=150)
     fig.patch.set_facecolor("white")
-    BWM = 0.15                                            # 15 cm — parede interna/externa
-    for x1, y1, x2, y2, _ in seg:                         # viga = PAREDE de 15 cm
+    for x1, y1, x2, y2, _, esp in seg:                    # viga = PAREDE (15 ou 25 cm)
         if abs(x2 - x1) >= abs(y2 - y1):                  # horizontal
             xa, xb = min(x1, x2), max(x1, x2)
-            ax.add_patch(plt.Rectangle((xa, y1 - BWM / 2), max(BWM, xb - xa), BWM,
+            ax.add_patch(plt.Rectangle((xa, y1 - esp / 2), max(esp, xb - xa), esp,
                                        facecolor=cor_viga, edgecolor="none", zorder=2))
         else:                                             # vertical
             ya, yb = min(y1, y2), max(y1, y2)
-            ax.add_patch(plt.Rectangle((x1 - BWM / 2, ya), BWM, max(BWM, yb - ya),
+            ax.add_patch(plt.Rectangle((x1 - esp / 2, ya), esp, max(esp, yb - ya),
                                        facecolor=cor_viga, edgecolor="none", zorder=2))
     off = max(0.42, 0.03 * max(W, H))
     labs = []
-    for x1, y1, x2, y2, nome in seg:                      # rótulo AFASTADO da viga
+    for x1, y1, x2, y2, nome, _ in seg:                   # rótulo AFASTADO da viga
         xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
         if abs(x2 - x1) >= abs(y2 - y1):
             ym += off
@@ -307,9 +307,9 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
                     fontweight="bold", ha="center", va="center", zorder=5,
                     bbox=dict(boxstyle="round,pad=0.2", fc="white", ec=cor_viga,
                               lw=0.7)))
-    hbs = [(y1, min(x1, x2), max(x1, x2)) for x1, y1, x2, y2, _ in seg
+    hbs = [(y1, min(x1, x2), max(x1, x2)) for x1, y1, x2, y2, _, _ in seg
            if abs(y1 - y2) < abs(x1 - x2)]
-    vbs = [(x1, min(y1, y2), max(y1, y2)) for x1, y1, x2, y2, _ in seg
+    vbs = [(x1, min(y1, y2), max(y1, y2)) for x1, y1, x2, y2, _, _ in seg
            if abs(x1 - x2) <= abs(y1 - y2)]
     lo = max(0.34, 0.028 * max(W, H))
     for p in pilares:                                     # pilar no TAMANHO real

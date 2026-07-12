@@ -56,6 +56,7 @@ ss.setdefault("pc_planta", None)     # planta extraída do PDF (fundo do editor)
 ss.setdefault("pc_data", None)       # estrutura JSON (lançamento salvo)
 ss.setdefault("pc_proj", "projeto")
 ss.setdefault("pc_larg", 15.0)
+ss.setdefault("paredes_25", set())   # (dir, pos) das paredes de divisa (25 cm)
 
 
 def _vista(v):
@@ -80,9 +81,10 @@ def _img_planta(chave, criar):
 
 
 def _chave_dados():
-    """Hash do lançamento atual (p/ invalidar as plantas quando ele muda)."""
+    """Hash do lançamento + paredes de divisa (invalida as plantas quando muda)."""
     try:
-        return str(abs(hash(json.dumps(ss.pc_data, sort_keys=True, default=str))))
+        base = json.dumps(ss.pc_data, sort_keys=True, default=str)
+        return str(abs(hash(base + str(sorted(ss.get("paredes_25", []))))))
     except Exception:
         return "0"
 
@@ -196,7 +198,8 @@ if ss.pc_vista == "lancar":
                 for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache"):
+                          "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache",
+                          "paredes_25"):
                     ss.pop(k, None)
                 _vista("conferir")
 
@@ -215,7 +218,7 @@ elif ss.pc_vista == "conferir":
                 "Se sumiu algo, é só ir em **Editar**.")
     st.caption("Compare os croquis com a planta que você lançou. **Faltou ou "
                "sobrou** alguma viga, pilar ou laje?")
-    _pj = cp.planta_do_json(ss.pc_data)
+    _pj = cp.planta_do_json(ss.pc_data, ss["paredes_25"])
     _dh = _chave_dados()
     st.markdown("**① Planta de FORMA** — vigas de cobertura (**VH/VV**) + as "
                 "**lajes** (setas azuis do sentido da vigota).")
@@ -232,6 +235,23 @@ elif ss.pc_vista == "conferir":
     st.caption("Amarelo = vigas (forma **VH/VV** · fundação **VB**) · vermelho = "
                "pilares (**P**) · azul = **lajes** (sentido da vigota). Mesma "
                "numeração do detalhamento — as **duas** plantas vão para o cálculo.")
+
+    # ---- paredes de DIVISA (25 cm) — o resto é 15 cm
+    _bmap = {b["nome"]: (b["dir"], round(b["pos"], 2)) for b in _pj["baldrames"]}
+    _atuais = [nm for nm, k in _bmap.items() if k in ss["paredes_25"]]
+    _sel = st.multiselect(
+        "🧱 Paredes de DIVISA (alvenaria **25 cm**) — marque as que encostam na "
+        "divisa (as demais são **15 cm**). Confira o número na planta de **fundação** "
+        "(VB) acima:", options=list(_bmap.keys()), default=_atuais,
+        help="Parede de divisa com construção encostada = 25 cm: pesa mais no baldrame "
+             "(~10 kN/m em vez de 6) e sai mais grossa no desenho. As internas/externas "
+             "que não encostam na divisa ficam 15 cm.")
+    _novo = {_bmap[nm] for nm in _sel}
+    if _novo != ss["paredes_25"]:
+        ss["paredes_25"] = _novo
+        for k in ("pc_r", "_img_cache"):
+            ss.pop(k, None)
+        st.rerun()
 
     rr = el.resumo_estrutura(ss.pc_data)
     c1, c2, c3 = st.columns(3)
@@ -415,7 +435,8 @@ else:
     if ss.get("pc_r") is None:
         with st.spinner("Rodando o cálculo NBR 6118 de todas as vigas, baldrames "
                         "e pilares…"):
-            ss["pc_r"] = cp.calcular_projeto(ss.pc_data, g_telhado=ss["g_telhado"])
+            ss["pc_r"] = cp.calcular_projeto(ss.pc_data, g_telhado=ss["g_telhado"],
+                                             paredes_25=ss["paredes_25"])
     r = ss["pc_r"]
 
     st.info("**Materiais adotados:** concreto **C25** (fck = 25 MPa) · aço "

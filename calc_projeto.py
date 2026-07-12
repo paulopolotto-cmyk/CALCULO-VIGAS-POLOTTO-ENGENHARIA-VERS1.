@@ -24,7 +24,10 @@ G_TELHADO = {  # telhado = telha (NBR 6120/catálogo) + madeiramento (estimativa
     "fibrocimento": 0.30,   # Eternit/fibrocimento 6 mm + madeira (~30 kgf/m²)
     "ceramica": 0.80,       # telha cerâmica + madeira (~80 kgf/m²)
 }
-WALL = 6.0     # kN/m parede sobre baldrame (~15 cm rebocada, altura ~2,85 m)
+WALL = 6.0     # kN/m parede de 15 cm (interna/externa) sobre baldrame (~2,85 m, rebocada)
+WALL_25 = 10.0  # kN/m parede de DIVISA de 25 cm (construção encostada na divisa)
+PAREDE_INT = 0.15   # m — espessura da parede interna/externa (padrão)
+PAREDE_DIV = 0.25   # m — espessura da parede de divisa (25 cm)
 FCK = 25.0     # concreto C25 (padrão)
 BW = 14        # base padrão das vigas/baldrames (assenta na parede) [cm]
 L0_PILAR = 3.0  # pé-direito livre dos pilares (comprimento de flambagem) [m]
@@ -164,26 +167,34 @@ def _w_laje(l, carga, tol=0.25):
     return round(f_tot / l_tot, 2)
 
 
-def planta_do_json(data):
+def _esp_parede(l, paredes_25):
+    """Espessura da parede daquela linha: 25 cm se for divisa marcada, senão 15."""
+    return PAREDE_DIV if (l["dir"], round(l["pos"], 2)) in (paredes_25 or ()) else PAREDE_INT
+
+
+def planta_do_json(data, paredes_25=None):
     """Geometria da planta (croqui) direto do JSON, SEM rodar o cálculo — para
     a tela de conferência. Agrupa as vigas contínuas e nomeia VH/VV como no
-    detalhamento; devolve no mesmo formato que `fig_planta` consome."""
+    detalhamento; `paredes_25` = conjunto de (dir, pos) marcadas como divisa (25 cm)."""
     linhas = agrupar_vigas_continuas(data.get("vigas", []))
     nomes, bnomes = _nomear_linhas(linhas)
-    vigas = [dict(nome=nomes[i], dir=l["dir"],
-                  pos=l["pos"], ini=l["ini"], fim=l["fim"])
+    vigas = [dict(nome=nomes[i], dir=l["dir"], pos=l["pos"], ini=l["ini"],
+                  fim=l["fim"], parede=_esp_parede(l, paredes_25))
              for i, l in enumerate(linhas)]
-    baldrames = [dict(nome=bnomes[i], dir=l["dir"],
-                      pos=l["pos"], ini=l["ini"], fim=l["fim"])
+    baldrames = [dict(nome=bnomes[i], dir=l["dir"], pos=l["pos"], ini=l["ini"],
+                      fim=l["fim"], parede=_esp_parede(l, paredes_25))
                  for i, l in enumerate(linhas)]
     return dict(vigas=vigas, baldrames=baldrames,
                 pilares=data.get("pilares", []), lajes=data.get("lajes", []))
 
 
-def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0):
+def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0, paredes_25=None):
     """Roda o projeto inteiro a partir do JSON do editor. `g_telhado` (kN/m²) é o
     peso do telhado escolhido; a carga de cobertura vira composição transparente:
-    q_cob = laje-forro+revest. (G_PERM) + sobrecarga de forro (Q_FORRO) + telhado."""
+    q_cob = laje-forro+revest. (G_PERM) + sobrecarga de forro (Q_FORRO) + telhado.
+    `paredes_25` = conjunto de (dir, pos) de DIVISA (25 cm) — o baldrame recebe a
+    carga de parede maior (WALL_25) e a parede sai mais grossa no desenho."""
+    paredes_25 = paredes_25 or set()
     if g_telhado is None:
         g_telhado = G_TELHADO["fibrocimento"]
     g_telhado = float(g_telhado)
@@ -208,18 +219,22 @@ def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0):
         vigas_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
                               comp=l["comp"], vaos=l["vaos"], w=w, secao=f"{BW}x{h}",
                               pos=l["pos"], ini=l["ini"], fim=l["fim"],
+                              parede=_esp_parede(l, paredes_25),
                               mmax=_mmax(res), peso=_peso(res),
                               falha=(res is None or bool(res.get("falha_flexao")
                                      or res.get("falha_biela"))),
                               res=res))
-    # ---- baldrames (mesmas linhas, carga de parede)
+    # ---- baldrames (mesmas linhas; parede de divisa 25 cm pesa mais)
     baldr_det = []
     for i, l in enumerate(linhas):
         nome = bnomes[i]
-        res, h = _detalhar_viga(nome, l["vaos"], wall)
+        div = (l["dir"], round(l["pos"], 2)) in paredes_25
+        wl = WALL_25 if div else wall
+        res, h = _detalhar_viga(nome, l["vaos"], wl)
         baldr_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
-                              comp=l["comp"], vaos=l["vaos"], w=wall, secao=f"{BW}x{h}",
+                              comp=l["comp"], vaos=l["vaos"], w=wl, secao=f"{BW}x{h}",
                               pos=l["pos"], ini=l["ini"], fim=l["fim"],
+                              parede=(PAREDE_DIV if div else PAREDE_INT),
                               mmax=_mmax(res), peso=_peso(res),
                               falha=(res is None or bool(res.get("falha_flexao")
                                      or res.get("falha_biela"))),
