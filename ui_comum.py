@@ -46,8 +46,8 @@ _CSS = """
 [data-testid="stCaptionContainer"],
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaptionContainer"] div {
-    font-size: 0.98rem !important; font-weight: 600 !important;
-    color: #475569 !important;
+    font-size: 1.06rem !important; font-weight: 700 !important;
+    color: #1E293B !important;
 }
 [data-testid="stAlert"] p, [data-testid="stAlert"] li {
     font-size: 1.06rem; line-height: 1.5; font-weight: 700;
