@@ -122,7 +122,8 @@ def planta_do_json(data):
     vigas = [dict(nome=nomes[i], dir=l["dir"],
                   pos=l["pos"], ini=l["ini"], fim=l["fim"])
              for i, l in enumerate(linhas)]
-    return dict(vigas=vigas, pilares=data.get("pilares", []))
+    return dict(vigas=vigas, pilares=data.get("pilares", []),
+                lajes=data.get("lajes", []))
 
 
 def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
@@ -198,7 +199,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     return dict(vigas=vigas_det, baldrames=baldr_det, pilares=pil_det,
                 aco_vigas=aco_vigas, aco_pilares=aco_pilares, aco_baldrames=aco_baldr,
                 aco_total=aco_total, fund_tf=fund_tf, principal=principal,
-                q_cob=q_cob, wall=wall, falhas=falhas)
+                q_cob=q_cob, wall=wall, falhas=falhas, lajes=data.get("lajes", []))
 
 
 # ------------------------------------------------------------ relatório HTML

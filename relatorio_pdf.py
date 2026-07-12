@@ -196,14 +196,36 @@ def fig_planta(r):
                                    lw=0.8, zorder=6))
         ax.text(x + s * 0.8, y, p["pilar"], fontsize=13, color=NAVY,
                 fontweight="bold", ha="left", va="center", zorder=7)
+    # setas das LAJES (sentido da vigota) lançadas no editor — azul
+    a = max(0.45, 0.05 * max(W, H))
+    for i, L in enumerate(r.get("lajes", []), 1):
+        x, y = L.get("x_m"), L.get("y_m")
+        if x is None or y is None:
+            continue
+        if L.get("dir") == "V":
+            ax.annotate("", xy=(x, y + a), xytext=(x, y - a),
+                        arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.4),
+                        zorder=8)
+            lox, loy = a * 0.4, 0
+        else:
+            ax.annotate("", xy=(x + a, y), xytext=(x - a, y),
+                        arrowprops=dict(arrowstyle="<->", color="#1D4ED8", lw=2.4),
+                        zorder=8)
+            lox, loy = 0, a * 0.45
+        ax.text(x + lox, y + loy, L.get("nome", f"L{i}"), fontsize=10.5,
+                color="#1D4ED8", fontweight="bold", ha="center", va="center",
+                zorder=9, bbox=dict(boxstyle="round,pad=0.15", fc="white",
+                                    ec="none", alpha=0.9))
     ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima como
     #                                        no editor (mesma orientação do desenho)
     ax.set_xlabel("x (m)", fontsize=9)
     ax.set_ylabel("y (m)", fontsize=9)
     ax.tick_params(labelsize=8)
     ax.grid(alpha=0.15)
-    ax.set_title("PLANTA DE FORMA — VIGAS/BALDRAMES (amarelo) e PILARES "
-                 "(vermelho)", fontsize=13, fontweight="bold", color=NAVY)
+    _tit = "PLANTA DE FORMA — VIGAS/BALDRAMES (amarelo) e PILARES (vermelho)"
+    if r.get("lajes"):
+        _tit += " · SETAS das LAJES (azul)"
+    ax.set_title(_tit, fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
     return fig
 
