@@ -267,6 +267,7 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     return fig
 
 
+KGF = 101.97                # kgf por kN (1 kN ≈ 101,97 kgf) — pesos em kgf
 COR_FORMA = "#F5B301"       # amarelo bem vivo (planta de forma)
 COR_FUND = "#E11D2E"        # vermelho bem vivo (planta de fundação)
 COR_PIL_FORMA = "#1E3A8A"   # pilar na forma = azul-marinho
@@ -366,11 +367,11 @@ def fig_cargas_vigas(r):
                                     min(16.0, max(6.0, 0.7 * H + 2))), dpi=150)
     fig.patch.set_facecolor("white")
     for x1, y1, x2, y2, v in seg:
-        wt = round((v.get("w", 0) or 0) + _pp_viga(v.get("secao")), 1)
+        wt = round(((v.get("w", 0) or 0) + _pp_viga(v.get("secao"))) * KGF)  # kgf/m
         ax.plot([x1, x2], [y1, y2], color=COR_FORMA, lw=4.4,
                 solid_capstyle="round", zorder=2)
         xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
-        ax.text(xm, ym, f"{v.get('nome', '')}\n{wt:.1f} kN/m", fontsize=9,
+        ax.text(xm, ym, f"{v.get('nome', '')}\n{wt} kgf/m", fontsize=9,
                 color="#0F172A", fontweight="bold", ha="center", va="center",
                 zorder=6, bbox=dict(boxstyle="round,pad=0.18", fc="white",
                                     ec=COR_FORMA, lw=0.7))
@@ -386,7 +387,7 @@ def fig_cargas_vigas(r):
     ax.set_xlabel("x (m)", fontsize=9)
     ax.set_ylabel("y (m)", fontsize=9)
     ax.tick_params(labelsize=8)
-    ax.set_title("PLANTA DE CARGAS NAS VIGAS — kN/m (laje + telhado + peso próprio)",
+    ax.set_title("PLANTA DE CARGAS NAS VIGAS — kgf/m (laje + telhado + peso próprio)",
                  fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
     return fig

@@ -13,6 +13,7 @@ por viga/baldrame/pilar (figuras + memorial) + quantitativo de aço por etapa
 """
 import motor_viga as mv
 import motor_pilar as mp
+import calc_laje_projeto as cl
 from editor_lancamento import agrupar_vigas_continuas
 
 Q_COB = 3.0    # kN/m² cobertura (compatibilidade; hoje calculado por composição)
@@ -120,6 +121,47 @@ def _nomear_linhas(linhas):
     return nomes, bnomes
 
 
+def _cargas_lajes_vigas(vigas, lajes_editor, q_cob):
+    """Reação REAL das lajes (uma direção) nas vigas de apoio. Cada laje descarrega
+    q·(vão/2) nas DUAS vigas PERPENDICULARES às vigotas (a laje pré-moldada é
+    unidirecional; as vigas paralelas às vigotas não recebem laje). Direção = seta
+    do editor, senão o menor vão. Devolve dict (dir, pos) -> [força_kN, comp_apoiado]."""
+    comodos = cl.detectar_comodos(vigas)
+    for c in comodos:
+        for L in lajes_editor:
+            xm, ym = L.get("x_m"), L.get("y_m")
+            if xm is not None and ym is not None \
+                    and c["x0"] <= xm <= c["x1"] and c["y0"] <= ym <= c["y1"]:
+                c["vigota"] = "V" if L.get("dir") == "V" else "H"
+                break
+    carga = {}
+    for c in comodos:
+        if c["vigota"] == "H":            # vigotas em x (vencem Lx) -> apoiam nas VERTICAIS
+            reac, edge, dirn, apoios = q_cob * c["Lx"] / 2.0, c["Ly"], "V", (c["x0"], c["x1"])
+        else:                             # vigotas em y (vencem Ly) -> apoiam nas HORIZONTAIS
+            reac, edge, dirn, apoios = q_cob * c["Ly"] / 2.0, c["Lx"], "H", (c["y0"], c["y1"])
+        for p in apoios:
+            k = (dirn, round(p, 2))
+            e = carga.get(k, [0.0, 0.0])
+            e[0] += reac * edge          # força total (kN) daquela laje no apoio
+            e[1] += edge                 # comprimento apoiado
+            carga[k] = e
+    return carga
+
+
+def _w_laje(l, carga, tol=0.25):
+    """Carga distribuída (kN/m) na viga contínua l vinda das lajes (média sobre o
+    comprimento efetivamente apoiado)."""
+    f_tot, l_tot = 0.0, 0.0
+    for (d, p), (f, comp) in carga.items():
+        if d == l["dir"] and abs(p - l["pos"]) <= tol:
+            f_tot += f
+            l_tot += comp
+    if l_tot < 0.3:
+        return 0.0
+    return round(f_tot / l_tot, 2)
+
+
 def planta_do_json(data):
     """Geometria da planta (croqui) direto do JSON, SEM rodar o cálculo — para
     a tela de conferência. Agrupa as vigas contínuas e nomeia VH/VV como no
@@ -150,15 +192,15 @@ def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0):
     nomes, bnomes = _nomear_linhas(linhas)
     posH = sorted(set(l["pos"] for l in linhas if l["dir"] == "H"))
     posV = sorted(set(l["pos"] for l in linhas if l["dir"] == "V"))
-    # direção principal (mais linhas = onde as vigotas se apoiam) recebe a laje;
-    # a outra direção carrega só o peso próprio (modelo unidirecional simplificado).
-    principal = "H" if len(posH) >= len(posV) else "V"
+    principal = "H" if len(posH) >= len(posV) else "V"    # só p/ exibição
+    # REAÇÃO REAL das lajes: cada laje descarrega nas vigas que a sustentam
+    # (perpendiculares às vigotas). Bidirecional — não é mais só a direção principal.
+    carga_lajes = _cargas_lajes_vigas(vigas, data.get("lajes", []), q_cob)
 
     # ---- vigas de cobertura
     vigas_det = []
     for i, l in enumerate(linhas):
-        arr = posH if l["dir"] == "H" else posV
-        w = round(q_cob * _trib(l["pos"], arr), 2) if l["dir"] == principal else 0.0
+        w = _w_laje(l, carga_lajes)
         nome = nomes[i]
         res, h = _detalhar_viga(nome, l["vaos"], w)
         vigas_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),

@@ -361,11 +361,11 @@ else:
         ss.pop("pc_r", None)
         st.rerun()
     _qc = cp.G_PERM + cp.Q_FORRO + ss["g_telhado"]
-    st.caption(f"Cobertura = laje-forro+revest. **{cp.G_PERM:.1f}** + sobrecarga de "
-               f"forro **{cp.Q_FORRO:.1f}** + telhado **{ss['g_telhado']:.2f}** = "
-               f"**{_qc:.2f} kN/m²**. Peso da telha: NBR 6120/catálogo · madeiramento: "
-               "estimativa (ajuste ao lado se o seu for diferente). A responsabilidade "
-               "do valor é do engenheiro.")
+    st.caption(f"Cobertura = laje-forro+revest. **{round(cp.G_PERM*101.97)}** + "
+               f"sobrecarga de forro **{round(cp.Q_FORRO*101.97)}** + telhado "
+               f"**{round(ss['g_telhado']*101.97)}** = **{round(_qc*101.97)} kgf/m²** "
+               f"({_qc:.2f} kN/m²). Peso da telha: NBR 6120/catálogo · madeiramento: "
+               "estimativa (ajuste ao lado). A responsabilidade do valor é do engenheiro.")
 
     if ss.get("pc_r") is None:
         with st.spinner("Rodando o cálculo NBR 6118 de todas as vigas, baldrames "
@@ -511,31 +511,34 @@ else:
 
     # ---- vigas de cobertura
     sec(2, "Vigas de cobertura (viga contínua NBR 6118)")
-    st.caption(f"Laje lançada na direção "
-               f"**{'horizontal' if r['principal']=='H' else 'vertical'}** "
-               f"(cobertura q ≈ {r['q_cob']} kN/m²). A seção cresce sozinha se o "
-               "vão exigir.")
+    st.caption(f"Cobertura q ≈ **{round(r['q_cob']*101.97)} kgf/m²** "
+               f"({r['q_cob']} kN/m²). Cada viga recebe a **reação real** das lajes que "
+               "sustenta (não é mais só a direção principal). A seção cresce sozinha se "
+               "o vão exigir.")
     tabela([{"Viga": v["nome"], "Seção": v["secao"], "Nº vãos": v["nvaos"],
              "Vãos (m)": " + ".join(f"{x:.2f}" for x in v["vaos"]),
-             "Carga w (kN/m)": v["w"], "M máx (kN·m)": v["mmax"],
+             "Carga (kgf/m)": round((v["w"] + rpdf._pp_viga(v["secao"])) * 101.97),
+             "M máx (kN·m)": v["mmax"],
              "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
     st.markdown("**📊 Planta de CARGAS NAS VIGAS** (kN/m — laje + telhado + peso próprio):")
     _fcv = rpdf.fig_cargas_vigas(r)
     if _fcv is not None:
         st.pyplot(_fcv, width="stretch")
         plt.close(_fcv)
-    st.caption("Carga total de cada viga. **Modelo unidirecional:** a laje descarrega "
-               f"nas vigas **{'horizontais (VH)' if r['principal']=='H' else 'verticais (VV)'}** "
-               "(direção principal); as da outra direção levam só o **peso próprio** "
-               "(~1 kN/m). Se quiser, evoluo para carga nos dois sentidos (reação real "
-               "da laje).")
+    st.caption("Carga total de cada viga (**reação real da laje** + peso próprio). Cada "
+               "laje descarrega q·(vão/2) nas **duas vigas que a sustentam** "
+               "(perpendiculares às vigotas) — por isso as vigas dos **dois sentidos** "
+               "recebem carga, conforme a direção de cada laje. Viga sem laje mostra só o "
+               "**peso próprio** (~107 kgf/m para 14×30).")
 
     # ---- baldrames
     sec(3, "Baldrames (vigas de fundação sob as paredes)")
-    st.caption(f"Carga de parede ≈ {r['wall']} kN/m sobre cada linha de baldrame.")
+    st.caption(f"Carga de parede ≈ {round(r['wall']*101.97)} kgf/m ({r['wall']} kN/m) "
+               "sobre cada linha de baldrame.")
     tabela([{"Baldrame": b["nome"], "Seção": b["secao"], "Nº vãos": b["nvaos"],
              "Vãos (m)": " + ".join(f"{x:.2f}" for x in b["vaos"]),
-             "Carga w (kN/m)": b["w"], "M máx (kN·m)": b["mmax"],
+             "Carga (kgf/m)": round((b["w"] + rpdf._pp_viga(b["secao"])) * 101.97),
+             "M máx (kN·m)": b["mmax"],
              "Aço (kg)": b["peso"] if b["peso"] else "—"} for b in r["baldrames"]])
 
     # ---- pilares
@@ -556,9 +559,9 @@ else:
         plt.close(_fcp)
     st.caption("Relação de cargas por pilar (carga do pilar = carga na fundação "
                "correspondente):")
-    tabela([{"Pilar": p["pilar"], "Carga (tf)": p["carga_tf"],
-             "Carga (kN)": round((p.get("carga_tf") or 0) * 9.81, 0),
-             "Seção (cm)": p["secao"]} for p in r["pilares"]])
+    tabela([{"Pilar": p["pilar"], "Carga (kgf)": round((p.get("carga_tf") or 0) * 1000),
+             "Carga (tf)": p["carga_tf"], "Seção (cm)": p["secao"]}
+            for p in r["pilares"]])
     st.caption("O dimensionamento das fundações (bloco, estaca, sapata) depende do "
                "**SPT do terreno**. As cargas dos pilares vêm do lançamento (área de "
                "influência + paredes).")
