@@ -26,6 +26,24 @@ import calc_laje_projeto as cl
 import fechamento_auto as fa
 import relatorio_pdf as rpdf
 
+# Observação nos cálculos — cópia PRÓPRIA (não depende de rpdf estar atualizado no
+# cache do Streamlit Cloud; usa a do rpdf se existir, senão a de baixo). Evita o
+# AttributeError quando o módulo relatorio_pdf fica velho em cache após um deploy.
+OBS_CALCULOS = getattr(rpdf, "OBS_CALCULOS", None) or [
+    ("1)  DIREÇÃO e USO (sobrecarga) da laje na tabela",
+     "A direção e o tipo de uso escolhidos na tabela mudam o dimensionamento da "
+     "PRÓPRIA laje (altura e armadura). Porém, a carga lançada nas VIGAS de "
+     "cobertura usa a direção lançada no editor e a carga de cobertura UNIFORME "
+     "(q_cob = laje de forro + revestimento + sobrecarga de forro + telhado). A "
+     "sobrecarga por ambiente (uso de cada cômodo) NÃO é somada individualmente na "
+     "viga de cobertura."),
+    ("2)  VÃO de dimensionamento da laje pré-moldada",
+     "As lajes pré-moldadas são SEMPRE dimensionadas pelo MENOR vão (o vão da "
+     "vigota). Girar a seta muda o desenho e a distribuição da carga nas vigas, mas "
+     "NÃO altera a altura/armadura da PRÓPRIA laje — que continua calculada pelo "
+     "menor vão."),
+]
+
 aplicar_estilo()
 header("Projeto Completo — Lançar → Conferir → Calcular",
        "Desenhe, confira a planta com o seu projeto e mande para o cálculo")
@@ -592,7 +610,7 @@ else:
     # ---- OBSERVAÇÃO NOS CÁLCULOS (o que o motor executa — vai também no PDF)
     sec(7, "📌 OBSERVAÇÃO NOS CÁLCULOS")
     st.warning("**O que o programa executa — para você conferir e decidir:**\n\n"
-               + "\n\n".join(f"**{_t}** — {_x}" for _t, _x in rpdf.OBS_CALCULOS))
+               + "\n\n".join(f"**{_t}** — {_x}" for _t, _x in OBS_CALCULOS))
 
     # ---- relatório resumido em HTML (rápido)
     sec(8, "Baixar os relatórios")
