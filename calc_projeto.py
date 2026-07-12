@@ -109,7 +109,7 @@ def _nomear_linhas(linhas):
         nomes[k] = f"VH{n}"
     for n, k in enumerate(V, 1):
         nomes[k] = f"VV{n}"
-    bnomes = {k: f"B{n}" for n, k in enumerate(H + V, 1)}
+    bnomes = {k: f"VB{n}" for n, k in enumerate(H + V, 1)}   # Viga Baldrame
     return nomes, bnomes
 
 
@@ -118,12 +118,15 @@ def planta_do_json(data):
     a tela de conferência. Agrupa as vigas contínuas e nomeia VH/VV como no
     detalhamento; devolve no mesmo formato que `fig_planta` consome."""
     linhas = agrupar_vigas_continuas(data.get("vigas", []))
-    nomes, _ = _nomear_linhas(linhas)
+    nomes, bnomes = _nomear_linhas(linhas)
     vigas = [dict(nome=nomes[i], dir=l["dir"],
                   pos=l["pos"], ini=l["ini"], fim=l["fim"])
              for i, l in enumerate(linhas)]
-    return dict(vigas=vigas, pilares=data.get("pilares", []),
-                lajes=data.get("lajes", []))
+    baldrames = [dict(nome=bnomes[i], dir=l["dir"],
+                      pos=l["pos"], ini=l["ini"], fim=l["fim"])
+                 for i, l in enumerate(linhas)]
+    return dict(vigas=vigas, baldrames=baldrames,
+                pilares=data.get("pilares", []), lajes=data.get("lajes", []))
 
 
 def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
@@ -158,6 +161,7 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
         res, h = _detalhar_viga(nome, l["vaos"], wall)
         baldr_det.append(dict(nome=nome, dir=l["dir"], nvaos=len(l["vaos"]),
                               comp=l["comp"], vaos=l["vaos"], w=wall, secao=f"{BW}x{h}",
+                              pos=l["pos"], ini=l["ini"], fim=l["fim"],
                               mmax=_mmax(res), peso=_peso(res),
                               falha=bool(res and (res.get("falha_flexao") or res.get("falha_biela"))),
                               res=res))

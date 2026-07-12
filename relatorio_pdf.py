@@ -147,13 +147,11 @@ def _divisoria(pdf, titulo):
     plt.close(fig)
 
 
-def fig_planta(r):
-    """Planta de forma: eixos de vigas/baldrames (amarelo) e pilares (vermelho),
-    com a MESMA numeração do detalhamento (VH1…, VV…, P1…). Permite localizar
-    cada elemento no projeto."""
-    pilares = r.get("pilares", [])
+def _planta(vigas, pilares, lajes, titulo):
+    """Desenha UMA planta: vigas (amarelo, rotuladas), pilares (vermelho) e, se
+    houver, as setas das LAJES (azul). `vigas` = lista com nome/dir/pos/ini/fim."""
     seg = []
-    for v in r.get("vigas", []):
+    for v in vigas:
         if v.get("ini") is None:
             continue
         if v["dir"] == "H":
@@ -198,7 +196,7 @@ def fig_planta(r):
                 fontweight="bold", ha="left", va="center", zorder=7)
     # setas das LAJES (sentido da vigota) lançadas no editor — azul
     a = max(0.45, 0.05 * max(W, H))
-    for i, L in enumerate(r.get("lajes", []), 1):
+    for i, L in enumerate(lajes or [], 1):
         x, y = L.get("x_m"), L.get("y_m")
         if x is None or y is None:
             continue
@@ -222,12 +220,25 @@ def fig_planta(r):
     ax.set_ylabel("y (m)", fontsize=9)
     ax.tick_params(labelsize=8)
     ax.grid(alpha=0.15)
-    _tit = "PLANTA DE FORMA — VIGAS/BALDRAMES (amarelo) e PILARES (vermelho)"
-    if r.get("lajes"):
-        _tit += " · SETAS das LAJES (azul)"
-    ax.set_title(_tit, fontsize=13, fontweight="bold", color=NAVY)
+    ax.set_title(titulo, fontsize=13, fontweight="bold", color=NAVY)
     fig.tight_layout()
     return fig
+
+
+def fig_planta(r):
+    """PLANTA DE FORMA — vigas de cobertura (VH/VV) + LAJES (setas) + pilares."""
+    tit = "PLANTA DE FORMA — VIGAS de cobertura (amarelo) e PILARES (vermelho)"
+    if r.get("lajes"):
+        tit += " · SETAS das LAJES (azul)"
+    return _planta(r.get("vigas", []), r.get("pilares", []), r.get("lajes", []), tit)
+
+
+def fig_planta_fundacao(r):
+    """PLANTA DE FUNDAÇÃO — vigas BALDRAMES (VB) + pilares, SEM lajes (o baldrame
+    fica sob a parede; não recebe laje, então não precisa de fechamento)."""
+    return _planta(r.get("baldrames", []), r.get("pilares", []), [],
+                   "PLANTA DE FUNDAÇÃO — VIGAS BALDRAMES VB (amarelo) e "
+                   "PILARES (vermelho)")
 
 
 # ------------------------------------------------------------ memoriais
@@ -473,6 +484,9 @@ def gerar_pdf(r, proj="projeto", reduzido=False):
         planta = fig_planta(r)
         if planta is not None:
             _salva(pdf, planta)
+        planta_fund = fig_planta_fundacao(r)      # planta de fundação (baldrames VB)
+        if planta_fund is not None:
+            _salva(pdf, planta_fund)
         _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
                    f"{len(r['vigas'])} vigas)")
         for g in gv:

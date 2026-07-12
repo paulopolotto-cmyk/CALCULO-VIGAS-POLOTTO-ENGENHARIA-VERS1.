@@ -158,7 +158,7 @@ if ss.pc_vista == "lancar":
 
 # ============================================================ 2) CONFERIR
 elif ss.pc_vista == "conferir":
-    sec(1, "Confira a planta com o seu desenho")
+    sec(1, "Confira as DUAS plantas — Forma (lajes) e Fundação (baldrames)")
     _lz = ss.get("pc_limpeza")
     if _lz and (_lz["endireitadas"] or _lz["duplicadas"] or _lz["tocos"]):
         st.info(f"🧹 **Limpei o seu lançamento ao carregar:** endireitei "
@@ -166,16 +166,26 @@ elif ss.pc_vista == "conferir":
                 f"**{_lz['duplicadas']}** viga(s) em duplicidade e **{_lz['tocos']}** "
                 "toco(s). As diagonais de verdade foram mantidas. Se sumiu algo que "
                 "você queria, é só ir em **Editar**.")
-    st.caption("Compare este croqui com a planta que você lançou. **Faltou ou "
-               "sobrou** alguma viga ou pilar?")
-    planta = rpdf.fig_planta(cp.planta_do_json(ss.pc_data))
-    if planta is not None:
-        st.pyplot(planta, width="stretch")
-        plt.close(planta)                      # libera memória (evita vazamento)
-        st.caption("Vigas/baldrames em **amarelo** (VH…, VV…) e pilares em "
-                   "**vermelho** (P…) — a mesma numeração que vai no detalhamento.")
+    st.caption("Compare os croquis com a planta que você lançou. **Faltou ou "
+               "sobrou** alguma viga, pilar ou laje?")
+    _pj = cp.planta_do_json(ss.pc_data)
+    st.markdown("**① Planta de FORMA** — vigas de cobertura (**VH/VV**) + as "
+                "**lajes** (setas azuis do sentido da vigota).")
+    _pf = rpdf.fig_planta(_pj)
+    if _pf is not None:
+        st.pyplot(_pf, width="stretch")
+        plt.close(_pf)
     else:
         st.warning("Sem coordenadas para desenhar a planta.")
+    st.markdown("**② Planta de FUNDAÇÃO** — vigas **baldrames (VB)** sob as paredes. "
+                "**Não tem laje** e **não precisa de fechamento**.")
+    _pfu = rpdf.fig_planta_fundacao(_pj)
+    if _pfu is not None:
+        st.pyplot(_pfu, width="stretch")
+        plt.close(_pfu)
+    st.caption("Amarelo = vigas (forma **VH/VV** · fundação **VB**) · vermelho = "
+               "pilares (**P**) · azul = **lajes** (sentido da vigota). Mesma "
+               "numeração do detalhamento — as **duas** plantas vão para o cálculo.")
 
     rr = el.resumo_estrutura(ss.pc_data)
     c1, c2, c3 = st.columns(3)
@@ -183,8 +193,11 @@ elif ss.pc_vista == "conferir":
     c2.metric("Vigas (trechos)", rr["n_vigas"])
     c3.metric("Vigas contínuas", rr["n_continuas"])
 
-    # ---- diagnóstico das vigas: onde não fecha / vão grande
-    sec(2, "Diagnóstico das vigas (fechamento das lajes e vãos)")
+    # ---- fechamento das LAJES (só a planta de FORMA precisa)
+    sec(2, "Fechamento das LAJES (vale só para a planta de FORMA)")
+    st.caption("A laje precisa de viga em volta para apoiar — isso vale **só na "
+               "planta de forma**. A **fundação (baldrames VB) NÃO precisa fechar** "
+               "(não recebe laje).")
     _com = cl.detectar_comodos(ss.pc_data.get("vigas", []))
     _ab = cl.regioes_abertas(ss.pc_data.get("vigas", []))
     _grandes = [c for c in _com if c["menor"] > cl.VAO_GRANDE]
@@ -193,8 +206,9 @@ elif ss.pc_vista == "conferir":
         st.pyplot(_fd, width="stretch")
         plt.close(_fd)
         if _ab:
-            st.warning(f"⚠️ **{len(_ab)} área(s) NÃO estão fechadas por vigas** "
-                       "(vermelho hachurado) — a laje não teria onde se apoiar. Volte "
+            st.warning(f"⚠️ **{len(_ab)} área(s) da FORMA sem viga fechando** "
+                       "(vermelho hachurado) — se puser laje ali, ela não teria apoio. "
+                       "Volte "
                        "em **Editar** e lance uma viga fechando esses lados.")
         if _grandes:
             st.warning("⚠️ **Vão grande** (laranja): " + ", ".join(
