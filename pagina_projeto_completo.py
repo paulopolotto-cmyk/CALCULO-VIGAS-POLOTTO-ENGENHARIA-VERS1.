@@ -66,43 +66,61 @@ _stepper()
 
 # ============================================================ 1) LANÇAR
 if ss.pc_vista == "lancar":
-    sec(1, "Suba a planta (PDF) e desenhe os pilares e vigas")
-    up = st.file_uploader("Planta baixa em PDF (do CAD) — fundo para desenhar",
-                          type=["pdf"], key="pc_pdf")
-    if up is not None:
-        with st.spinner("Lendo a planta…"):
-            try:
-                ss.pc_planta = el.extrair_planta(up.getvalue())
-                ss.pc_proj = up.name.rsplit(".", 1)[0]
-            except Exception as e:
-                st.error(f"Não consegui ler a planta: {e}")
-
-    if ss.pc_planta is not None:
-        d = ss.pc_planta
-        st.success(f"Planta lida ({len(d['VX'])} eixos verticais, "
-                   f"{len(d['HY'])} horizontais para o snap).")
-        ss.pc_larg = st.number_input(
-            "Largura total da construção (m) — só para acertar a escala",
-            min_value=1.0, max_value=300.0, value=float(ss.pc_larg), step=0.5)
-        S = el.estimar_escala(d, ss.pc_larg)
-        st.caption(f"Escala: 1 m ≈ {S} pontos. Desenhe os **pilares (+Pilar)** e "
-                   "as **vigas (+Viga)**. Ao terminar, clique **ENVIAR** — ele "
-                   "baixa o `estrutura_*.json`.")
-        lskey = "lanc_" + "".join(c for c in ss.pc_proj if c.isalnum())[:20]
-        html = el.build_editor(d, S, proj=ss.pc_proj, lskey=lskey or "lanc_proj")
-        components.html(html, height=820, scrolling=True)
-    elif ss.pc_data is not None:
-        st.success(f"✏️ Editando o seu projeto — **{len(ss.pc_data.get('pilares', []))} "
-                   f"pilares** e **{len(ss.pc_data.get('vigas', []))} vigas** já "
-                   "carregados. Fundo em branco; para ver a planta da casa atrás, "
-                   "suba o PDF acima.")
+    editando = ss.pc_data is not None and ss.pc_planta is None
+    if editando:
+        sec(1, "Edite as vigas e os pilares — mexa direto no desenho")
+        n_p = len(ss.pc_data.get("pilares", []))
+        n_v = len(ss.pc_data.get("vigas", []))
+        st.success(f"✏️ **Você está EDITANDO o seu projeto** — **{n_p} pilares** e "
+                   f"**{n_v} vigas** já estão no desenho abaixo, prontos para mexer.")
+        st.info("**Para editar e voltar a conferir — 3 passos:**  \n"
+                "**1)** mexa no **desenho abaixo**: arraste para mover, **+Pilar / "
+                "+Viga** para acrescentar, **Excluir** para tirar.  \n"
+                "**2)** clique **➤ ENVIAR** (botão verde do editor) — baixa um arquivo "
+                "`estrutura_*.json` na pasta **Downloads**.  \n"
+                "**3)** suba esse arquivo na caixa **📁 logo abaixo do editor** e "
+                "clique **👁️ Ver a planta para CONFERIR**.")
+        with st.expander("🖼️ Ver as paredes da casa (PDF) atrás do desenho"):
+            up = st.file_uploader("Planta em PDF (do CAD)", type=["pdf"], key="pc_pdf")
+            if up is not None:
+                with st.spinner("Lendo a planta…"):
+                    try:
+                        ss.pc_planta = el.extrair_planta(up.getvalue())
+                        ss.pc_proj = up.name.rsplit(".", 1)[0]
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Não consegui ler a planta: {e}")
         html = el.build_editor_from_data(ss.pc_data)
         components.html(html, height=820, scrolling=True)
-        st.caption("Complete/ajuste as vigas e pilares e clique **ENVIAR** (baixa o "
-                   "arquivo). Depois suba o arquivo **abaixo** para conferir de novo.")
     else:
-        st.info("Para desenhar do zero, suba o **PDF** acima. Se já tem o arquivo do "
-                "projeto salvo, suba ele **abaixo** — dá para editar mesmo sem o PDF.")
+        sec(1, "Suba a planta (PDF) e desenhe os pilares e vigas")
+        up = st.file_uploader("Planta baixa em PDF (do CAD) — fundo para desenhar",
+                              type=["pdf"], key="pc_pdf")
+        if up is not None:
+            with st.spinner("Lendo a planta…"):
+                try:
+                    ss.pc_planta = el.extrair_planta(up.getvalue())
+                    ss.pc_proj = up.name.rsplit(".", 1)[0]
+                except Exception as e:
+                    st.error(f"Não consegui ler a planta: {e}")
+        if ss.pc_planta is not None:
+            d = ss.pc_planta
+            st.success(f"Planta lida ({len(d['VX'])} eixos verticais, "
+                       f"{len(d['HY'])} horizontais para o snap).")
+            ss.pc_larg = st.number_input(
+                "Largura total da construção (m) — só para acertar a escala",
+                min_value=1.0, max_value=300.0, value=float(ss.pc_larg), step=0.5)
+            S = el.estimar_escala(d, ss.pc_larg)
+            st.caption(f"Escala: 1 m ≈ {S} pontos. Desenhe os **pilares (+Pilar)** e "
+                       "as **vigas (+Viga)**. Ao terminar, clique **ENVIAR** — ele "
+                       "baixa o `estrutura_*.json`.")
+            lskey = "lanc_" + "".join(c for c in ss.pc_proj if c.isalnum())[:20]
+            html = el.build_editor(d, S, proj=ss.pc_proj, lskey=lskey or "lanc_proj")
+            components.html(html, height=820, scrolling=True)
+        else:
+            st.info("Para desenhar do zero, suba o **PDF** acima. Se já tem o arquivo "
+                    "do projeto salvo, suba ele **abaixo** — dá para editar mesmo sem "
+                    "o PDF.")
 
     sec(2, "Salvou? Suba o arquivo para CONFERIR a planta")
     st.caption("No editor, clique **ENVIAR** (baixa o `estrutura_*.json`). Depois "
@@ -258,12 +276,20 @@ elif ss.pc_vista == "conferir":
                 _vista("conferir")
 
     st.write("")
+    st.markdown("#### O que você quer fazer agora?")
     b1, b2 = st.columns(2)
-    if b1.button("✏️ Editar (faltou/sobrou algo)", width="stretch"):
+    if b1.button("✏️ Editar (faltou/sobrou algo)", type="primary", width="stretch"):
+        st.toast("Abrindo o editor do desenho…")
         _vista("lancar")
     if b2.button("✅ Está certo — enviar para o cálculo", type="primary",
                  width="stretch"):
         _vista("calcular")
+    ca, cb = st.columns(2)
+    ca.caption("✏️ **Editar** te leva de volta ao **desenho** para mexer nas vigas e "
+               "pilares. Lá aparece o **passo a passo** (mexer → ENVIAR → subir o "
+               "arquivo de novo).")
+    cb.caption("✅ **Está certo** manda para o **cálculo** (tabelas, aço, fundação e "
+               "os PDFs). Você ainda pode voltar depois.")
 
 # ============================================================ 3) CALCULAR
 else:
