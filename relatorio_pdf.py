@@ -285,9 +285,16 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2.0)),
                                     min(16.0, max(6.0, 0.7 * H + 2.0))), dpi=150)
     fig.patch.set_facecolor("white")
-    for x1, y1, x2, y2, _ in seg:                         # vigas — cor viva e grossa
-        ax.plot([x1, x2], [y1, y2], color=cor_viga, lw=4.6,
-                solid_capstyle="round", zorder=2)
+    BWM = 0.14                                            # 14 cm — espessura real
+    for x1, y1, x2, y2, _ in seg:                         # viga = PAREDE de 14 cm
+        if abs(x2 - x1) >= abs(y2 - y1):                  # horizontal
+            xa, xb = min(x1, x2), max(x1, x2)
+            ax.add_patch(plt.Rectangle((xa, y1 - BWM / 2), max(BWM, xb - xa), BWM,
+                                       facecolor=cor_viga, edgecolor="none", zorder=2))
+        else:                                             # vertical
+            ya, yb = min(y1, y2), max(y1, y2)
+            ax.add_patch(plt.Rectangle((x1 - BWM / 2, ya), BWM, max(BWM, yb - ya),
+                                       facecolor=cor_viga, edgecolor="none", zorder=2))
     off = max(0.42, 0.03 * max(W, H))
     labs = []
     for x1, y1, x2, y2, nome in seg:                      # rótulo AFASTADO da viga
@@ -341,6 +348,9 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
                     color="#1D4ED8", fontweight="bold", ha="center", va="center",
                     zorder=9, bbox=dict(boxstyle="round,pad=0.12", fc="white",
                                         ec="none", alpha=0.9)))
+    mgx, mgy = 0.04 * W + 0.4, 0.04 * H + 0.4   # as paredes são add_patch: fixo a vista
+    ax.set_xlim(min(xs) - mgx, max(xs) + mgx)
+    ax.set_ylim(min(ys) - mgy, max(ys) + mgy)
     ax.set_aspect("equal")                 # y NÃO invertido: cresce p/ cima
     ax.set_xlabel("x (m)", fontsize=9)
     ax.set_ylabel("y (m)", fontsize=9)
