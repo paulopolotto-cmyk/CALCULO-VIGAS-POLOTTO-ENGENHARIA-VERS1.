@@ -56,6 +56,14 @@ th{background:var(--soft);color:var(--azul);font-weight:800;position:sticky;top:
  <span class="sep"></span>
  <button class="tool send" id="send">&#10148; ENVIAR<span class="kb">Enter</span></button>
 </div>
+<div class="tools" style="background:#EEF3FB">
+ <b style="font-size:.82rem;color:#1E3A8A;align-self:center">&#128193; Projeto (Desktop):</b>
+ <button class="tool" id="projpasta">Pasta <b>Projeto Estrutural PRP</b></button>
+ <button class="tool" id="projnovo">&#127381; Novo projeto</button>
+ <select id="projsel" style="font-size:.8rem;font-weight:700;padding:6px;border-radius:8px;border:1px solid #CBD5E1;background:#fff;color:#0F172A"><option value="">&mdash; seus projetos &mdash;</option></select>
+ <button class="tool" id="projcont">&#128194; Continuar</button>
+ <span id="projind" style="font-size:.78rem;font-weight:800;color:#15803D;align-self:center"></span>
+</div>
 <div class="wrap">
  <div class="left">
   <div class="planbox" id="box"><img src="__IMG__" alt="planta">
@@ -239,7 +247,7 @@ $('min').onclick=()=>{if(!confirm('Reiniciar com apenas cantos/interseções? (v
 $('auto').onclick=()=>{snap();autobeams();renderFull();};$('undo').onclick=undo;
 $('reset').onclick=()=>{if(!confirm('Restaurar o lançamento inicial? (perde as alterações não salvas)'))return;snap();try{localStorage.removeItem(LSKEY);}catch(e){}pillars=JSON.parse(JSON.stringify(INIT));pillars.forEach(p=>snapAxis(p));nextId=Math.max(0,...pillars.map(p=>p.id))+1;nextBid=1;lajes=[];nextLid=1;autobeams();selP=null;selB=null;renderFull();};
 function stamp(){let d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'_'+p(d.getHours())+'h'+p(d.getMinutes());}
-function salvar(){let data={_tipo:'lancamento_caldeira',pillars,beams,lajes,nextId,nextBid,nextLid};let bl=new Blob([JSON.stringify(data)],{type:'application/json'});let a=document.createElement('a');let fn='lancamento_caldeira_'+stamp()+'.json';a.href=URL.createObjectURL(bl);a.download=fn;a.click();alert('Lançamento SALVO em '+fn+' (Downloads).\nDepois use "Editar" para reabrir e continuar.');}
+async function salvar(){let data={_tipo:'lancamento_caldeira',projeto:projName||'Caldeira',pillars,beams,lajes,nextId,nextBid,nextLid};let bl=new Blob([JSON.stringify(data)],{type:'application/json'});let a=document.createElement('a');let fn='lancamento_caldeira_'+stamp()+'.json';a.href=URL.createObjectURL(bl);a.download=fn;a.click();let msg='Lançamento SALVO em '+fn+' (Downloads).';if(dirProj){let vf=await gravarVersao();if(vf)msg+='\nE a versão '+vf+' na pasta do projeto "'+projName+'" (Desktop).';}alert(msg+'\nUse "Editar" para reabrir e continuar.');}
 $('salvar').onclick=salvar;
 $('editar').onclick=()=>$('file').click();
 $('file').onchange=ev=>{let fl=ev.target.files[0];if(!fl)return;let rd=new FileReader();rd.onload=()=>{try{let d=JSON.parse(rd.result);
@@ -254,6 +262,21 @@ $('file').onchange=ev=>{let fl=ev.target.files[0];if(!fl)return;let rd=new FileR
  catch(err){alert('Não consegui ler esse arquivo (JSON inválido).');}};rd.readAsText(fl);ev.target.value='';};
 async function writeFile(){if(!fileHandle)return;try{let w=await fileHandle.createWritable();await w.write(JSON.stringify({_tipo:'lancamento_caldeira',pillars,beams,lajes,nextId,nextBid,nextLid}));await w.close();$('autoind').textContent='🔴 auto-salvo '+new Date().toLocaleTimeString();}catch(e){$('autoind').textContent='⚠ erro ao salvar';}}
 $('autofile').onclick=async()=>{if(fileHandle){fileHandle=null;$('autoind').textContent='auto-arquivo: desligado';return;}if(!window.showSaveFilePicker){alert('Este navegador não deixa gravar em arquivo automaticamente.\nUse o Chrome ou o Edge.\n(O autosave interno do navegador já protege contra queda de energia: reabra o arquivo que ele volta.)');return;}try{fileHandle=await window.showSaveFilePicker({suggestedName:'lancamento_caldeira.json',types:[{description:'Lancamento',accept:{'application/json':['.json']}}]});await writeFile();}catch(e){}};
+// ============== PROJETO: pasta no Desktop + versoes (Chrome/Edge) ==============
+let dirRoot=null,dirProj=null,projName='',projVer=1;
+function _idb(){return new Promise((res,rej)=>{let r=indexedDB.open('prp_db',1);r.onupgradeneeded=()=>r.result.createObjectStore('h');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
+async function idbSet(k,v){try{let db=await _idb();await new Promise((res,rej)=>{let t=db.transaction('h','readwrite');t.objectStore('h').put(v,k);t.oncomplete=()=>res();t.onerror=()=>rej(t.error);});}catch(e){}}
+async function idbGet(k){let db=await _idb();return new Promise((res)=>{let t=db.transaction('h','readonly'),rq=t.objectStore('h').get(k);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>res(null);});}
+async function ensurePerm(h){if(!h)return false;let o={mode:'readwrite'};try{if((await h.queryPermission(o))==='granted')return true;return (await h.requestPermission(o))==='granted';}catch(e){return false;}}
+function vlabel(n){return 'v'+String(n).padStart(2,'0');}
+function projStatus(){let el=$('projind');if(!el)return;el.textContent=dirProj?('📁 '+projName+' · próxima '+vlabel(projVer)):(dirRoot?'pasta PRP conectada — use Novo ou Continuar':'sem pasta (opcional)');}
+async function refreshProjList(){let sel=$('projsel');if(!sel)return;let base='<option value="">— seus projetos —</option>';if(!dirRoot){sel.innerHTML=base;return;}try{let ns=[];for await(const [nm,h] of dirRoot.entries())if(h.kind==='directory')ns.push(nm);ns.sort();sel.innerHTML=base+ns.map(n=>'<option>'+n+'</option>').join('');}catch(e){sel.innerHTML=base;}}
+async function pickRoot(){if(!window.showDirectoryPicker){alert('Para salvar em pasta no Desktop use o Chrome ou o Edge.');return false;}try{let h=await window.showDirectoryPicker({mode:'readwrite'});if(h.name!=='Projeto Estrutural PRP')h=await h.getDirectoryHandle('Projeto Estrutural PRP',{create:true});dirRoot=h;await idbSet('root',h);await refreshProjList();projStatus();return true;}catch(e){return false;}}
+async function novoProjeto(){if(!dirRoot&&!(await pickRoot()))return;if(!(await ensurePerm(dirRoot))){alert('Preciso da permissão da pasta.');return;}let nm=prompt('Nome do NOVO projeto:');if(nm==null)return;nm=nm.trim().replace(/[\\\/:*?"<>|]/g,'-');if(!nm)return;dirProj=await dirRoot.getDirectoryHandle(nm,{create:true});projName=nm;projVer=1;await refreshProjList();let s=$('projsel');if(s)s.value=nm;projStatus();alert('Projeto "'+nm+'" criado em Projeto Estrutural PRP.\nClique Salvar (ou ENVIAR) para gravar a versão '+vlabel(1)+'.');}
+async function continuarProjeto(){let sel=$('projsel'),nm=sel?sel.value:'';if(!nm){alert('Escolha um projeto na lista ao lado.');return;}if(!dirRoot||!(await ensurePerm(dirRoot)))return;dirProj=await dirRoot.getDirectoryHandle(nm,{create:false});projName=nm;let maxv=0,latest=null;for await(const [enm,eh] of dirProj.entries()){let m=enm.match(/v(\d+)/i);if(m&&eh.kind==='file'){let v=+m[1];if(v>=maxv){maxv=v;latest=eh;}}}projVer=maxv+1;if(latest){try{let f=await latest.getFile(),d=JSON.parse(await f.text());if(d.pillars){snap();pillars=d.pillars;beams=d.beams||[];lajes=d.lajes||[];nextId=d.nextId||1;nextBid=d.nextBid||1;nextLid=d.nextLid||1;selP=null;selB=null;migrateBeams();renderFull();}}catch(e){}}projStatus();alert('Projeto "'+nm+'" carregado'+(maxv?(' (última '+vlabel(maxv)+')'):' (ainda vazio)')+'.\nA próxima gravação será '+vlabel(projVer)+'.');}
+async function gravarVersao(){if(!dirProj)return null;try{if(!(await ensurePerm(dirRoot)))return null;let fn=vlabel(projVer)+'_'+stamp()+'.json';let fh=await dirProj.getFileHandle(fn,{create:true}),w=await fh.createWritable();await w.write(JSON.stringify({_tipo:'lancamento_caldeira',projeto:projName,pillars,beams,lajes,nextId,nextBid,nextLid}));await w.close();projVer++;projStatus();return fn;}catch(e){return null;}}
+$('projpasta').onclick=pickRoot;$('projnovo').onclick=novoProjeto;$('projcont').onclick=continuarProjeto;
+(async function(){try{let h=await idbGet('root');if(h){dirRoot=h;projStatus();if((await h.queryPermission({mode:'readwrite'}))==='granted')await refreshProjList();}}catch(e){}})();
 function enviar(){let bd=beamData();let w=issues(bd);
  if(w.length&&!confirm('Nota: '+w.length+' pilar(es) parecem fora de parede.\n\nVocê é o engenheiro — deseja ENVIAR assim mesmo?'))return;
  cache=loads(bd);let m=S;
