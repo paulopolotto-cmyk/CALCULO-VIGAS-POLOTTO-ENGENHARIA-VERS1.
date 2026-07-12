@@ -147,6 +147,47 @@ def _divisoria(pdf, titulo):
     plt.close(fig)
 
 
+# OBSERVAÇÃO NOS CÁLCULOS — o que o motor do programa executa (o engenheiro sabe)
+OBS_CALCULOS = [
+    ("1)  DIREÇÃO e USO (sobrecarga) da laje na tabela",
+     "A direção e o tipo de uso escolhidos na tabela mudam o dimensionamento da "
+     "PRÓPRIA laje (altura e armadura). Porém, a carga lançada nas VIGAS de "
+     "cobertura usa a direção lançada no editor e a carga de cobertura UNIFORME "
+     "(q_cob = laje de forro + revestimento + sobrecarga de forro + telhado). A "
+     "sobrecarga por ambiente (uso de cada cômodo) NÃO é somada individualmente "
+     "na viga de cobertura."),
+    ("2)  VÃO de dimensionamento da laje pré-moldada",
+     "As lajes pré-moldadas são SEMPRE dimensionadas pelo MENOR vão (o vão da "
+     "vigota). Girar a seta muda o desenho e a distribuição da carga nas vigas, "
+     "mas NÃO altera a altura/armadura da PRÓPRIA laje — que continua calculada "
+     "pelo menor vão."),
+]
+
+
+def _pagina_observacao(pdf):
+    """Página 'OBSERVAÇÃO NOS CÁLCULOS' — deixa claro o que o motor executa."""
+    fig = plt.figure(figsize=A4)
+    fig.patch.set_facecolor("white")
+    fig.text(0.5, 0.93, "OBSERVAÇÃO NOS CÁLCULOS", ha="center", fontsize=23,
+             fontweight="bold", color="#B45309")
+    fig.text(0.5, 0.885, "O que o programa executa — para o engenheiro conferir e "
+             "decidir.", ha="center", fontsize=11, color=CINZA_TXT, style="italic")
+    y = 0.80
+    for tit, txt in OBS_CALCULOS:
+        fig.text(0.09, y, tit, ha="left", va="top", fontsize=14, fontweight="bold",
+                 color="#0f172a")
+        y -= 0.05
+        wrapped = _wrap(txt, 82)
+        fig.text(0.09, y, wrapped, ha="left", va="top", fontsize=12.5,
+                 color="#1e293b", linespacing=1.7)
+        y -= 0.042 * (wrapped.count("\n") + 1) + 0.06
+    fig.text(0.5, 0.05, "Documento gerado automaticamente — conferir por "
+             "profissional habilitado (NBR 6118 / NBR 6120).", ha="center",
+             fontsize=8, color=CINZA_TXT, style="italic")
+    pdf.savefig(fig)
+    plt.close(fig)
+
+
 def _sec_dims(secao, sentido):
     """Dimensões REAIS (m) do pilar a partir da seção ('14x30') e do sentido."""
     import re
@@ -645,6 +686,7 @@ def gerar_pdf(r, proj="projeto", reduzido=False):
         cargv = fig_cargas_vigas(r)               # cargas nas vigas
         if cargv is not None:
             _salva(pdf, cargv)
+        _pagina_observacao(pdf)                   # OBSERVAÇÃO NOS CÁLCULOS
         _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
                    f"{len(r['vigas'])} vigas)")
         for g in gv:

@@ -589,8 +589,13 @@ else:
     if r["falhas"] or rl["falhas"]:
         st.warning("Verificar manualmente: " + ", ".join(r["falhas"] + rl["falhas"]))
 
+    # ---- OBSERVAÇÃO NOS CÁLCULOS (o que o motor executa — vai também no PDF)
+    sec(7, "📌 OBSERVAÇÃO NOS CÁLCULOS")
+    st.warning("**O que o programa executa — para você conferir e decidir:**\n\n"
+               + "\n\n".join(f"**{_t}** — {_x}" for _t, _x in rpdf.OBS_CALCULOS))
+
     # ---- relatório resumido em HTML (rápido)
-    sec(7, "Baixar os relatórios")
+    sec(8, "Baixar os relatórios")
     html_rel = cp.relatorio_html(r, proj)
     st.download_button("📥 Relatório resumido (HTML — abre no navegador)",
                        data=html_rel.encode("utf-8"),
