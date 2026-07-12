@@ -198,9 +198,10 @@ if ss.pc_vista == "lancar":
                 for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache",
-                          "paredes_25"):
+                          "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache"):
                     ss.pop(k, None)
+                # paredes de 25 cm marcadas no EDITOR (campo parede=25) já vêm no arquivo
+                ss["paredes_25"] = fa.paredes_25_do_data(d_limpo)
                 _vista("conferir")
 
 # ============================================================ 2) CONFERIR

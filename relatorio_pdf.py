@@ -188,8 +188,9 @@ def _pagina_observacao(pdf):
     plt.close(fig)
 
 
-def _sec_dims(secao, sentido):
-    """Dimensões REAIS (m) do pilar a partir da seção ('14x30') e do sentido."""
+def _sec_dims(secao, sentido, across=None):
+    """Dimensões REAIS (m) do pilar a partir da seção ('14x30') e do sentido.
+    `across` força o lado CURTO (atravessa a parede): pilar em parede de 25 cm = 20 cm."""
     import re
     n = re.findall(r"\d+\.?\d*", str(secao or ""))
     if len(n) >= 2:
@@ -197,6 +198,8 @@ def _sec_dims(secao, sentido):
     else:
         a, b = 0.14, 0.30
     lo, hi = min(a, b), max(a, b)
+    if across and abs(a - b) > 0.01:   # só retangular: lado curto vira `across`
+        lo = across
     if sentido == "vertical":
         return lo, hi          # lado curto no x, longo no y
     if sentido == "horizontal":
@@ -311,12 +314,24 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
            if abs(y1 - y2) < abs(x1 - x2)]
     vbs = [(x1, min(y1, y2), max(y1, y2)) for x1, y1, x2, y2, _, _ in seg
            if abs(x1 - x2) <= abs(y1 - y2)]
+    walls25 = [(x1, y1, x2, y2) for x1, y1, x2, y2, _, esp in seg if esp >= 0.20]
+
+    def _on25(px, py, tol=0.22):                          # pilar numa parede de 25 cm?
+        for x1, y1, x2, y2 in walls25:
+            if abs(x2 - x1) >= abs(y2 - y1):
+                if abs(y1 - py) <= tol and min(x1, x2) - tol <= px <= max(x1, x2) + tol:
+                    return True
+            elif abs(x1 - px) <= tol and min(y1, y2) - tol <= py <= max(y1, y2) + tol:
+                return True
+        return False
+
     lo = max(0.34, 0.028 * max(W, H))
     for p in pilares:                                     # pilar no TAMANHO real
         x, y = p.get("x_m"), p.get("y_m")
         if x is None:
             continue
-        wx, hy = _sec_dims(p.get("secao", "14x30"), p.get("sentido"))
+        wx, hy = _sec_dims(p.get("secao", "14x30"), p.get("sentido"),
+                           across=(0.20 if _on25(x, y) else None))
         ax.add_patch(plt.Rectangle((x - wx / 2, y - hy / 2), wx, hy,
                                    facecolor=cor_pilar, edgecolor="white",
                                    lw=1.0, zorder=6))

@@ -85,20 +85,22 @@ def _detalhar_viga(nome, vaos, w, b=BW):
     return res, 100
 
 
-def _detalhar_pilar(carga_tf):
-    """Dimensiona no motor_pilar. Padrão 14×30; cresce a seção pela norma
-    (h, depois b) até haver arranjo de armadura válido (≤ 4% de aço)."""
+def _detalhar_pilar(carga_tf, base=14):
+    """Dimensiona no motor_pilar. Padrão 14×30 (base=14); cresce a seção pela
+    norma (h, depois b) até haver arranjo de armadura válido (≤ 4% de aço).
+    base=20 nos pilares embutidos em parede de divisa de 25 cm (largura mínima)."""
     Nk = max(1.0, float(carga_tf or 0.0)) * 9.81        # tf -> kN
-    tentativas = ([(14, h) for h in range(30, 75, 5)]    # 14×30 .. 14×70
-                  + [(19, h) for h in range(30, 100, 5)]  # b=19 (sem γn)
-                  + [(25, h) for h in range(30, 130, 5)])
+    b0 = int(base)
+    tentativas = ([(b0, h) for h in range(30, 75, 5)]            # base×30 .. base×70
+                  + [(max(b0, 19), h) for h in range(30, 100, 5)]
+                  + [(max(b0, 25), h) for h in range(30, 130, 5)])
     rp = None
     for b, h in tentativas:
         rp = mp.calcular_pilar({"b": b, "h": h, "l0": L0_PILAR, "fck": FCK,
                                 "Nk": Nk, "caa": CAA})
         if "erros" not in rp and rp.get("opcoes"):
             return rp, rp["opcoes"][0], f"{b}x{h}", round(Nk)
-    return rp, None, "14x30", round(Nk)
+    return rp, None, f"{b0}x30", round(Nk)
 
 
 def _mmax(res):
@@ -239,13 +241,28 @@ def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0, paredes_25=No
                               falha=(res is None or bool(res.get("falha_flexao")
                                      or res.get("falha_biela"))),
                               res=res))
-    # ---- pilares (dimensionados no motor_pilar; 14×30 crescendo pela norma)
+    # ---- pilares (dimensionados no motor_pilar; 14×30 crescendo pela norma;
+    #      pilar embutido em parede de divisa 25 cm começa em 20 cm de base)
+    walls25 = [(l["dir"], l["pos"], l["ini"], l["fim"]) for l in linhas
+               if (l["dir"], round(l["pos"], 2)) in paredes_25]
+
+    def _pilar_em_div(px, py, tol=0.20):
+        if px is None or py is None:
+            return False
+        for dirn, pos, a, b in walls25:
+            if dirn == "V" and abs(px - pos) <= tol and a - tol <= py <= b + tol:
+                return True    # na parede vertical (x=pos), dentro do vão em y
+            if dirn == "H" and abs(py - pos) <= tol and a - tol <= px <= b + tol:
+                return True    # na parede horizontal (y=pos), dentro do vão em x
+        return False
+
     pil_det = []
     aco_pil = 0.0
     for i, p in enumerate(pilares):
         nome = p.get("pilar", f"P{i+1}")
         carga = p.get("carga_tf", 0) or 0
-        rp, opt, secao, Nk = _detalhar_pilar(carga)
+        base = 20 if _pilar_em_div(p.get("x_m"), p.get("y_m")) else 14
+        rp, opt, secao, Nk = _detalhar_pilar(carga, base=base)
         peso = opt["peso_total"] if opt else 0.0
         aco_pil += peso
         pil_det.append(dict(pilar=nome, secao=secao, carga_tf=carga, Nk=Nk,

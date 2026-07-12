@@ -345,6 +345,22 @@ def alinhar_pilares(data, tol=0.35):
     return d, n
 
 
+def paredes_25_do_data(data):
+    """Conjunto de (dir, pos) das vigas marcadas como parede de DIVISA (25 cm) no
+    editor (campo `parede`=25). Alimenta o `paredes_25` do cálculo/desenho."""
+    s = set()
+    for v in data.get("vigas", []):
+        try:
+            esp = float(v.get("parede", 15))
+        except (TypeError, ValueError):
+            esp = 15
+        if esp >= 20:
+            seg = _seg(v)
+            if seg:
+                s.add((seg[0], round(seg[1], 2)))
+    return s
+
+
 def limpar_lancamento(data):
     """Faxina no lançamento à mão: endireita (90°), cola linhas paralelas coladas,
     tira tocos e DUPLICATAS exatas, e ALINHA os pilares no eixo das vigas (14 cm
