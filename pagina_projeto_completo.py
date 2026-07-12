@@ -13,9 +13,21 @@ e independente: NÃO altera as telas aprovadas (Vigas/Pilares/Lajes/Prévios).
 import copy
 import io
 import json
+import os
 
 import streamlit as st
 import streamlit.components.v1 as components
+
+# Ponte editor -> programa: componente declarado que lê o envio do editor no
+# localStorage do navegador e entrega ao Python (dispensa baixar+subir o arquivo
+# à mão). Protocolo oficial do Streamlit, SEM dependência nova. Se por algum
+# motivo não declarar, a página segue funcionando com o upload manual.
+try:
+    _ponte = components.declare_component(
+        "prp_ponte",
+        path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "prp_ponte"))
+except Exception:
+    _ponte = None
 
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -57,11 +69,34 @@ ss.setdefault("pc_data", None)       # estrutura JSON (lançamento salvo)
 ss.setdefault("pc_proj", "projeto")
 ss.setdefault("pc_larg", 15.0)
 ss.setdefault("paredes_25", set())   # (dir, pos) das paredes de divisa (25 cm)
+ss.setdefault("prp_last_id", 0)      # último envio do editor já consumido (ponte)
+ss.setdefault("pc_autocarga", False)  # carregar automático ao ENVIAR?
+ss.setdefault("prp_recebido", None)  # lançamento recebido do editor, aguardando
 
 
 def _vista(v):
     ss.pc_vista = v
     st.rerun()
+
+
+def _carregar_lancamento(d, ir_conferir=True):
+    """Carrega o lançamento `d` (do upload manual OU da ponte do editor): limpa,
+    renumera, semeia as paredes de divisa e zera o que foi calculado antes."""
+    d_limpo, _stats = fa.limpar_lancamento(d)   # endireita + tira duplicatas
+    d_limpo = fa.renumerar_pilares(d_limpo)     # P1..Pn profissional
+    ss.pc_data = d_limpo
+    ss["pc_limpeza"] = _stats
+    ss.pc_proj = d.get("projeto") or ss.pc_proj
+    for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
+              "laje_tipos", "laje_vigota", "laje_telhado",
+              "laje_manuais", "laje_excluidas", "laje_mcount",
+              "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache"):
+        ss.pop(k, None)
+    # paredes de 25 cm marcadas no EDITOR (campo parede=25) já vêm no arquivo
+    ss["paredes_25"] = fa.paredes_25_do_data(d_limpo)
+    ss["prp_recebido"] = None
+    if ir_conferir:
+        _vista("conferir")
 
 
 def _img_planta(chave, criar):
@@ -168,41 +203,69 @@ if ss.pc_vista == "lancar":
                     "do projeto salvo, suba ele **abaixo** — dá para editar mesmo sem "
                     "o PDF.")
 
-    sec(2, "Salvou? Suba o arquivo para CONFERIR a planta")
-    st.caption("No editor, clique **ENVIAR** (baixa o `estrutura_*.json`). Depois "
-               "solte o arquivo aqui — a próxima tela mostra a planta numerada "
-               "para você conferir com o seu desenho.")
-    upj = st.file_uploader("Arquivo do editor (estrutura_*.json)",
-                           type=["json"], key="pc_json")
-    if upj is not None:
-        d = None
+    sec(2, "Apertou ENVIAR? O programa JÁ RECEBE — sem baixar e subir arquivo")
+    st.checkbox("⚡ Carregar automático assim que eu apertar ENVIAR no editor",
+                key="pc_autocarga",
+                help="Ligado: ao ENVIAR já pula direto para a conferência da planta. "
+                     "Desligado: aparece o botão 'Carregar agora' — bom quando você "
+                     "quer voltar ao editor e ajustar mais alguns detalhes antes.")
+
+    # PONTE: lê o envio do editor (localStorage) e entrega ao Python. Sem upload.
+    if _ponte is not None:
         try:
-            d = json.loads(upj.getvalue().decode("utf-8"))
-        except Exception as e:
-            st.error(f"Arquivo inválido (não é um JSON): {e}")
-        if d is not None and "pilares" not in d:
-            st.error("Esse arquivo não é o do lançamento. Use o arquivo baixado "
-                     "pelo botão **ENVIAR** do editor (estrutura_*.json).")
+            env = _ponte(consumido=int(ss.get("prp_last_id", 0)),
+                         key="prp_ponte", default=None)
+        except Exception:
+            env = None
+        if isinstance(env, dict) and env.get("id", 0) > ss.get("prp_last_id", 0):
+            ss["prp_last_id"] = int(env["id"])          # consome este envio 1x
+            try:
+                d_rx = json.loads(env.get("data") or "")
+            except Exception:
+                d_rx = None
+            if isinstance(d_rx, dict) and "pilares" in d_rx:
+                if ss.get("pc_autocarga"):
+                    _carregar_lancamento(d_rx)          # vai direto para CONFERIR
+                else:
+                    ss["prp_recebido"] = d_rx           # espera o clique do eng.
+
+    rx = ss.get("prp_recebido")
+    if isinstance(rx, dict) and "pilares" in rx:
+        st.success(f"📥 **Recebi o projeto do editor:** {len(rx.get('pilares', []))} "
+                   f"pilares e {len(rx.get('vigas', []))} trechos de viga. Não precisa "
+                   "baixar nem subir arquivo — é só carregar.")
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("👁️ Carregar agora e CONFERIR →", type="primary",
+                         width="stretch"):
+                _carregar_lancamento(rx)
+        with c2:
+            if st.button("✏️ Vou continuar editando", width="stretch"):
+                ss["prp_recebido"] = None
+                st.rerun()
+
+    with st.expander("Prefere subir o arquivo à mão? (opcional)"):
+        st.caption("Toda vez que você aperta ENVIAR eu também baixo o "
+                   "`estrutura_*.json` em Downloads. Se preferir o modo antigo, "
+                   "solte esse arquivo aqui.")
+        upj = st.file_uploader("Arquivo do editor (estrutura_*.json)",
+                               type=["json"], key="pc_json")
+        if upj is not None:
             d = None
-        if d is not None:
-            st.success(f"✅ Arquivo lido: **{len(d.get('pilares', []))} pilares** e "
-                       f"**{len(d.get('vigas', []))} trechos de viga**. "
-                       "Clique abaixo para ver a planta e conferir.")
-            if st.button("👁️ Ver a planta numerada para CONFERIR →",
-                         type="primary", width="stretch"):
-                d_limpo, _stats = fa.limpar_lancamento(d)   # endireita + tira dup.
-                d_limpo = fa.renumerar_pilares(d_limpo)     # P1..Pn profissional
-                ss.pc_data = d_limpo
-                ss["pc_limpeza"] = _stats
-                ss.pc_proj = d.get("projeto") or ss.pc_proj
-                for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
-                          "laje_tipos", "laje_vigota", "laje_telhado",
-                          "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache"):
-                    ss.pop(k, None)
-                # paredes de 25 cm marcadas no EDITOR (campo parede=25) já vêm no arquivo
-                ss["paredes_25"] = fa.paredes_25_do_data(d_limpo)
-                _vista("conferir")
+            try:
+                d = json.loads(upj.getvalue().decode("utf-8"))
+            except Exception as e:
+                st.error(f"Arquivo inválido (não é um JSON): {e}")
+            if d is not None and "pilares" not in d:
+                st.error("Esse arquivo não é o do lançamento. Use o arquivo baixado "
+                         "pelo botão **ENVIAR** do editor (estrutura_*.json).")
+                d = None
+            if d is not None:
+                st.success(f"✅ Arquivo lido: **{len(d.get('pilares', []))} pilares** e "
+                           f"**{len(d.get('vigas', []))} trechos de viga**.")
+                if st.button("👁️ Ver a planta numerada para CONFERIR →",
+                             type="primary", width="stretch", key="btn_manual"):
+                    _carregar_lancamento(d)
 
 # ============================================================ 2) CONFERIR
 elif ss.pc_vista == "conferir":
