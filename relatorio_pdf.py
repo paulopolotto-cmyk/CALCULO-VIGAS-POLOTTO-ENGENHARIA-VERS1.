@@ -289,6 +289,109 @@ def fig_planta_fundacao(r):
                    "PILARES (preto)", COR_FUND, COR_PIL_FUND)
 
 
+def _pp_viga(secao):
+    """Peso próprio da viga (kN/m) a partir da seção '14x40' (× 25 kN/m³)."""
+    import re
+    n = re.findall(r"\d+\.?\d*", str(secao or ""))
+    if len(n) >= 2:
+        return round((float(n[0]) / 100.0) * (float(n[1]) / 100.0) * 25.0, 2)
+    return 0.0
+
+
+def _seg_bounds(vigas, pilares):
+    """Segmentos (x1,y1,x2,y2,viga) e dimensões da planta (p/ as plantas de carga)."""
+    seg = []
+    for v in vigas:
+        if v.get("ini") is None:
+            continue
+        if v["dir"] == "H":
+            seg.append((v["ini"], v["pos"], v["fim"], v["pos"], v))
+        else:
+            seg.append((v["pos"], v["ini"], v["pos"], v["fim"], v))
+    xs = [p["x_m"] for p in pilares if p.get("x_m") is not None]
+    ys = [p["y_m"] for p in pilares if p.get("y_m") is not None]
+    for x1, y1, x2, y2, _ in seg:
+        xs += [x1, x2]
+        ys += [y1, y2]
+    if not xs or not ys:
+        return None
+    return seg, max(1.0, max(xs) - min(xs)), max(1.0, max(ys) - min(ys))
+
+
+def fig_cargas_pilares(r):
+    """Planta com a CARGA de cada pilar em número GRANDE (tf) — para a fundação."""
+    pilares = r.get("pilares", [])
+    gb = _seg_bounds(r.get("vigas", []), pilares)
+    if gb is None:
+        return None
+    seg, W, H = gb
+    fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2)),
+                                    min(16.0, max(6.0, 0.7 * H + 2))), dpi=150)
+    fig.patch.set_facecolor("white")
+    for x1, y1, x2, y2, _ in seg:                    # vigas de fundo (cinza claro)
+        ax.plot([x1, x2], [y1, y2], color="#CBD5E1", lw=2.4, zorder=1)
+    s = max(0.16, 0.014 * max(W, H))
+    for p in pilares:
+        x, y = p.get("x_m"), p.get("y_m")
+        if x is None:
+            continue
+        ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s, facecolor=VERMELHO,
+                                   edgecolor="white", lw=0.8, zorder=6))
+        carga = p.get("carga_tf", 0) or 0
+        ax.text(x, y + 1.4 * s, f"{carga:.1f}", fontsize=14, color="#B91C1C",
+                fontweight="bold", ha="center", va="bottom", zorder=8,
+                bbox=dict(boxstyle="round,pad=0.16", fc="#FEF3C7", ec="#B45309",
+                          lw=0.7))
+        ax.text(x, y - 1.2 * s, p.get("pilar", ""), fontsize=8.5, color=NAVY,
+                fontweight="bold", ha="center", va="top", zorder=8)
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.12)
+    ax.set_xlabel("x (m)", fontsize=9)
+    ax.set_ylabel("y (m)", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.set_title("PLANTA DE CARGAS NOS PILARES — carga (tf) para a FUNDAÇÃO",
+                 fontsize=13, fontweight="bold", color=NAVY)
+    fig.tight_layout()
+    return fig
+
+
+def fig_cargas_vigas(r):
+    """Planta com a CARGA (kN/m) que cada viga de cobertura recebe (laje+telhado+pp)."""
+    pilares = r.get("pilares", [])
+    gb = _seg_bounds(r.get("vigas", []), pilares)
+    if gb is None:
+        return None
+    seg, W, H = gb
+    fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2)),
+                                    min(16.0, max(6.0, 0.7 * H + 2))), dpi=150)
+    fig.patch.set_facecolor("white")
+    for x1, y1, x2, y2, v in seg:
+        wt = round((v.get("w", 0) or 0) + _pp_viga(v.get("secao")), 1)
+        ax.plot([x1, x2], [y1, y2], color=COR_FORMA, lw=4.4,
+                solid_capstyle="round", zorder=2)
+        xm, ym = (x1 + x2) / 2, (y1 + y2) / 2
+        ax.text(xm, ym, f"{v.get('nome', '')}\n{wt:.1f} kN/m", fontsize=9,
+                color="#0F172A", fontweight="bold", ha="center", va="center",
+                zorder=6, bbox=dict(boxstyle="round,pad=0.18", fc="white",
+                                    ec=COR_FORMA, lw=0.7))
+    s = max(0.14, 0.012 * max(W, H))
+    for p in pilares:
+        x, y = p.get("x_m"), p.get("y_m")
+        if x is None:
+            continue
+        ax.add_patch(plt.Rectangle((x - s / 2, y - s / 2), s, s, facecolor=VERMELHO,
+                                   edgecolor="white", lw=0.7, zorder=5))
+    ax.set_aspect("equal")
+    ax.grid(alpha=0.12)
+    ax.set_xlabel("x (m)", fontsize=9)
+    ax.set_ylabel("y (m)", fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.set_title("PLANTA DE CARGAS NAS VIGAS — kN/m (laje + telhado + peso próprio)",
+                 fontsize=13, fontweight="bold", color=NAVY)
+    fig.tight_layout()
+    return fig
+
+
 # ------------------------------------------------------------ memoriais
 def _mem_viga(v):
     res = v["res"]
@@ -535,6 +638,12 @@ def gerar_pdf(r, proj="projeto", reduzido=False):
         planta_fund = fig_planta_fundacao(r)      # planta de fundação (baldrames VB)
         if planta_fund is not None:
             _salva(pdf, planta_fund)
+        cargp = fig_cargas_pilares(r)             # cargas nos pilares (p/ fundação)
+        if cargp is not None:
+            _salva(pdf, cargp)
+        cargv = fig_cargas_vigas(r)               # cargas nas vigas
+        if cargv is not None:
+            _salva(pdf, cargv)
         _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
                    f"{len(r['vigas'])} vigas)")
         for g in gv:

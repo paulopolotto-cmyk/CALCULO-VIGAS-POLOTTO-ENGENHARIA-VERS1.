@@ -338,10 +338,39 @@ else:
     if st.button("↩️ Voltar para conferir / editar a planta"):
         _vista("conferir")
 
+    # ---- TIPO DE TELHADO — define o peso da cobertura que entra no cálculo ----
+    _TELS = {"Fibrocimento (Eternit 6 mm) + madeira": cp.G_TELHADO["fibrocimento"],
+             "Cerâmica + madeira": cp.G_TELHADO["ceramica"]}
+    ss.setdefault("telhado_tipo", next(iter(_TELS)))
+    ss.setdefault("g_telhado", _TELS[ss["telhado_tipo"]])
+    st.markdown("#### 🏠 Tipo de telhado (casa térrea — laje de forro)")
+    ct1, ct2 = st.columns([2, 1])
+    _tt = ct1.selectbox("Cobertura", list(_TELS.keys()),
+                        index=(list(_TELS).index(ss["telhado_tipo"])
+                               if ss["telhado_tipo"] in _TELS else 0))
+    if _tt != ss["telhado_tipo"]:
+        ss["telhado_tipo"] = _tt
+        ss["g_telhado"] = _TELS[_tt]
+        ss.pop("pc_r", None)
+        st.rerun()
+    _gt = ct2.number_input("Peso do telhado (kN/m²) — pode ajustar", min_value=0.0,
+                           max_value=3.0, value=float(ss["g_telhado"]), step=0.05,
+                           format="%.2f")
+    if abs(_gt - ss["g_telhado"]) > 1e-6:
+        ss["g_telhado"] = _gt
+        ss.pop("pc_r", None)
+        st.rerun()
+    _qc = cp.G_PERM + cp.Q_FORRO + ss["g_telhado"]
+    st.caption(f"Cobertura = laje-forro+revest. **{cp.G_PERM:.1f}** + sobrecarga de "
+               f"forro **{cp.Q_FORRO:.1f}** + telhado **{ss['g_telhado']:.2f}** = "
+               f"**{_qc:.2f} kN/m²**. Peso da telha: NBR 6120/catálogo · madeiramento: "
+               "estimativa (ajuste ao lado se o seu for diferente). A responsabilidade "
+               "do valor é do engenheiro.")
+
     if ss.get("pc_r") is None:
         with st.spinner("Rodando o cálculo NBR 6118 de todas as vigas, baldrames "
                         "e pilares…"):
-            ss["pc_r"] = cp.calcular_projeto(ss.pc_data)
+            ss["pc_r"] = cp.calcular_projeto(ss.pc_data, g_telhado=ss["g_telhado"])
     r = ss["pc_r"]
 
     st.info("**Materiais adotados:** concreto **C25** (fck = 25 MPa) · aço "
@@ -375,10 +404,9 @@ else:
     comodos = ([c for c in ss["pc_comodos"] if c["nome"] not in ss["laje_excluidas"]]
                + ss["laje_manuais"])
 
-    ss["g_telhado"] = st.number_input(
-        "Peso do telhado (kN/m²) — aplicado nas lajes marcadas com telhado",
-        min_value=0.0, max_value=5.0, value=float(ss["g_telhado"]), step=0.1,
-        format="%.2f")
+    st.caption(f"Telhado adotado: **{ss['g_telhado']:.2f} kN/m²** "
+               f"({ss.get('telhado_tipo', '')}) — definido lá em cima; aqui ele entra "
+               "nas lajes marcadas com **Telhado**.")
     st.caption("O programa acha os cômodos fechados por vigas; **complete com "
                "➕ Adicionar laje** o que faltou e **exclua** o que não for laje. A "
                "**direção** já vem no menor vão (troque H/V). Marque **Telhado** onde a "
@@ -491,6 +519,16 @@ else:
              "Vãos (m)": " + ".join(f"{x:.2f}" for x in v["vaos"]),
              "Carga w (kN/m)": v["w"], "M máx (kN·m)": v["mmax"],
              "Aço (kg)": v["peso"] if v["peso"] else "—"} for v in r["vigas"]])
+    st.markdown("**📊 Planta de CARGAS NAS VIGAS** (kN/m — laje + telhado + peso próprio):")
+    _fcv = rpdf.fig_cargas_vigas(r)
+    if _fcv is not None:
+        st.pyplot(_fcv, width="stretch")
+        plt.close(_fcv)
+    st.caption("Carga total de cada viga. **Modelo unidirecional:** a laje descarrega "
+               f"nas vigas **{'horizontais (VH)' if r['principal']=='H' else 'verticais (VV)'}** "
+               "(direção principal); as da outra direção levam só o **peso próprio** "
+               "(~1 kN/m). Se quiser, evoluo para carga nos dois sentidos (reação real "
+               "da laje).")
 
     # ---- baldrames
     sec(3, "Baldrames (vigas de fundação sob as paredes)")
@@ -507,11 +545,23 @@ else:
              "Aço (kg)": p["peso"]} for p in r["pilares"]])
 
     # ---- fundação
-    sec(5, "Cargas na fundação")
+    sec(5, "Cargas na fundação (para escolher bloco / estaca / sapata)")
     st.metric("Carga total à fundação (cobertura + alvenaria/baldrames)",
               f"{r['fund_tf']} tf")
-    st.caption("A carga de cada sapata/estaca é a carga do pilar correspondente na "
-               "tabela acima. O dimensionamento das fundações depende do SPT do terreno.")
+    st.markdown("**📊 Planta de CARGAS NOS PILARES** (tf) — a carga de cada pilar em "
+                "número grande, para você projetar a fundação:")
+    _fcp = rpdf.fig_cargas_pilares(r)
+    if _fcp is not None:
+        st.pyplot(_fcp, width="stretch")
+        plt.close(_fcp)
+    st.caption("Relação de cargas por pilar (carga do pilar = carga na fundação "
+               "correspondente):")
+    tabela([{"Pilar": p["pilar"], "Carga (tf)": p["carga_tf"],
+             "Carga (kN)": round((p.get("carga_tf") or 0) * 9.81, 0),
+             "Seção (cm)": p["secao"]} for p in r["pilares"]])
+    st.caption("O dimensionamento das fundações (bloco, estaca, sapata) depende do "
+               "**SPT do terreno**. As cargas dos pilares vêm do lançamento (área de "
+               "influência + paredes).")
 
     # ---- QUANTITATIVO de aço a comprar
     sec(6, "Relação de aço a comprar (por etapa e total)", destaque=True)

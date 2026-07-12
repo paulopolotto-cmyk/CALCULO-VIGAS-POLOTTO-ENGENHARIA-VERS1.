@@ -15,7 +15,14 @@ import motor_viga as mv
 import motor_pilar as mp
 from editor_lancamento import agrupar_vigas_continuas
 
-Q_COB = 3.0    # kN/m² cobertura (laje EPS 16+4 + telha fibrocimento + sobrecarga)
+Q_COB = 3.0    # kN/m² cobertura (compatibilidade; hoje calculado por composição)
+# --- composição da carga da cobertura (kN/m²) — laje de FORRO com telhado ---
+G_PERM = 2.5   # laje de forro pré-moldada (EPS + capa) + revestimento/regularização
+Q_FORRO = 0.5  # sobrecarga de forro sem acesso a pessoas (NBR 6120)
+G_TELHADO = {  # telhado = telha (NBR 6120/catálogo) + madeiramento (estimativa)
+    "fibrocimento": 0.30,   # Eternit/fibrocimento 6 mm + madeira (~30 kgf/m²)
+    "ceramica": 0.80,       # telha cerâmica + madeira (~80 kgf/m²)
+}
 WALL = 6.0     # kN/m parede sobre baldrame (~15 cm rebocada, altura ~2,85 m)
 FCK = 25.0     # concreto C25 (padrão)
 BW = 14        # base padrão das vigas/baldrames (assenta na parede) [cm]
@@ -129,8 +136,14 @@ def planta_do_json(data):
                 pilares=data.get("pilares", []), lajes=data.get("lajes", []))
 
 
-def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
-    """Roda o projeto inteiro a partir do JSON do editor."""
+def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0):
+    """Roda o projeto inteiro a partir do JSON do editor. `g_telhado` (kN/m²) é o
+    peso do telhado escolhido; a carga de cobertura vira composição transparente:
+    q_cob = laje-forro+revest. (G_PERM) + sobrecarga de forro (Q_FORRO) + telhado."""
+    if g_telhado is None:
+        g_telhado = G_TELHADO["fibrocimento"]
+    g_telhado = float(g_telhado)
+    q_cob = round(G_PERM + Q_FORRO + g_telhado, 2)
     vigas = data.get("vigas", [])
     pilares = data.get("pilares", [])
     linhas = agrupar_vigas_continuas(vigas)
@@ -203,7 +216,9 @@ def calcular_projeto(data, q_cob=Q_COB, wall=WALL, h_pilar=3.0):
     return dict(vigas=vigas_det, baldrames=baldr_det, pilares=pil_det,
                 aco_vigas=aco_vigas, aco_pilares=aco_pilares, aco_baldrames=aco_baldr,
                 aco_total=aco_total, fund_tf=fund_tf, principal=principal,
-                q_cob=q_cob, wall=wall, falhas=falhas, lajes=data.get("lajes", []))
+                q_cob=q_cob, wall=wall, falhas=falhas, lajes=data.get("lajes", []),
+                carga_comp=dict(g_perm=G_PERM, q_forro=Q_FORRO, g_telhado=g_telhado,
+                                q_cob=q_cob))
 
 
 # ------------------------------------------------------------ relatório HTML
