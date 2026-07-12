@@ -285,8 +285,8 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2.0)),
                                     min(16.0, max(6.0, 0.7 * H + 2.0))), dpi=150)
     fig.patch.set_facecolor("white")
-    BWM = 0.14                                            # 14 cm — espessura real
-    for x1, y1, x2, y2, _ in seg:                         # viga = PAREDE de 14 cm
+    BWM = 0.15                                            # 15 cm — parede interna/externa
+    for x1, y1, x2, y2, _ in seg:                         # viga = PAREDE de 15 cm
         if abs(x2 - x1) >= abs(y2 - y1):                  # horizontal
             xa, xb = min(x1, x2), max(x1, x2)
             ax.add_patch(plt.Rectangle((xa, y1 - BWM / 2), max(BWM, xb - xa), BWM,
