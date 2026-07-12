@@ -209,9 +209,10 @@ elif ss.pc_vista == "conferir":
         st.info(f"🧹 **Limpei o seu lançamento ao carregar:** endireitei "
                 f"**{_lz['endireitadas']}** viga(s) tortas (90°), removi "
                 f"**{_lz['duplicadas']}** duplicada(s) e **{_lz['tocos']}** toco(s), e "
-                f"**alinhei {_lz.get('pilares_alinhados', 0)} pilar(es)** no eixo das "
-                "vigas (o lado de 14 cm dentro da parede / no cruzamento). As diagonais "
-                "de verdade foram mantidas. Se sumiu algo, é só ir em **Editar**.")
+                f"**ajeitei {_lz.get('pilares_alinhados', 0)} pilar(es)** — no eixo das "
+                "vigas (no cruzamento) e **virados para o lado de 14 cm ficar dentro da "
+                "parede** (sem invadir o cômodo). As diagonais de verdade foram mantidas. "
+                "Se sumiu algo, é só ir em **Editar**.")
     st.caption("Compare os croquis com a planta que você lançou. **Faltou ou "
                "sobrou** alguma viga, pilar ou laje?")
     _pj = cp.planta_do_json(ss.pc_data)

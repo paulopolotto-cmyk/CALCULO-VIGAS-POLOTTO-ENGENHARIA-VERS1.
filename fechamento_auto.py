@@ -314,10 +314,14 @@ def snap_linhas(data, tol=SNAP_LINHA):
 
 
 def alinhar_pilares(data, tol=0.35):
-    """Encosta cada pilar no EIXO das vigas: o lado de 14 cm fica dentro da parede
-    (no eixo da viga) e, num encontro de vigas, o pilar vai para o CRUZAMENTO dos
-    dois eixos. Snap do x ao eixo vertical mais próximo e do y ao horizontal mais
-    próximo (dentro de tol). Pilar longe de qualquer viga (>tol) fica onde está."""
+    """Encosta cada pilar no EIXO das vigas e VIRA na direção certa da parede:
+    - posição: snap do x ao eixo vertical mais próximo e do y ao horizontal (≤ tol);
+      num encontro de vigas, vai para o CRUZAMENTO dos eixos.
+    - orientação: o lado de 14 cm fica ATRAVESSADO na parede (o de 30 cm corre ao
+      longo). Numa parede VERTICAL (viga V) o pilar fica em pé (sentido vertical);
+      numa HORIZONTAL, deitado. Assim ele não invade o cômodo. Num CANTO (as duas)
+      mantém o sentido atual. Pilar longe de qualquer viga (>tol) fica como está.
+    A seção (14×30) e o cálculo NÃO mudam — só a posição/orientação do desenho."""
     d = copy.deepcopy(data)
     H, V = cl._segmentos(d.get("vigas", []))       # H:(y,x0,x1)  V:(x,y0,y1)
     n = 0
@@ -329,9 +333,15 @@ def alinhar_pilares(data, tol=0.35):
         hy = [y for (y, x0, x1) in H if x0 - tol <= px <= x1 + tol and abs(y - py) <= tol]
         nx = round(min(vx, key=lambda x: abs(x - px)), 2) if vx else px
         ny = round(min(hy, key=lambda y: abs(y - py)), 2) if hy else py
-        if abs(nx - px) > 0.005 or abs(ny - py) > 0.005:
-            n += 1
+        mudou = abs(nx - px) > 0.005 or abs(ny - py) > 0.005
         p["x_m"], p["y_m"] = nx, ny
+        if p.get("forma") != "quadrado":           # vira p/ o 14 cm ficar na parede
+            novo = "vertical" if (vx and not hy) else ("horizontal" if (hy and not vx) else None)
+            if novo and p.get("sentido") != novo:
+                p["sentido"] = novo
+                mudou = True
+        if mudou:
+            n += 1
     return d, n
 
 
