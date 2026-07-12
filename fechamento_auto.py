@@ -313,15 +313,40 @@ def snap_linhas(data, tol=SNAP_LINHA):
     return d
 
 
+def alinhar_pilares(data, tol=0.35):
+    """Encosta cada pilar no EIXO das vigas: o lado de 14 cm fica dentro da parede
+    (no eixo da viga) e, num encontro de vigas, o pilar vai para o CRUZAMENTO dos
+    dois eixos. Snap do x ao eixo vertical mais próximo e do y ao horizontal mais
+    próximo (dentro de tol). Pilar longe de qualquer viga (>tol) fica onde está."""
+    d = copy.deepcopy(data)
+    H, V = cl._segmentos(d.get("vigas", []))       # H:(y,x0,x1)  V:(x,y0,y1)
+    n = 0
+    for p in d.get("pilares", []):
+        px, py = p.get("x_m"), p.get("y_m")
+        if px is None or py is None:
+            continue
+        vx = [x for (x, y0, y1) in V if y0 - tol <= py <= y1 + tol and abs(x - px) <= tol]
+        hy = [y for (y, x0, x1) in H if x0 - tol <= px <= x1 + tol and abs(y - py) <= tol]
+        nx = round(min(vx, key=lambda x: abs(x - px)), 2) if vx else px
+        ny = round(min(hy, key=lambda y: abs(y - py)), 2) if hy else py
+        if abs(nx - px) > 0.005 or abs(ny - py) > 0.005:
+            n += 1
+        p["x_m"], p["y_m"] = nx, ny
+    return d, n
+
+
 def limpar_lancamento(data):
     """Faxina no lançamento à mão: endireita (90°), cola linhas paralelas coladas,
-    tira tocos e DUPLICATAS exatas. NÃO restrutura apoios (calc estável).
+    tira tocos e DUPLICATAS exatas, e ALINHA os pilares no eixo das vigas (14 cm
+    dentro da parede / no cruzamento). NÃO restrutura apoios (calc estável).
     Devolve (data_limpo, stats)."""
     d, n_end, n_stub = endireitar_vigas(data)
     d = snap_linhas(d)
     antes = len(d.get("vigas", []))
     d["vigas"] = dedup_vigas(d.get("vigas", []))
-    return d, dict(endireitadas=n_end, tocos=n_stub, duplicadas=antes - len(d["vigas"]))
+    d, n_pil = alinhar_pilares(d)
+    return d, dict(endireitadas=n_end, tocos=n_stub,
+                   duplicadas=antes - len(d["vigas"]), pilares_alinhados=n_pil)
 
 
 def renumerar_pilares(data):

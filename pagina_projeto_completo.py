@@ -179,12 +179,14 @@ if ss.pc_vista == "lancar":
 elif ss.pc_vista == "conferir":
     sec(1, "Confira as DUAS plantas — Forma (lajes) e Fundação (baldrames)")
     _lz = ss.get("pc_limpeza")
-    if _lz and (_lz["endireitadas"] or _lz["duplicadas"] or _lz["tocos"]):
+    if _lz and (_lz["endireitadas"] or _lz["duplicadas"] or _lz["tocos"]
+                or _lz.get("pilares_alinhados")):
         st.info(f"🧹 **Limpei o seu lançamento ao carregar:** endireitei "
-                f"**{_lz['endireitadas']}** viga(s) tortas (para 90°), removi "
-                f"**{_lz['duplicadas']}** viga(s) em duplicidade e **{_lz['tocos']}** "
-                "toco(s). As diagonais de verdade foram mantidas. Se sumiu algo que "
-                "você queria, é só ir em **Editar**.")
+                f"**{_lz['endireitadas']}** viga(s) tortas (90°), removi "
+                f"**{_lz['duplicadas']}** duplicada(s) e **{_lz['tocos']}** toco(s), e "
+                f"**alinhei {_lz.get('pilares_alinhados', 0)} pilar(es)** no eixo das "
+                "vigas (o lado de 14 cm dentro da parede / no cruzamento). As diagonais "
+                "de verdade foram mantidas. Se sumiu algo, é só ir em **Editar**.")
     st.caption("Compare os croquis com a planta que você lançou. **Faltou ou "
                "sobrou** alguma viga, pilar ou laje?")
     _pj = cp.planta_do_json(ss.pc_data)
