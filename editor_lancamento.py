@@ -81,6 +81,34 @@ def estimar_escala(dados, largura_m):
     return 39.0
 
 
+def planta_de_imagem(img_bytes):
+    """Fundo a partir de uma IMAGEM (PNG/JPG) — foto/print de uma planta. Nao tem
+    eixos vetoriais (VX/HY vazios): o usuario desenha os pilares/vigas POR CIMA e
+    o programa endireita/alinha depois. A escala vem da largura real informada.
+    Retorna o mesmo dict de extrair_planta."""
+    import fitz
+    pix = fitz.Pixmap(img_bytes)                 # le PNG/JPG direto
+    if pix.alpha or pix.n > 4:                    # normaliza p/ RGB
+        pix = fitz.Pixmap(fitz.csRGB, pix)
+    W, H = float(pix.width), float(pix.height)
+    png = pix.tobytes("png")
+    img = "data:image/png;base64," + base64.b64encode(png).decode()
+    return dict(img=img, VX=[], HY=[], X0=0.0, Y0=0.0,
+                VW=W, VH=H, page_pt=(W, H))
+
+
+def planta_de_pdf_imagem(pdf_bytes, zoom=2.0):
+    """Fundo a partir de um PDF ESCANEADO/imagem (sem linhas vetoriais): renderiza
+    a 1a pagina como imagem e usa de fundo (sem eixos). Retorna o dict padrao."""
+    import fitz
+    doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    pix = doc[0].get_pixmap(matrix=fitz.Matrix(zoom, zoom))
+    W, H = float(pix.width), float(pix.height)
+    img = "data:image/png;base64," + base64.b64encode(pix.tobytes("png")).decode()
+    return dict(img=img, VX=[], HY=[], X0=0.0, Y0=0.0,
+                VW=W, VH=H, page_pt=(W, H))
+
+
 # ---------------------------------------------------------------- monta o editor
 def build_editor(dados, S, proj="Projeto", pillars=None, mins=None,
                  lskey="lanc_proj", loaddata=None):

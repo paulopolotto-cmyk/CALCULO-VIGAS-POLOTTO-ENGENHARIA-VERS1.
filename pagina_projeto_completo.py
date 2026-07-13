@@ -113,6 +113,20 @@ def _chave_dados():
         return "0"
 
 
+def _ler_planta(up):
+    """Lê o fundo do upload: PDF vetorial do CAD (com eixos p/ snap) OU uma
+    IMAGEM (PNG/JPG — foto/print) OU um PDF escaneado (vira imagem de fundo).
+    Devolve (planta_dict, vetorial?)."""
+    nome = (up.name or "").lower()
+    dados = up.getvalue()
+    if nome.endswith((".png", ".jpg", ".jpeg")):
+        return el.planta_de_imagem(dados), False
+    try:
+        return el.extrair_planta(dados), True          # PDF vetorial (tem eixos)
+    except ValueError:
+        return el.planta_de_pdf_imagem(dados), False    # PDF escaneado/imagem
+
+
 def _stepper():
     """Barra de etapas CLICÁVEL — clique em '1 · Lançar' para voltar ao editor."""
     atual = ss.pc_vista
@@ -150,12 +164,13 @@ if ss.pc_vista == "lancar":
                 "**2)** clique **➤ ENVIAR** (botão verde do editor) — o desenho cai "
                 "sozinho na caixa **📁 logo abaixo**.  \n"
                 "**3)** clique **👁️ Carregar do editor → conferir**.")
-        with st.expander("🖼️ Ver as paredes da casa (PDF) atrás do desenho"):
-            up = st.file_uploader("Planta em PDF (do CAD)", type=["pdf"], key="pc_pdf")
+        with st.expander("🖼️ Ver as paredes da casa (PDF ou IMAGEM) atrás do desenho"):
+            up = st.file_uploader("Planta em PDF (do CAD) ou IMAGEM (PNG/JPG)",
+                                  type=["pdf", "png", "jpg", "jpeg"], key="pc_pdf")
             if up is not None:
                 with st.spinner("Lendo a planta…"):
                     try:
-                        ss.pc_planta = el.extrair_planta(up.getvalue())
+                        ss.pc_planta, _vet = _ler_planta(up)
                         ss.pc_proj = up.name.rsplit(".", 1)[0]
                         st.rerun()
                     except Exception as e:
@@ -173,20 +188,26 @@ if ss.pc_vista == "lancar":
             html = el.build_editor_from_data(ss.pc_data, lskey="lancd_" + _h)
         components.html(html, height=820, scrolling=True)
     else:
-        sec(1, "Suba a planta (PDF) e desenhe os pilares e vigas")
-        up = st.file_uploader("Planta baixa em PDF (do CAD) — fundo para desenhar",
-                              type=["pdf"], key="pc_pdf")
+        sec(1, "Suba a planta (PDF do CAD ou IMAGEM) e desenhe os pilares e vigas")
+        up = st.file_uploader("Planta baixa — PDF do CAD **ou** IMAGEM (PNG/JPG, "
+                              "foto/print) — fundo para desenhar",
+                              type=["pdf", "png", "jpg", "jpeg"], key="pc_pdf")
         if up is not None:
             with st.spinner("Lendo a planta…"):
                 try:
-                    ss.pc_planta = el.extrair_planta(up.getvalue())
+                    ss.pc_planta, ss["pc_vetorial"] = _ler_planta(up)
                     ss.pc_proj = up.name.rsplit(".", 1)[0]
                 except Exception as e:
                     st.error(f"Não consegui ler a planta: {e}")
         if ss.pc_planta is not None:
             d = ss.pc_planta
-            st.success(f"Planta lida ({len(d['VX'])} eixos verticais, "
-                       f"{len(d['HY'])} horizontais para o snap).")
+            if d["VX"] or d["HY"]:
+                st.success(f"Planta lida ({len(d['VX'])} eixos verticais, "
+                           f"{len(d['HY'])} horizontais para o snap).")
+            else:
+                st.info("🖼️ **Fundo carregado como IMAGEM** (sem eixos automáticos): "
+                        "desenhe os pilares e vigas POR CIMA da planta; ao terminar "
+                        "use o **Alinhar** (endireita e encaixa tudo) e **ENVIAR**.")
             ss.pc_larg = st.number_input(
                 "Largura total da construção (m) — só para acertar a escala",
                 min_value=1.0, max_value=300.0, value=float(ss.pc_larg), step=0.5)
