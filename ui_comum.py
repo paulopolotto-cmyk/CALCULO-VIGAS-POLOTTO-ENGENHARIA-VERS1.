@@ -393,6 +393,36 @@ def mostrar_figura(fig, dpi=170):
     return dados
 
 
+def compor_a4(pngs, orient="retrato", titulo=None):
+    """Junta várias imagens PNG (bytes) numa ÚNICA folha A4 — empilhadas e
+    escaladas para a largura, mantendo a proporção de cada uma (sem distorcer).
+    Serve para reduzir o nº de folhas impressas (ex.: armação + corte na mesma
+    folha). Devolve os bytes PNG da folha composta (fundo branco)."""
+    import matplotlib.pyplot as plt
+    import matplotlib.image as _mpimg
+    imgs = [_mpimg.imread(_io.BytesIO(p)) for p in pngs if p]
+    if not imgs:
+        return b""
+    A4 = (8.27, 11.69) if orient == "retrato" else (11.69, 8.27)
+    ratios = [im.shape[0] / im.shape[1] for im in imgs]   # altura/largura de cada
+    fig, axs = plt.subplots(len(imgs), 1, figsize=A4,
+                            gridspec_kw={"height_ratios": ratios})
+    fig.patch.set_facecolor("white")
+    if len(imgs) == 1:
+        axs = [axs]
+    for ax, im in zip(axs, imgs):
+        ax.imshow(im)
+        ax.axis("off")
+    top = 0.965 if titulo else 0.99
+    fig.subplots_adjust(left=0.01, right=0.99, top=top, bottom=0.01, hspace=0.04)
+    if titulo:
+        fig.suptitle(titulo, fontsize=13, fontweight="bold", color="#1E3A8A", y=0.992)
+    buf = _io.BytesIO()
+    fig.savefig(buf, format="png", dpi=160, facecolor="white")
+    plt.close(fig)
+    return buf.getvalue()
+
+
 def tabela(rows):
     """Renderiza uma tabela HTML (negrito, cabeçalho azul, rolagem horizontal).
 

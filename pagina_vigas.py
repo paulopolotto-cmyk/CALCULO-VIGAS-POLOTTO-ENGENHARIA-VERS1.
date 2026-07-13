@@ -18,7 +18,7 @@ import motor_viga as mv
 from ui_comum import (NAVY, AMBAR, VERMELHO, VERDE, CINZA_TXT, CONCRETO,
                       aplicar_estilo, header, sec, seletor_unidade, tabela,
                       mostrar_figura, seletor_pagina, assistente_carga,
-                      EXEMPLOS_VIGA)
+                      compor_a4, EXEMPLOS_VIGA)
 
 aplicar_estilo()
 header("Cálculo de Vigas Contínuas e Pilares",
@@ -568,6 +568,16 @@ if ss.res is not None:
                         "(comprimentos, marcas e estribos):**")
             png_long = mostrar_figura(fig_corte_longitudinal(res))
 
+            # ---- MESMA FOLHA A4: armação (corte longitudinal) + corte transversal
+            # (reduz o nº de folhas impressas — vai combinada no pacote/downloads)
+            png_armacao = compor_a4(
+                [png_long, png_corte],
+                titulo="Armação (corte longitudinal) e corte transversal")
+            st.success("📄 **No pacote de impressão, a armação e o corte transversal "
+                       "saem na MESMA folha A4** — assim imprime bem menos papel.")
+            with st.expander("👁️ Ver a folha A4 pronta (armação + corte juntos)"):
+                st.image(png_armacao, width="stretch")
+
             # ---- zona segura para furos
             sec(8, "Onde furar a viga (passagem de tubulação)")
             st.caption("Verde = pode furar · Vermelho = evitar. A **linha "
@@ -677,9 +687,9 @@ if ss.res is not None:
                 z.writestr("1_esquema_reacoes.png", png_esq)
                 z.writestr("2_diagramas_M_V.png", png_diag)
                 z.writestr("3_detalhamento.png", png)
-                z.writestr("4_corte_longitudinal.png", png_long)
-                z.writestr("5_corte_transversal.png", png_corte)
-                z.writestr("6_zona_furos.png", png_furos)
+                # armação + corte transversal na MESMA folha (menos papel)
+                z.writestr("4_armacao_e_corte_A4.png", png_armacao)
+                z.writestr("5_zona_furos.png", png_furos)
             st.download_button(
                 "📦 BAIXAR TUDO (.zip) — memorial + todos os desenhos",
                 zbuf.getvalue(), file_name=f"{nome_base}_completo.zip",
@@ -706,14 +716,10 @@ if ss.res is not None:
                 "🖼️ Detalhamento", png,
                 file_name=f"{nome_base}_detalhamento.png",
                 mime="image/png", width="stretch")
-            ce5, ce6 = st.columns(2)
-            ce5.download_button(
-                "🖼️ Corte longitudinal", png_long,
-                file_name=f"{nome_base}_corte_longitudinal.png",
-                mime="image/png", width="stretch")
-            ce6.download_button(
-                "🖼️ Corte transversal", png_corte,
-                file_name=f"{nome_base}_corte_{titulo_c}.png",
+            st.download_button(
+                "🖼️ Folha ARMAÇÃO + corte transversal (A4 — uma folha só)",
+                png_armacao,
+                file_name=f"{nome_base}_armacao_corte_A4.png",
                 mime="image/png", width="stretch")
             st.download_button(
                 "🖼️ Zona de furos", png_furos,
