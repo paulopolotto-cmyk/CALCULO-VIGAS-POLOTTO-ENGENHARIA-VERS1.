@@ -93,6 +93,51 @@ def _pag_texto(pdf, texto, titulo=None, mono=True, fs=9):
     plt.close(fig)
 
 
+def _pag_texto_com_figura(pdf, texto, png_fig, titulo=None, mono=True, fs=8):
+    """Página A4: memorial (texto no topo) + uma figura (PNG) no espaço que sobra
+    embaixo — junta o corte transversal na MESMA folha do memorial (menos papel).
+    Mede onde o texto termina e encaixa o corte SEM sobrepor. Se o memorial for
+    longo demais (não sobra espaço legível), o corte sai em folha própria — assim
+    cada viga fica completa e nada de detalhe some."""
+    import matplotlib.image as _mpimg
+    fig = plt.figure(figsize=A4)
+    fig.patch.set_facecolor("white")
+    y = 0.965
+    if titulo:
+        fig.text(0.06, 0.975, titulo, fontsize=13, fontweight="bold",
+                 color=NAVY, va="top")
+        fig.text(0.06, 0.945, "─" * 92, fontsize=8, color=AMBAR, va="top")
+        y = 0.925
+    txt = fig.text(0.06, y, _wrap(texto), fontsize=fs, va="top", ha="left",
+                   family="monospace" if mono else "sans-serif",
+                   color="#0f172a", linespacing=1.3)
+    embutido = False
+    if png_fig:
+        fig.canvas.draw()                       # mede a base real do texto
+        bb = txt.get_window_extent(fig.canvas.get_renderer())
+        y0 = fig.transFigure.inverted().transform((0, bb.y0))[1]
+        alt = (y0 - 0.035) - 0.03               # espaço livre abaixo do texto
+        if alt >= 0.16:                         # cabe com legibilidade
+            im = _mpimg.imread(io.BytesIO(png_fig))
+            ax = fig.add_axes([0.05, 0.03, 0.90, alt])
+            ax.imshow(im)
+            ax.axis("off")
+            embutido = True
+    pdf.savefig(fig)
+    plt.close(fig)
+    if png_fig and not embutido:                # memorial longo: corte em folha própria
+        fig2 = plt.figure(figsize=A4)
+        fig2.patch.set_facecolor("white")
+        fig2.suptitle("Corte transversal e estribo", fontsize=13,
+                      fontweight="bold", color=NAVY, y=0.985)
+        im = _mpimg.imread(io.BytesIO(png_fig))
+        ax = fig2.add_axes([0.06, 0.06, 0.88, 0.86])
+        ax.imshow(im)
+        ax.axis("off")
+        pdf.savefig(fig2)
+        plt.close(fig2)
+
+
 def _capa(pdf, r, proj, nv, nb, npil, reduzido=False):
     fig = plt.figure(figsize=A4)
     fig.patch.set_facecolor("white")
@@ -729,11 +774,17 @@ def _elemento_viga(pdf, v, membros, reduzido=False):
     if not reduzido:
         _salva(pdf, dv.fig_esquema(res), cab + "  ·  Esquema de cargas")
         _salva(pdf, dv.fig_diagramas(res), "Diagramas de momento e cortante")
+    png_corte = None
     if res.get("quantitativo"):
         _salva(pdf, dv.fig_corte_longitudinal(res), cab if reduzido else None)
         tipo, idx, tit = _corte_args(res)
-        _salva(pdf, dv.fig_corte_estribo(res, tipo, idx, tit),
-               "Corte transversal e estribo")
+        # o corte transversal vai JUNTO com o memorial (mesma folha) — menos papel.
+        # A figura já se rotula ("Corte — Apoio X" / "Detalhe do estribo").
+        _fc = dv.fig_corte_estribo(res, tipo, idx, tit)
+        _b = io.BytesIO()
+        _fc.savefig(_b, format="png", dpi=150, bbox_inches="tight", facecolor="white")
+        plt.close(_fc)
+        png_corte = _b.getvalue()
     if reduzido:
         mem = _mem_viga_red(v, nomes)
     else:
@@ -741,7 +792,8 @@ def _elemento_viga(pdf, v, membros, reduzido=False):
         if len(nomes) > 1:
             mem = (f"IGUAIS ({len(nomes)}): " + ", ".join(nomes)
                    + "\nMesmo desenho e ferragem para todas.\n\n" + mem)
-    _pag_texto(pdf, mem, titulo="Memorial — " + _rotulo("Viga", nomes))
+    _pag_texto_com_figura(pdf, mem, png_corte,
+                          titulo="Memorial — " + _rotulo("Viga", nomes))
 
 
 def _elemento_pilar(pdf, p, membros, reduzido=False):
