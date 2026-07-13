@@ -69,9 +69,11 @@ ss.setdefault("pc_data", None)       # estrutura JSON (lançamento salvo)
 ss.setdefault("pc_proj", "projeto")
 ss.setdefault("pc_larg", 15.0)
 ss.setdefault("paredes_25", set())   # (dir, pos) das paredes de divisa (25 cm)
-ss.setdefault("prp_last_id", 0)      # último envio do editor já consumido (ponte)
+ss.setdefault("prp_last_id", -1)     # último envio do editor consumido (-1 = nada ainda)
+ss.setdefault("prp_baseline", False)  # já vimos o estado inicial do localStorage?
 ss.setdefault("pc_autocarga", False)  # carregar automático ao ENVIAR?
 ss.setdefault("prp_recebido", None)  # lançamento recebido do editor, aguardando
+ss.setdefault("pc_manual_open", False)  # mostrar o upload manual?
 
 
 def _vista(v):
@@ -203,51 +205,68 @@ if ss.pc_vista == "lancar":
                     "do projeto salvo, suba ele **abaixo** — dá para editar mesmo sem "
                     "o PDF.")
 
-    sec(2, "Apertou ENVIAR? O programa JÁ RECEBE — sem baixar e subir arquivo")
-    st.checkbox("⚡ Carregar automático assim que eu apertar ENVIAR no editor",
+    sec(2, "Apertou ENVIAR no editor? Escolha como carregar")
+    st.checkbox("⚡ Carregar SOZINHO assim que eu apertar ENVIAR (sem clicar em nada)",
                 key="pc_autocarga",
-                help="Ligado: ao ENVIAR já pula direto para a conferência da planta. "
-                     "Desligado: aparece o botão 'Carregar agora' — bom quando você "
-                     "quer voltar ao editor e ajustar mais alguns detalhes antes.")
+                help="Ligado: ao apertar ENVIAR no editor o programa já pula direto "
+                     "para a conferência da planta. Desligado: aperte o botão verde "
+                     "abaixo quando quiser — assim dá para voltar ao editor e ajustar "
+                     "mais detalhes antes de carregar.")
 
-    # PONTE: lê o envio do editor (localStorage) e entrega ao Python. Sem upload.
+    # PONTE: lê o envio do editor (localStorage do navegador) e entrega ao Python.
+    env = None
     if _ponte is not None:
         try:
-            env = _ponte(consumido=int(ss.get("prp_last_id", 0)),
+            env = _ponte(consumido=int(ss.get("prp_last_id", -1)),
                          key="prp_ponte", default=None)
         except Exception:
             env = None
-        if isinstance(env, dict) and env.get("id", 0) > ss.get("prp_last_id", 0):
-            ss["prp_last_id"] = int(env["id"])          # consome este envio 1x
-            try:
-                d_rx = json.loads(env.get("data") or "")
-            except Exception:
-                d_rx = None
-            if isinstance(d_rx, dict) and "pilares" in d_rx:
+
+    def _rx_do_env(e):
+        try:
+            d0 = json.loads(e.get("data") or "")
+        except Exception:
+            d0 = None
+        return d0 if (isinstance(d0, dict) and "pilares" in d0) else None
+
+    if isinstance(env, dict):
+        nid = int(env.get("id", 0) or 0)
+        if not ss.get("prp_baseline"):          # 1o contato: o que já existe NÃO dispara
+            ss["prp_baseline"] = True
+            ss["prp_last_id"] = nid
+            if nid > 0:
+                ss["prp_recebido"] = _rx_do_env(env)
+        elif nid > int(ss.get("prp_last_id", 0)):   # envio NOVO nesta sessão
+            ss["prp_last_id"] = nid
+            d_new = _rx_do_env(env)
+            if d_new:
                 if ss.get("pc_autocarga"):
-                    _carregar_lancamento(d_rx)          # vai direto para CONFERIR
+                    _carregar_lancamento(d_new)     # pula direto para CONFERIR
                 else:
-                    ss["prp_recebido"] = d_rx           # espera o clique do eng.
+                    ss["prp_recebido"] = d_new
 
     rx = ss.get("prp_recebido")
-    if isinstance(rx, dict) and "pilares" in rx:
-        st.success(f"📥 **Recebi o projeto do editor:** {len(rx.get('pilares', []))} "
-                   f"pilares e {len(rx.get('vigas', []))} trechos de viga. Não precisa "
-                   "baixar nem subir arquivo — é só carregar.")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("👁️ Carregar agora e CONFERIR →", type="primary",
-                         width="stretch"):
-                _carregar_lancamento(rx)
-        with c2:
-            if st.button("✏️ Vou continuar editando", width="stretch"):
-                ss["prp_recebido"] = None
-                st.rerun()
+    tem = isinstance(rx, dict) and "pilares" in rx
+    if tem:
+        st.success(f"🟢 **Recebi o desenho do editor:** {len(rx.get('pilares', []))} "
+                   f"pilares e {len(rx.get('vigas', []))} trechos de viga — é só "
+                   "carregar (não precisa baixar nem subir arquivo).")
+    else:
+        st.info("⚪ **Aguardando o ENVIAR do editor.** Aperte **ENVIAR** lá em cima — "
+                "o desenho aparece aqui sozinho. Se não aparecer em alguns segundos, "
+                "use o botão **📁 Subir arquivo manualmente**.")
 
-    with st.expander("Prefere subir o arquivo à mão? (opcional)"):
-        st.caption("Toda vez que você aperta ENVIAR eu também baixo o "
-                   "`estrutura_*.json` em Downloads. Se preferir o modo antigo, "
-                   "solte esse arquivo aqui.")
+    b1, b2 = st.columns(2)
+    with b1:
+        if st.button("📥 Carregar do editor, conferir e salvar →", type="primary",
+                     width="stretch", disabled=not tem):
+            _carregar_lancamento(rx)
+    with b2:
+        st.toggle("📁 Subir arquivo manualmente", key="pc_manual_open",
+                  help="Modo antigo: usa o estrutura_*.json que também baixo em "
+                       "Downloads a cada ENVIAR.")
+
+    if ss.get("pc_manual_open"):
         upj = st.file_uploader("Arquivo do editor (estrutura_*.json)",
                                type=["json"], key="pc_json")
         if upj is not None:

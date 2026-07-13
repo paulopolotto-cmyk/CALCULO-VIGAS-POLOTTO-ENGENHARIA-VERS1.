@@ -17,8 +17,8 @@
    aparece um envio NOVO (id > o ja consumido). O Python decide carregar (auto)
    ou mostrar o botao "Carregar agora" (manual). O upload manual continua valendo. */
 (function () {
-  var consumido = 0;   // maior id ja processado pelo Python (vem no render)
-  var enviado = 0;     // maior id ja mandado ao Python nesta montagem
+  var consumido = -1;  // maior id ja processado pelo Python (vem no render; -1 = nada)
+  var enviado = -1;    // maior id ja mandado ao Python nesta montagem (-1 = nada)
 
   function post(msg) { msg.isStreamlitMessage = true; window.parent.postMessage(msg, "*"); }
   function setValue(v) { post({ type: "streamlit:setComponentValue", value: v, dataType: "json" }); }
