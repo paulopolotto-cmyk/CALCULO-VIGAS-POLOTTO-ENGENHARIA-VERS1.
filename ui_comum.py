@@ -59,12 +59,9 @@ html, body, .stApp,
 .main, .block-container, section.main {
     background-color: #F4F6FA !important;
 }
-/* cor padrão do texto = escuro legível (as classes coloridas específicas, como
-   cabeçalho azul e botões âmbar, continuam com a cor própria — sem !important) */
-body, .stApp, [data-testid="stMarkdownContainer"],
-[data-testid="stText"], [data-testid="stTableStyledTable"] td {
-    color: #16213E;
-}
+/* (o texto padrão fica escuro pelo tema `light` do config.toml + color-scheme
+   acima; NÃO forço `color` global para não pintar o texto BRANCO dos botões
+   azuis de escuro — o que tornava os botões ilegíveis) */
 
 /* ===== TIPOGRAFIA GERAL: texto maior e em negrito (melhor visualização) === */
 [data-testid="stMarkdownContainer"] p,
