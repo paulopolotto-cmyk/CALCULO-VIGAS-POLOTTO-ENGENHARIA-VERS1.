@@ -306,6 +306,7 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     fig, ax = plt.subplots(figsize=(min(12.0, max(7.0, 0.7 * W + 2.0)),
                                     min(16.0, max(6.0, 0.7 * H + 2.0))), dpi=150)
     fig.patch.set_facecolor("white")
+    ax.set_facecolor("white")                             # área do gráfico SÓLIDA
     for x1, y1, x2, y2, _, esp in seg:                    # viga = PAREDE (15 ou 25 cm)
         if abs(x2 - x1) >= abs(y2 - y1):                  # horizontal
             xa, xb = min(x1, x2), max(x1, x2)
@@ -357,11 +358,12 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
         labs.append(ax.text(x + lo, y + lo * 0.35, p.get("pilar", "P"), fontsize=11,
                     color=cor_pilar, fontweight="bold", ha="left", va="center",
                     zorder=7, bbox=dict(boxstyle="round,pad=0.12", fc="white",
-                                        ec="none", alpha=0.9)))
-        if p.get("secao"):                                # dimensão do pilar
+                                        ec="none")))            # caixa branca OPACA
+        if p.get("secao"):                                # dimensão do pilar (caixa branca)
             labs.append(ax.text(x + lo, y - lo * 0.5, str(p["secao"]), fontsize=8,
-                        color="#475569", fontweight="bold", ha="left", va="center",
-                        zorder=7))
+                        color="#334155", fontweight="bold", ha="left", va="center",
+                        zorder=7, bbox=dict(boxstyle="round,pad=0.1", fc="white",
+                                            ec="none")))
     for i, L in enumerate(lajes or [], 1):                # setas das LAJES (azul)
         x, y = L.get("x_m"), L.get("y_m")
         if x is None or y is None:

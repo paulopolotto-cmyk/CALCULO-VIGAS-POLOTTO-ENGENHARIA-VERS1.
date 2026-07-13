@@ -96,7 +96,8 @@ def _img_planta(chave, criar):
             cache[chave] = None
         else:
             buf = io.BytesIO()
-            fig.savefig(buf, format="png", dpi=110, bbox_inches="tight")
+            fig.savefig(buf, format="png", dpi=110, bbox_inches="tight",
+                        facecolor="white")     # fundo branco sólido (celular escuro)
             plt.close(fig)
             cache[chave] = buf.getvalue()
     return cache[chave]

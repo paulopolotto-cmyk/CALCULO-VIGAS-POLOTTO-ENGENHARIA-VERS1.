@@ -8,6 +8,17 @@ import os as _os
 import streamlit as st
 import streamlit.components.v1 as components
 
+# Fundo BRANCO em TODAS as figuras matplotlib do app (desenhos, plantas,
+# diagramas). No modo escuro do celular, um fundo transparente/escuro sumia com
+# o texto preto — forçar branco garante legibilidade em qualquer aparelho.
+try:
+    import matplotlib as _mpl
+    _mpl.rcParams["figure.facecolor"] = "white"
+    _mpl.rcParams["axes.facecolor"] = "white"
+    _mpl.rcParams["savefig.facecolor"] = "white"
+except Exception:
+    pass
+
 # Logo oficial Polotto (embutido como data-URI: funciona na web, no túnel e
 # no .exe, sem depender de arquivo externo em runtime).
 _LOGO_URI = None
@@ -37,6 +48,24 @@ CONCRETO = "#CBD5E1"
 
 _CSS = """
 <style>
+/* ===== TRAVA o app em tema CLARO — o MODO ESCURO do celular escurecia o fundo
+   e sumia com os textos escuros. Agora o fundo é sempre claro e o texto escuro
+   fica legível em qualquer aparelho (Samsung/iPhone, claro ou escuro). Vale p/
+   qualquer projeto. ===== */
+:root, html { color-scheme: light only !important; }
+html, body, .stApp,
+[data-testid="stAppViewContainer"], [data-testid="stMain"],
+[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stBottom"],
+.main, .block-container, section.main {
+    background-color: #F4F6FA !important;
+}
+/* cor padrão do texto = escuro legível (as classes coloridas específicas, como
+   cabeçalho azul e botões âmbar, continuam com a cor própria — sem !important) */
+body, .stApp, [data-testid="stMarkdownContainer"],
+[data-testid="stText"], [data-testid="stTableStyledTable"] td {
+    color: #16213E;
+}
+
 /* ===== TIPOGRAFIA GERAL: texto maior e em negrito (melhor visualização) === */
 [data-testid="stMarkdownContainer"] p,
 [data-testid="stMarkdownContainer"] li {
