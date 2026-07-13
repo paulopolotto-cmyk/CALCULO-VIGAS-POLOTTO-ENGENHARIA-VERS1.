@@ -174,6 +174,33 @@ def _esp_parede(l, paredes_25):
     return PAREDE_DIV if (l["dir"], round(l["pos"], 2)) in (paredes_25 or ()) else PAREDE_INT
 
 
+def _linhas_divisa(linhas, paredes_25):
+    """Segmentos (dir,pos,ini,fim) das linhas marcadas como parede de divisa 25 cm."""
+    p25 = paredes_25 or set()
+    return [(l["dir"], l["pos"], l["ini"], l["fim"]) for l in linhas
+            if (l["dir"], round(l["pos"], 2)) in p25]
+
+
+def _pilar_em_divisa(px, py, walls25, tol=0.20):
+    """Pilar embutido em uma parede de divisa de 25 cm (na linha e dentro do vão)?"""
+    if px is None or py is None:
+        return False
+    for dirn, pos, a, b in walls25:
+        if dirn == "V" and abs(px - pos) <= tol and a - tol <= py <= b + tol:
+            return True
+        if dirn == "H" and abs(py - pos) <= tol and a - tol <= px <= b + tol:
+            return True
+    return False
+
+
+def _secao_divisa(secao):
+    """Rótulo do pilar de divisa: base vira 20 cm (ex.: '14x30' -> '20x30')."""
+    import re
+    n = re.findall(r"\d+", str(secao or ""))
+    h = n[1] if len(n) >= 2 else "30"
+    return f"20x{h}"
+
+
 def planta_do_json(data, paredes_25=None):
     """Geometria da planta (croqui) direto do JSON, SEM rodar o cálculo — para
     a tela de conferência. Agrupa as vigas contínuas e nomeia VH/VV como no
@@ -186,8 +213,15 @@ def planta_do_json(data, paredes_25=None):
     baldrames = [dict(nome=bnomes[i], dir=l["dir"], pos=l["pos"], ini=l["ini"],
                       fim=l["fim"], parede=_esp_parede(l, paredes_25))
                  for i, l in enumerate(linhas)]
+    walls25 = _linhas_divisa(linhas, paredes_25)          # pilar de divisa = 20 cm
+    pilares = []
+    for p in data.get("pilares", []):
+        q = dict(p)
+        if _pilar_em_divisa(p.get("x_m"), p.get("y_m"), walls25):
+            q["secao"] = _secao_divisa(p.get("secao", "14x30"))
+        pilares.append(q)
     return dict(vigas=vigas, baldrames=baldrames,
-                pilares=data.get("pilares", []), lajes=data.get("lajes", []))
+                pilares=pilares, lajes=data.get("lajes", []))
 
 
 def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0, paredes_25=None):
@@ -243,25 +277,14 @@ def calcular_projeto(data, g_telhado=None, wall=WALL, h_pilar=3.0, paredes_25=No
                               res=res))
     # ---- pilares (dimensionados no motor_pilar; 14×30 crescendo pela norma;
     #      pilar embutido em parede de divisa 25 cm começa em 20 cm de base)
-    walls25 = [(l["dir"], l["pos"], l["ini"], l["fim"]) for l in linhas
-               if (l["dir"], round(l["pos"], 2)) in paredes_25]
-
-    def _pilar_em_div(px, py, tol=0.20):
-        if px is None or py is None:
-            return False
-        for dirn, pos, a, b in walls25:
-            if dirn == "V" and abs(px - pos) <= tol and a - tol <= py <= b + tol:
-                return True    # na parede vertical (x=pos), dentro do vão em y
-            if dirn == "H" and abs(py - pos) <= tol and a - tol <= px <= b + tol:
-                return True    # na parede horizontal (y=pos), dentro do vão em x
-        return False
+    walls25 = _linhas_divisa(linhas, paredes_25)
 
     pil_det = []
     aco_pil = 0.0
     for i, p in enumerate(pilares):
         nome = p.get("pilar", f"P{i+1}")
         carga = p.get("carga_tf", 0) or 0
-        base = 20 if _pilar_em_div(p.get("x_m"), p.get("y_m")) else 14
+        base = 20 if _pilar_em_divisa(p.get("x_m"), p.get("y_m"), walls25) else 14
         rp, opt, secao, Nk = _detalhar_pilar(carga, base=base)
         peso = opt["peso_total"] if opt else 0.0
         aco_pil += peso

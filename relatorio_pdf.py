@@ -207,6 +207,23 @@ def _sec_dims(secao, sentido, across=None):
     return a, b                # quadrado / indefinido
 
 
+def _estica_ate_pilar(a, b, pos, horizontal, pilares, tol=0.25, alcance=0.8):
+    """Estica o intervalo [a,b] da PAREDE para ENCOSTAR nos pilares alinhados que
+    ficam logo além das pontas — fecha o vazio quando a viga foi desenhada um
+    pouco curta (não chega no pilar). Só alcança pilares na mesma linha do muro."""
+    for p in pilares:
+        px, py = p.get("x_m"), p.get("y_m")
+        if px is None or py is None:
+            continue
+        c, e = (py, px) if horizontal else (px, py)   # c: transversal ao muro; e: ao longo
+        if abs(c - pos) <= tol:
+            if a - alcance <= e < a:
+                a = e
+            elif b < e <= b + alcance:
+                b = e
+    return a, b
+
+
 def _laje_span(lx, ly, hbs, vbs, dirn, default, tol=0.20):
     """Vão do painel na direção da seta (p/ a seta caber dentro da laje)."""
     if dirn == "V":
@@ -292,10 +309,12 @@ def _planta(vigas, pilares, lajes, titulo, cor_viga, cor_pilar):
     for x1, y1, x2, y2, _, esp in seg:                    # viga = PAREDE (15 ou 25 cm)
         if abs(x2 - x1) >= abs(y2 - y1):                  # horizontal
             xa, xb = min(x1, x2), max(x1, x2)
+            xa, xb = _estica_ate_pilar(xa, xb, y1, True, pilares)   # encosta no pilar
             ax.add_patch(plt.Rectangle((xa, y1 - esp / 2), max(esp, xb - xa), esp,
                                        facecolor=cor_viga, edgecolor="none", zorder=2))
         else:                                             # vertical
             ya, yb = min(y1, y2), max(y1, y2)
+            ya, yb = _estica_ate_pilar(ya, yb, x1, False, pilares)  # encosta no pilar
             ax.add_patch(plt.Rectangle((x1 - esp / 2, ya), esp, max(esp, yb - ya),
                                        facecolor=cor_viga, edgecolor="none", zorder=2))
     off = max(0.42, 0.03 * max(W, H))
