@@ -68,7 +68,7 @@ th{background:var(--soft);color:var(--azul);font-weight:800;position:sticky;top:
 <div class="wrap">
  <div class="left">
   <div class="planbox" id="box"><img src="__IMG__" alt="planta">
-   <svg id="ov" viewBox="__X0__ __Y0__ __VW__ __VH__" preserveAspectRatio="none">
+   <svg id="ov" tabindex="-1" style="outline:none" viewBox="__X0__ __Y0__ __VW__ __VH__" preserveAspectRatio="none">
     <g id="axes"></g><g id="beams"></g><g id="sup"></g><g id="lbl"></g><g id="pil"></g><g id="lajes"></g><g id="pend"></g></svg></div>
   <div class="status" id="status"></div>
   <div class="legc"><span><i style="background:#EAB308"></i>viga fixa (amarela)</span>
@@ -194,7 +194,7 @@ function vigaClick(pt){let ep=epAt(pt);
  if(Math.hypot(vigaStart.x-ep.x,vigaStart.y-ep.y)<8){vigaStart=null;renderFull();return;}
  if(Math.abs(ep.x-vigaStart.x)>=Math.abs(ep.y-vigaStart.y))ep={t:'xy',x:ep.x,y:vigaStart.y};else ep={t:'xy',x:vigaStart.x,y:ep.y};
  snap();let nb={id:nextBid++,A:vigaStart,B:ep};beams.push(nb);selB=nb.id;selP=null;vigaStart=null;renderFull();}  // 2º ponto: cria e FIXA (verde; sem encadear)
-svg.addEventListener('pointerdown',e=>{e.preventDefault();try{svg.setPointerCapture(e.pointerId);}catch(_){}let pt=toPt(e);
+svg.addEventListener('pointerdown',e=>{e.preventDefault();try{svg.focus({preventScroll:true});}catch(_){}try{svg.setPointerCapture(e.pointerId);}catch(_){}let pt=toPt(e);
  // --- LAJES (seta do sentido da vigota) ---
  if(mode==='laje'){let li=hitLaje(pt);
    if(li>=0){snap();dragLaje=li;dragLast=pt;moved=false;selP=null;selB=null;renderFull();}
