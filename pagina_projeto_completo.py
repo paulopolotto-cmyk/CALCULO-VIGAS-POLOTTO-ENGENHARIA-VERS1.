@@ -11,6 +11,7 @@ O cálculo só roda DEPOIS que o usuário confere a planta e confirma. Módulo N
 e independente: NÃO altera as telas aprovadas (Vigas/Pilares/Lajes/Prévios).
 """
 import copy
+import hashlib
 import io
 import json
 
@@ -135,20 +136,20 @@ _stepper()
 
 # ============================================================ 1) LANÇAR
 if ss.pc_vista == "lancar":
-    editando = ss.pc_data is not None and ss.pc_planta is None
+    editando = ss.pc_data is not None
     if editando:
         sec(1, "Edite as vigas e os pilares — mexa direto no desenho")
         n_p = len(ss.pc_data.get("pilares", []))
         n_v = len(ss.pc_data.get("vigas", []))
-        st.success(f"✏️ **Você está EDITANDO o seu projeto** — **{n_p} pilares** e "
-                   f"**{n_v} vigas** já estão no desenho abaixo, prontos para mexer.")
+        st.success(f"✏️ **Você está EDITANDO o SEU último projeto enviado** — "
+                   f"**{n_p} pilares** e **{n_v} vigas** já estão no desenho abaixo, "
+                   "prontos para mexer (**não** começa do zero).")
         st.info("**Para editar e voltar a conferir — 3 passos:**  \n"
                 "**1)** mexa no **desenho abaixo**: arraste para mover, **+Pilar / "
                 "+Viga** para acrescentar, **Excluir** para tirar.  \n"
-                "**2)** clique **➤ ENVIAR** (botão verde do editor) — baixa um arquivo "
-                "`estrutura_*.json` na pasta **Downloads**.  \n"
-                "**3)** suba esse arquivo na caixa **📁 logo abaixo do editor** e "
-                "clique **👁️ Ver a planta para CONFERIR**.")
+                "**2)** clique **➤ ENVIAR** (botão verde do editor) — o desenho cai "
+                "sozinho na caixa **📁 logo abaixo**.  \n"
+                "**3)** clique **👁️ Carregar do editor → conferir**.")
         with st.expander("🖼️ Ver as paredes da casa (PDF) atrás do desenho"):
             up = st.file_uploader("Planta em PDF (do CAD)", type=["pdf"], key="pc_pdf")
             if up is not None:
@@ -159,7 +160,17 @@ if ss.pc_vista == "lancar":
                         st.rerun()
                     except Exception as e:
                         st.error(f"Não consegui ler a planta: {e}")
-        html = el.build_editor_from_data(ss.pc_data)
+        # chave por CONTEÚDO: o editor sempre carrega o SEU último lançamento
+        # (o localStorage só guarda edições em andamento DESTE mesmo lançamento)
+        _h = hashlib.md5(json.dumps(ss.pc_data, sort_keys=True,
+                                    default=str).encode()).hexdigest()[:8]
+        if ss.pc_planta is not None:      # PDF de fundo + o SEU lançamento carregado
+            S = float(ss.pc_data.get("escala_pt_por_m")
+                      or el.estimar_escala(ss.pc_planta, ss.pc_larg))
+            html = el.build_editor(ss.pc_planta, S, proj=ss.pc_proj,
+                                   lskey="lancd_" + _h, loaddata=ss.pc_data)
+        else:                             # sem PDF: fundo branco + lançamento
+            html = el.build_editor_from_data(ss.pc_data, lskey="lancd_" + _h)
         components.html(html, height=820, scrolling=True)
     else:
         sec(1, "Suba a planta (PDF) e desenhe os pilares e vigas")
