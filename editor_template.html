@@ -288,12 +288,26 @@ function enviar(){let bd=beamData();let w=issues(bd);
   lajes:lajes.map((L,i)=>({nome:"L"+(i+1),x_m:+((L.x-X0)/m).toFixed(2),y_m:+((Y0+VH-L.y)/m).toFixed(2),dir:L.dir})),
   total_tf:+(Object.values(cache.Nt).reduce((a,b)=>a+b,0)/9.81).toFixed(0)};
  let js=JSON.stringify(data,null,1);
- // PONTE p/ o programa: grava o envio no navegador c/ um numero crescente.
- // A tela do projeto le isso e ja mostra "Carregar agora" (sem upload manual).
- try{var _id=(parseInt(localStorage.getItem('prp_envio_id')||'0',10)||0)+1;
-     localStorage.setItem('prp_envio',js);localStorage.setItem('prp_envio_id',String(_id));}catch(e){}
- let bl=new Blob([js],{type:'application/json'});let a=document.createElement('a');let fn='estrutura_caldeira_'+stamp()+'.json';a.href=URL.createObjectURL(bl);a.download=fn;a.click();
- alert('Estrutura ENVIADA!\n\nVolte para a tela do programa (item 2): a luz fica VERDE\ne o botao "Carregar do editor" acende. (Tambem baixei '+fn+' em Downloads,\ncaso queira usar o "Subir arquivo manualmente".)');}
+ let fn='estrutura_caldeira_'+stamp()+'.json';
+ // ENVIO DIRETO: coloca o arquivo no campo de upload do programa (o MESMO caminho
+ // do "Subir manualmente", que funciona sempre). Editor e programa sao da mesma
+ // origem, entao da p/ preencher o input do file_uploader do Streamlit no pai.
+ let injetou=false;
+ try{
+   let wins=[window.parent,window.top].filter(function(w){return w&&w!==window;});
+   for(let wi=0;wi<wins.length&&!injetou;wi++){
+     let PW=wins[wi],pdoc=PW.document,ins=pdoc.querySelectorAll('input[type=file]'),tgt=null;
+     for(let i=0;i<ins.length;i++){if((ins[i].getAttribute('accept')||'').indexOf('.json')>=0){tgt=ins[i];break;}}
+     if(!tgt&&ins.length)tgt=ins[ins.length-1];
+     if(tgt){let dt=new PW.DataTransfer();dt.items.add(new PW.File([js],fn,{type:'application/json'}));
+       tgt.files=dt.files;tgt.dispatchEvent(new PW.Event('input',{bubbles:true}));
+       tgt.dispatchEvent(new PW.Event('change',{bubbles:true}));injetou=true;}
+   }
+ }catch(e){}
+ let bl=new Blob([js],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=fn;a.click();
+ alert(injetou
+   ? 'Estrutura ENVIADA para o programa!\n\nVolte para a tela (item 2): a luz fica VERDE\ne o botao "Carregar do editor" acende. (Tambem baixei '+fn+' em Downloads.)'
+   : 'Estrutura ENVIADA!\n\nBaixei '+fn+' em Downloads. Suba ele no item 2\n(campo "Arquivo do editor").');}
 $('send').onclick=enviar;
 window.manterViga=function(bid){let bm=byBid(bid);if(bm){snap();bm.ok=true;renderFull();}};
 window.removerViga=function(bid){snap();beams=beams.filter(b=>b.id!=bid);selB=null;renderFull();};
