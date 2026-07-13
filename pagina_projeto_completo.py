@@ -75,7 +75,7 @@ def _carregar_lancamento(d, ir_conferir=True):
     ss.pc_data = d_limpo
     ss["pc_limpeza"] = _stats
     ss.pc_proj = d.get("projeto") or ss.pc_proj
-    for k in ("pdf_completo", "pdf_reduzido", "pc_r", "pc_comodos",
+    for k in ("pdf_completo", "pdf_reduzido", "pdf_reduzidissimo", "pc_r", "pc_comodos",
               "laje_tipos", "laje_vigota", "laje_telhado",
               "laje_manuais", "laje_excluidas", "laje_mcount",
               "fecha_novas", "fecha_ok", "fecha_backup", "_img_cache"):
@@ -357,7 +357,7 @@ elif ss.pc_vista == "conferir":
             ss.pc_data = ss.pop("fecha_backup")
             for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos", "laje_tipos",
                       "laje_vigota", "laje_telhado", "laje_manuais", "laje_excluidas",
-                      "laje_mcount", "pdf_completo", "pdf_reduzido"):
+                      "laje_mcount", "pdf_completo", "pdf_reduzido", "pdf_reduzidissimo"):
                 ss.pop(k, None)
             st.toast("Fechamento desfeito — voltei ao seu lançamento.")
             _vista("conferir")
@@ -422,7 +422,7 @@ elif ss.pc_vista == "conferir":
                 for k in ("fecha_novas", "fecha_ok", "pc_r", "pc_comodos",
                           "laje_tipos", "laje_vigota", "laje_telhado",
                           "laje_manuais", "laje_excluidas", "laje_mcount",
-                          "pdf_completo", "pdf_reduzido", "pc_limpeza", "_img_cache"):
+                          "pdf_completo", "pdf_reduzido", "pdf_reduzidissimo", "pc_limpeza", "_img_cache"):
                     ss.pop(k, None)
                 st.success("Vigas aplicadas e pilares renumerados! Veja a planta "
                            "atualizada no topo.")
@@ -713,35 +713,46 @@ else:
                        data=html_rel.encode("utf-8"),
                        file_name=f"relatorio_{proj}.html", mime="text/html")
 
-    # ---- detalhamento em PDF — dois níveis (sob demanda, ~1 min cada)
-    st.markdown("**Detalhamento em PDF de cada viga e cada pilar** — a planta "
-                "numerada vai na frente. Escolha o nível (gera sob demanda):")
+    # ---- detalhamento em PDF — TRÊS níveis (sob demanda, ~1 min cada)
+    st.markdown("**Detalhamento em PDF — escolha o nível** (a planta numerada vai "
+                "na frente; gera sob demanda):")
     n_el = len(r["vigas"]) + len(r["baldrames"]) + len(r["pilares"])
-    cpdf1, cpdf2 = st.columns(2)
-    with cpdf1:
-        st.markdown("**🛠️ Completo** — esquema de cargas, diagramas de momento e "
-                    "cortante, cortes de armação e memorial completo.")
-        if st.button(f"Gerar COMPLETO ({n_el} elem.)", width="stretch"):
-            ss.pop("pdf_completo", None)
-            with st.spinner("Desenhando tudo (esquema, diagramas, cortes e "
-                            "memorial)…"):
-                ss["pdf_completo"] = rpdf.gerar_pdf(r, proj)
-            st.success("PDF completo pronto!")
-        if ss.get("pdf_completo"):
-            st.download_button("📥 Baixar COMPLETO (PDF)",
-                               data=ss["pdf_completo"],
-                               file_name=f"detalhamento_{proj}.pdf",
-                               mime="application/pdf", width="stretch")
-    with cpdf2:
-        st.markdown("**📄 Reduzido** — só as **armações** (cortes + quantitativo), "
-                    "**sem** os diagramas de momento/cortante. PDF bem menor.")
-        if st.button(f"Gerar REDUZIDO ({n_el} elem.)", width="stretch"):
-            ss.pop("pdf_reduzido", None)
-            with st.spinner("Desenhando só as armações…"):
-                ss["pdf_reduzido"] = rpdf.gerar_pdf(r, proj, reduzido=True)
-            st.success("PDF reduzido pronto!")
-        if ss.get("pdf_reduzido"):
-            st.download_button("📥 Baixar REDUZIDO (PDF)",
-                               data=ss["pdf_reduzido"],
-                               file_name=f"detalhamento_reduzido_{proj}.pdf",
-                               mime="application/pdf", width="stretch")
+
+    st.markdown("**🛠️ COMPLETO** — esquema de cargas, diagramas de momento e "
+                "cortante, cortes de armação e memorial completo.")
+    if st.button(f"Gerar COMPLETO ({n_el} elem.)", width="stretch", key="g_comp"):
+        ss.pop("pdf_completo", None)
+        with st.spinner("Desenhando tudo (esquema, diagramas, cortes e memorial)…"):
+            ss["pdf_completo"] = rpdf.gerar_pdf(r, proj)
+        st.success("PDF completo pronto!")
+    if ss.get("pdf_completo"):
+        st.download_button("📥 Baixar COMPLETO (PDF)", data=ss["pdf_completo"],
+                           file_name=f"detalhamento_{proj}.pdf",
+                           mime="application/pdf", width="stretch")
+
+    st.markdown("**📄 REDUZIDO** — só as **armações** (cortes + quantitativo), "
+                "**sem** os diagramas de momento/cortante. PDF bem menor.")
+    if st.button(f"Gerar REDUZIDO ({n_el} elem.)", width="stretch", key="g_red"):
+        ss.pop("pdf_reduzido", None)
+        with st.spinner("Desenhando só as armações…"):
+            ss["pdf_reduzido"] = rpdf.gerar_pdf(r, proj, nivel="reduzido")
+        st.success("PDF reduzido pronto!")
+    if ss.get("pdf_reduzido"):
+        st.download_button("📥 Baixar REDUZIDO (PDF)", data=ss["pdf_reduzido"],
+                           file_name=f"detalhamento_reduzido_{proj}.pdf",
+                           mime="application/pdf", width="stretch")
+
+    st.markdown("**📑 REDUZIDÍSSIMO** — **cada viga/pilar numa ÚNICA folha A4** "
+                "(armação + corte transversal + resumo). O **menor de todos** — "
+                "imprime bem menos papel.")
+    if st.button(f"Gerar REDUZIDÍSSIMO ({n_el} elem.)", width="stretch",
+                 key="g_min"):
+        ss.pop("pdf_reduzidissimo", None)
+        with st.spinner("Montando uma folha A4 por elemento…"):
+            ss["pdf_reduzidissimo"] = rpdf.gerar_pdf(r, proj, nivel="reduzidissimo")
+        st.success("PDF reduzidíssimo pronto!")
+    if ss.get("pdf_reduzidissimo"):
+        st.download_button("📥 Baixar REDUZIDÍSSIMO (PDF)",
+                           data=ss["pdf_reduzidissimo"],
+                           file_name=f"detalhamento_reduzidissimo_{proj}.pdf",
+                           mime="application/pdf", width="stretch")

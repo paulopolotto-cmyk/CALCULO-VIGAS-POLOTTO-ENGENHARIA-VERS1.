@@ -435,19 +435,26 @@ def fig_corte_longitudinal(res):
             xk += s
             n += 1
         n_est = int(math.ceil((xf - xi) * 100.0 / e['s'])) + 1
-        ax.text((xi + xf) / 2, rotulo_y,
-                f"estribos {e['texto']} ({n_est} un)", ha='center',
-                va='top', fontsize=8.5, color='#78350F', fontweight='bold',
-                style='italic')
+        w = xf - xi
+        fs = 8.5 if w >= 2.2 else 7.5 if w >= 1.5 else 6.5    # cabe em vão curto
+        ax.text((xi + xf) / 2, rotulo_y, f"{e['texto']} · {n_est}un",
+                ha='center', va='top', fontsize=fs, color='#78350F',
+                fontweight='bold', style='italic')
 
+    # segmentos na ordem (balanço esq · vãos · balanço dir); os rótulos vão em
+    # 2 LINHAS alternadas (par/ímpar) p/ não ficarem um EM CIMA do outro em
+    # vãos curtos, e o texto foi encurtado ("ø5.0 c/18 cm · 8un").
+    segs = []
+    if est['bal_esq']:
+        segs.append((0.0, off_e, res['estribo_be']))
     x0 = xs_ap[0]
     for i, v in enumerate(est['vaos']):
-        _desenha_estribos(x0, x0 + v['L'], res['estribos'][i], -1.28)
+        segs.append((x0, x0 + v['L'], res['estribos'][i]))
         x0 += v['L']
-    if est['bal_esq']:
-        _desenha_estribos(0.0, off_e, res['estribo_be'], -1.28)
     if est['bal_dir']:
-        _desenha_estribos(xs_ap[-1], L_tot, res['estribo_bd'], -1.28)
+        segs.append((xs_ap[-1], L_tot, res['estribo_bd']))
+    for k, (xi, xf, e) in enumerate(segs):
+        _desenha_estribos(xi, xf, e, -1.28 if k % 2 == 0 else -1.52)
 
     # ---- porta-estribos (2 ø8) — linha fina no topo
     pe = next((p for p in q['posicoes'] if 'Porta' in p['descr']), None)

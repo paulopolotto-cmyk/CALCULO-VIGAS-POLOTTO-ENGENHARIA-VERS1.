@@ -138,17 +138,25 @@ def _pag_texto_com_figura(pdf, texto, png_fig, titulo=None, mono=True, fs=8):
         plt.close(fig2)
 
 
-def _capa(pdf, r, proj, nv, nb, npil, reduzido=False):
+def _capa(pdf, r, proj, nv, nb, npil, reduzido=False, nivel=None):
+    nivel = nivel or ("reduzido" if reduzido else "completo")
     fig = plt.figure(figsize=A4)
     fig.patch.set_facecolor("white")
     fig.text(0.5, 0.90, "POLOTTO ENGENHARIA", ha="center", fontsize=20,
              fontweight="bold", color=NAVY)
-    fig.text(0.5, 0.865, ("Projeto Completo — Relatório REDUZIDO (só armações)"
-                          if reduzido else
-                          "Projeto Completo — Detalhamento estrutural"),
+    _titcapa = {
+        "completo": "Projeto Completo — Detalhamento estrutural",
+        "reduzido": "Projeto Completo — Relatório REDUZIDO (só armações)",
+        "reduzidissimo": "Projeto Completo — Relatório REDUZIDÍSSIMO",
+    }
+    fig.text(0.5, 0.865, _titcapa.get(nivel, _titcapa["completo"]),
              ha="center", fontsize=13, color=CINZA_TXT)
-    if reduzido:
-        fig.text(0.5, 0.842, "sem diagramas de momento/cortante — ver o completo",
+    _subcapa = {
+        "reduzido": "sem diagramas de momento/cortante — ver o completo",
+        "reduzidissimo": "cada viga/pilar numa ÚNICA folha A4 (armação + corte + resumo)",
+    }
+    if nivel in _subcapa:
+        fig.text(0.5, 0.842, _subcapa[nivel],
                  ha="center", fontsize=9, color=CINZA_TXT, style="italic")
     fig.text(0.5, 0.83, f"Projeto: {proj}", ha="center", fontsize=12,
              fontweight="bold", color="#0f172a")
@@ -796,6 +804,53 @@ def _elemento_viga(pdf, v, membros, reduzido=False):
                           titulo="Memorial — " + _rotulo("Viga", nomes))
 
 
+def _duas_figuras_a4(pdf, titulo, subtitulo, png_top, png_bot):
+    """Uma folha A4: título + duas figuras (topo e base). Base do Reduzidíssimo."""
+    import matplotlib.image as _mpimg
+    fig = plt.figure(figsize=A4)
+    fig.patch.set_facecolor("white")
+    fig.text(0.06, 0.978, titulo, fontsize=13, fontweight="bold",
+             color=NAVY, va="top")
+    if subtitulo:
+        fig.text(0.06, 0.95, subtitulo, fontsize=9, fontweight="bold",
+                 color=CINZA_TXT, va="top")
+    ax1 = fig.add_axes([0.03, 0.50, 0.94, 0.42])
+    ax1.imshow(_mpimg.imread(io.BytesIO(png_top)))
+    ax1.axis("off")
+    ax2 = fig.add_axes([0.06, 0.04, 0.88, 0.42])
+    ax2.imshow(_mpimg.imread(io.BytesIO(png_bot)))
+    ax2.axis("off")
+    pdf.savefig(fig)
+    plt.close(fig)
+
+
+def _png_fig(fig, dpi=150):
+    b = io.BytesIO()
+    fig.savefig(b, format="png", dpi=dpi, bbox_inches="tight", facecolor="white")
+    plt.close(fig)
+    return b.getvalue()
+
+
+def _elemento_viga_min(pdf, v, membros):
+    """REDUZIDÍSSIMO: 1 folha A4 por viga — armação (corte longitudinal) EM CIMA
+    + corte transversal EMBAIXO + resumo curto. Cada viga completa numa folha só."""
+    res = v["res"]
+    nomes = [m["nome"] for m in membros]
+    if not res or not res.get("quantitativo"):
+        _pag_texto(pdf, _mem_viga_red(v, nomes),
+                   titulo="Memorial — " + _rotulo("Viga", nomes))
+        return
+    png_long = _png_fig(dv.fig_corte_longitudinal(res))
+    tipo, idx, tit = _corte_args(res)
+    png_corte = _png_fig(dv.fig_corte_estribo(res, tipo, idx, tit))
+    q = res["quantitativo"]
+    ig = "  · mesma ferragem p/ todas" if len(nomes) > 1 else ""
+    sub = (f"Seção {v['secao']} cm · C25 · CA-50A · {v['nvaos']} vão(s) · "
+           f"aço {q['peso_total']:.1f} kg (compra +10%: {q['peso_compra']:.1f} kg){ig}")
+    _duas_figuras_a4(pdf, "Reduzidíssimo — " + _rotulo("Viga", nomes),
+                     sub, png_long, png_corte)
+
+
 def _elemento_pilar(pdf, p, membros, reduzido=False):
     rp = p["res"]
     opt = p["opt"]
@@ -810,16 +865,40 @@ def _elemento_pilar(pdf, p, membros, reduzido=False):
     _pag_texto(pdf, memf(p, nomes), titulo="Memorial — " + _rotulo("Pilar", nomes))
 
 
-def gerar_pdf(r, proj="projeto", reduzido=False):
+def _elemento_pilar_min(pdf, p, membros):
+    """REDUZIDÍSSIMO: 1 folha A4 por pilar — corte longitudinal (armação) EM CIMA
+    + corte transversal (seção) EMBAIXO + resumo curto."""
+    rp = p["res"]
+    opt = p["opt"]
+    nomes = [m["pilar"] for m in membros]
+    if not rp or not opt:
+        _pag_texto(pdf, _mem_pilar_red(p, nomes),
+                   titulo="Memorial — " + _rotulo("Pilar", nomes))
+        return
+    png_long = _png_fig(dp.fig_pilar_longitudinal(rp, opt))
+    png_sec = _png_fig(dp.fig_secao(rp, opt))
+    ig = "  · mesma ferragem p/ todos" if len(nomes) > 1 else ""
+    sub = (f"Seção {p['secao']} cm · C25 · CA-50A · "
+           f"Nk = {p.get('Nk', 0):.0f} kN · {opt.get('texto', '')}{ig}")
+    _duas_figuras_a4(pdf, "Reduzidíssimo — " + _rotulo("Pilar", nomes),
+                     sub, png_long, png_sec)
+
+
+def gerar_pdf(r, proj="projeto", reduzido=False, nivel=None):
     """Monta o PDF (elementos iguais agrupados) e devolve os bytes.
-    reduzido=True: só armações (cortes + quantitativo), sem os diagramas de
-    momento/cortante nem os memoriais de esforços."""
+    `nivel`: 'completo' (tudo) · 'reduzido' (só armações, sem diagramas) ·
+    'reduzidissimo' (cada viga/pilar numa ÚNICA folha A4: armação + corte +
+    resumo). `reduzido=True` é mantido por compatibilidade (= nível reduzido)."""
+    if nivel is None:
+        nivel = "reduzido" if reduzido else "completo"
+    minimo = nivel == "reduzidissimo"
+    reduzido = nivel in ("reduzido", "reduzidissimo")   # memoriais compactos
     gv = _agrupar(r["vigas"], _kv)
     gb = _agrupar(r["baldrames"], _kv)
     gp = _agrupar(r["pilares"], _kp, repfn=lambda p: p.get("Nk", 0))
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        _capa(pdf, r, proj, len(gv), len(gb), len(gp), reduzido=reduzido)
+        _capa(pdf, r, proj, len(gv), len(gb), len(gp), nivel=nivel)
         planta = fig_planta(r)
         if planta is not None:
             _salva(pdf, planta)
@@ -836,13 +915,22 @@ def gerar_pdf(r, proj="projeto", reduzido=False):
         _divisoria(pdf, f"VIGAS DE COBERTURA\n({_tipos(len(gv))} · "
                    f"{len(r['vigas'])} vigas)")
         for g in gv:
-            _elemento_viga(pdf, g["rep"], g["membros"], reduzido=reduzido)
+            if minimo:
+                _elemento_viga_min(pdf, g["rep"], g["membros"])
+            else:
+                _elemento_viga(pdf, g["rep"], g["membros"], reduzido=reduzido)
         _divisoria(pdf, f"BALDRAMES\n({_tipos(len(gb))} · "
                    f"{len(r['baldrames'])} baldrames)")
         for g in gb:
-            _elemento_viga(pdf, g["rep"], g["membros"], reduzido=reduzido)
+            if minimo:
+                _elemento_viga_min(pdf, g["rep"], g["membros"])
+            else:
+                _elemento_viga(pdf, g["rep"], g["membros"], reduzido=reduzido)
         _divisoria(pdf, f"PILARES\n({_tipos(len(gp))} · "
                    f"{len(r['pilares'])} pilares)")
         for g in gp:
-            _elemento_pilar(pdf, g["rep"], g["membros"], reduzido=reduzido)
+            if minimo:
+                _elemento_pilar_min(pdf, g["rep"], g["membros"])
+            else:
+                _elemento_pilar(pdf, g["rep"], g["membros"], reduzido=reduzido)
     return buf.getvalue()
