@@ -63,32 +63,33 @@ html, body, .stApp,
    acima; NÃO forço `color` global para não pintar o texto BRANCO dos botões
    azuis de escuro — o que tornava os botões ilegíveis) */
 
-/* ===== TIPOGRAFIA GERAL: texto maior e em negrito (melhor visualização) === */
+/* ===== TIPOGRAFIA: sans-serif legível, NEGRITO, tamanho NORMAL, cor NAVY
+   (nunca preta) — hierarquia clara: titulo > rotulo > corpo > apoio ===== */
 [data-testid="stMarkdownContainer"] p,
 [data-testid="stMarkdownContainer"] li {
-    font-size: 1.07rem; line-height: 1.55; font-weight: 600;
+    font-size: 0.98rem; line-height: 1.5; font-weight: 600; color: #263449;
 }
-[data-testid="stMarkdownContainer"] strong { font-weight: 800; }
+[data-testid="stMarkdownContainer"] strong { font-weight: 800; color: #16213E; }
 [data-testid="stCaptionContainer"],
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaptionContainer"] div {
-    font-size: 1.06rem !important; font-weight: 700 !important;
-    color: #1E293B !important;
+    font-size: 0.9rem !important; font-weight: 600 !important;
+    color: #5B6B82 !important;          /* texto de APOIO: cinza-azulado neutro */
 }
 [data-testid="stAlert"] p, [data-testid="stAlert"] li {
-    font-size: 1.06rem; line-height: 1.5; font-weight: 700;
+    font-size: 0.96rem; line-height: 1.45; font-weight: 600;
 }
 [data-testid="stWidgetLabel"] p, [data-testid="stWidgetLabel"] label {
-    font-weight: 700 !important; font-size: 1.02rem !important;
+    font-weight: 700 !important; font-size: 0.95rem !important; color: #1E293B !important;
 }
-[data-testid="stMetricValue"] { font-weight: 800 !important; }
-[data-testid="stMetricLabel"] p { font-weight: 700 !important; }
+[data-testid="stMetricValue"] { font-weight: 800 !important; color: #1E3A8A !important; }
+[data-testid="stMetricLabel"] p { font-weight: 700 !important; color: #5B6B82 !important; }
 .pol-tab td, .pol-tab th { font-weight: 700 !important; }
 
 /* esconde os steppers +/- dos number_inputs (melhor no touch) */
 [data-testid="stNumberInput"] button { display: none; }
-[data-testid="stNumberInput"] input { font-weight: 700; font-size: 1.03rem; }
-[data-testid="stTextInput"] input { font-weight: 700; font-size: 1.03rem; }
+[data-testid="stNumberInput"] input { font-weight: 700; font-size: 0.98rem; }
+[data-testid="stTextInput"] input { font-weight: 700; font-size: 0.98rem; }
 [data-baseweb="select"] > div { font-weight: 700; }
 
 /* ===== NAVEGAÇÃO: esconde a barra padrão (usamos o seletor CALCULAR) ===== */
@@ -102,35 +103,54 @@ html, body, .stApp,
     font-weight: 800; color: #1E3A8A; font-size: 1.06rem; margin: 12px 0 3px;
 }
 
-/* seletor CALCULAR (Vigas / Pilares) — botões do MESMO tamanho, lado a lado */
+/* seletor de MÓDULO (Vigas / Lajes / Pilares / …) — ativo em ÂMBAR, demais
+   em contorno navy discreto; tamanho equilibrado, lado a lado */
 .pol-pg-ativo {
     background: linear-gradient(135deg, #F6C86B, #E8A33D);
-    color: #16265B !important; font-weight: 800; font-size: 1.2rem;
-    padding: 13px 10px; border-radius: 12px;
-    box-shadow: 0 3px 10px rgba(180,83,9,.32);
-    min-height: 54px; box-sizing: border-box;
+    color: #16265B !important; font-weight: 800; font-size: 1.02rem;
+    padding: 11px 10px; border-radius: 12px;
+    box-shadow: 0 3px 10px rgba(180,83,9,.26);
+    min-height: 48px; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
 }
 [data-testid="stPageLink"] { width: 100%; }
 [data-testid="stPageLink"] a {
-    background: #EEF3FC; border: 2px solid #1E3A8A; border-radius: 12px;
-    padding: 13px 10px !important; min-height: 54px;
+    background: #F1F5FB; border: 1.5px solid #C9D6F5; border-radius: 12px;
+    padding: 11px 10px !important; min-height: 48px;
     width: 100%; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
     transition: all .12s ease;
 }
 [data-testid="stPageLink"] a:hover {
-    background: #DCE6FA; transform: translateY(-1px);
+    background: #E6EDF9; border-color: #1E3A8A; transform: translateY(-1px);
 }
 [data-testid="stPageLink"] a * {
-    color: #1E3A8A !important; font-size: 1.2rem !important;
+    color: #1E3A8A !important; font-size: 1.02rem !important;
     font-weight: 800 !important;
 }
 .pol-pg-inativo {
-    background: #EEF3FC; border: 2px solid #1E3A8A; border-radius: 12px;
-    color: #1E3A8A !important; font-weight: 800; font-size: 1.2rem;
-    padding: 13px 10px; min-height: 54px; box-sizing: border-box;
+    background: #F1F5FB; border: 1.5px solid #C9D6F5; border-radius: 12px;
+    color: #1E3A8A !important; font-weight: 800; font-size: 1.02rem;
+    padding: 11px 10px; min-height: 48px; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
+}
+
+/* ===== ETAPAS 1·Lançar / 2·Conferir / 3·Calcular =====
+   ÂMBAR por padrão; ficam AZUL (navy) quando a etapa está ATIVA (clicada) ===== */
+[class*="st-key-step_"] button[kind="secondary"] {
+    background: linear-gradient(135deg, #F6C86B, #E8A33D) !important;
+    color: #16265B !important; border: 1px solid #E8A33D !important;
+    font-weight: 800 !important; box-shadow: 0 2px 7px rgba(180,83,9,.18) !important;
+}
+[class*="st-key-step_"] button[kind="secondary"]:hover:not(:disabled) { filter: brightness(1.05); }
+[class*="st-key-step_"] button[kind="secondary"]:disabled {
+    background: #F1E7CE !important; color: #A78E5C !important;
+    border-color: #E7D8B0 !important; box-shadow: none !important;
+}
+[class*="st-key-step_"] button[kind="primary"] {
+    background: linear-gradient(135deg, #16265B, #1E3A8A) !important;
+    color: #fff !important; border: none !important;
+    box-shadow: 0 3px 10px rgba(30,58,138,.32) !important;
 }
 /* mantém os 2 botões (Vigas | Pilares) LADO A LADO mesmo no celular.
    Escopo: só a linha que contém um stPageLink (o seletor CALCULAR),
@@ -146,7 +166,7 @@ html, body, .stApp,
 /* cabeçalho da marca */
 .pol-header {
     background: linear-gradient(135deg, #16265B, #1E3A8A 55%, #24479E);
-    color: #fff; border-radius: 14px; padding: 20px 22px 16px;
+    color: #fff; border-radius: 14px; padding: 13px 18px 11px;
     margin-bottom: 4px; text-align: center;
 }
 a.pol-marca-link { text-decoration: none !important; display: block; }
@@ -160,13 +180,13 @@ a.pol-marca-link:hover .pol-site-hint {
 }
 /* cartão branco onde o logo oficial (preto+laranja) fica legível */
 .pol-logo-card {
-    display: inline-block; background: #fff; border-radius: 12px;
-    padding: 13px 18px; box-shadow: 0 3px 14px rgba(0,0,0,.24);
+    display: inline-block; background: #fff; border-radius: 11px;
+    padding: 8px 14px; box-shadow: 0 3px 12px rgba(0,0,0,.22);
     transition: transform .12s ease, box-shadow .12s ease;
 }
-.pol-logo-img {
+.pol-logo-card .pol-logo-img {
     display: block; margin: 0 auto; height: auto;
-    width: 100%; max-width: 260px;
+    width: 100%; max-width: 185px !important;   /* logo PROPORCIONAL (menor, ainda legível) */
 }
 .pol-header .marca {
     display: flex; align-items: center; justify-content: center; gap: 12px;
@@ -208,27 +228,29 @@ a.pol-marca-link:hover .pol-site-hint {
 }
 .pol-header .sub { color: #A9BCE8; font-size: .82rem; margin-top: 3px; }
 
-/* título de seção */
+/* título de seção — limpo; o número vira um "chip"; SEM cortar (quebra linha) */
 .pol-sec {
-    display: flex; align-items: center; gap: 9px;
+    display: flex; align-items: center; gap: 10px;
     font-weight: 800; color: #1E3A8A;
-    font-size: clamp(1.08rem, 4.2vw, 1.22rem); white-space: nowrap;
-    margin: 10px 0 4px;
+    font-size: clamp(1.02rem, 4vw, 1.16rem); line-height: 1.25;
+    white-space: normal; margin: 16px 0 6px;
 }
 .pol-sec .num {
     background: #1E3A8A; color: #fff; border-radius: 999px;
-    min-width: 26px; height: 26px; display: inline-flex;
-    align-items: center; justify-content: center; font-size: .85rem;
-    flex: 0 0 auto;
+    min-width: 25px; height: 25px; display: inline-flex;
+    align-items: center; justify-content: center; font-size: .82rem;
+    flex: 0 0 auto; box-shadow: 0 1px 3px rgba(30,58,138,.3);
 }
-/* seção de ENTRADA em destaque (barra âmbar/azul) */
+/* seção de ENTRADA em destaque — CARTÃO claro com barra lateral navy (leve,
+   sem faixa pesada) + número em chip âmbar */
 .pol-sec.destaque {
-    background: linear-gradient(135deg, #16265B, #1E3A8A 60%, #24479E);
-    color: #fff; padding: 10px 14px; border-radius: 11px;
-    margin: 14px 0 8px; box-shadow: 0 2px 8px rgba(30,58,138,.22);
+    background: #F3F6FC; color: #1E3A8A;
+    padding: 10px 13px; border-radius: 11px;
+    border-left: 4px solid #1E3A8A;
+    margin: 16px 0 8px; box-shadow: 0 1px 3px rgba(16,33,68,.06);
 }
 .pol-sec.destaque .num {
-    background: #F0C879; color: #16265B;
+    background: linear-gradient(135deg, #F6C86B, #E8A33D); color: #16265B;
 }
 
 /* linha de tramo na lista */
@@ -245,19 +267,19 @@ div.stButton > button, div[data-testid="stFormSubmitButton"] > button {
 /* dataframes ocupam a largura toda */
 [data-testid="stDataFrame"] { width: 100%; }
 
-/* ===== LEITURA REFORÇADA (negrito e um pouco maior, bom no celular) ===== */
+/* ===== NEGRITO no conteúdo principal (rótulos e corpo); o texto de APOIO
+   (captions) fica mais leve p/ hierarquia limpa ===== */
 [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] *,
-[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
-[data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * {
+[data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] * {
     font-weight: 700 !important;
 }
-[data-testid="stWidgetLabel"] p { font-size: 1.02rem !important; }
+[data-testid="stWidgetLabel"] p { font-size: 0.95rem !important; }
 [data-testid="stMetricValue"] { font-weight: 800 !important; }
 [data-testid="stMetricLabel"] * { font-weight: 700 !important; }
-/* números digitados: negrito e maiores */
+/* números digitados: negrito, tamanho NORMAL */
 [data-testid="stNumberInput"] input, [data-testid="stTextInput"] input,
 [data-baseweb="select"] div {
-    font-weight: 800 !important; font-size: 1.08rem !important;
+    font-weight: 700 !important; font-size: 0.98rem !important;
 }
 
 /* ===== SELETOR DE UNIDADE (kN / kgf): maior e negrito ===== */
@@ -282,20 +304,43 @@ div.stButton > button, div[data-testid="stFormSubmitButton"] > button {
     color: #16265B !important;
 }
 
-/* ===== BOTÕES DE AÇÃO (Inserir / Salvar) grandes e em ÂMBAR ===== */
+/* ===== AÇÃO PRIMÁRIA (Inserir / Salvar) em ÂMBAR — tamanho equilibrado ===== */
 [data-testid="stFormSubmitButton"] button {
     background: linear-gradient(135deg, #E8A33D, #B45309) !important;
     color: #ffffff !important; border: none !important;
-    font-size: 1.16rem !important; font-weight: 800 !important;
-    min-height: 54px !important; letter-spacing: .01em;
-    box-shadow: 0 3px 10px rgba(180,83,9,.30);
+    font-size: 1.0rem !important; font-weight: 800 !important;
+    min-height: 46px !important; letter-spacing: .01em; border-radius: 10px !important;
+    box-shadow: 0 3px 10px rgba(180,83,9,.26);
 }
 [data-testid="stFormSubmitButton"] button:hover { filter: brightness(1.07); }
-/* botão primário CALCULAR: maior e mais forte */
+/* botão primário (Calcular etc.) em NAVY — normal e firme */
 div.stButton > button[kind="primary"] {
-    font-size: 1.2rem !important; font-weight: 800 !important;
-    min-height: 56px !important;
+    font-size: 1.04rem !important; font-weight: 800 !important;
+    min-height: 48px !important; border-radius: 10px !important;
 }
+/* botões em geral: cantos suaves e altura confortável de toque */
+div.stButton > button, [data-testid="stFormSubmitButton"] button {
+    border-radius: 10px; min-height: 44px;
+}
+div.stButton > button[kind="secondary"] {
+    border: 1.5px solid #C9D6F5; color: #1E3A8A; background: #F8FAFD;
+}
+div.stButton > button[kind="secondary"]:hover { border-color: #1E3A8A; background: #EEF3FC; }
+
+/* ===== CALLOUTS (dica/sucesso/alerta): cantos suaves + leve elevação ===== */
+[data-testid="stAlert"] {
+    border-radius: 10px !important; box-shadow: 0 1px 3px rgba(16,33,68,.05);
+}
+/* inputs/selects: cantos suaves + FOCO visível (acessibilidade/toque) */
+[data-testid="stNumberInput"] input, [data-testid="stTextInput"] input,
+[data-baseweb="select"] > div {
+    border-radius: 9px !important;
+}
+[data-testid="stNumberInput"] input:focus, [data-testid="stTextInput"] input:focus {
+    outline: 2px solid #93B4F5 !important; outline-offset: 1px;
+}
+/* divisórias suaves */
+hr { border-color: #E4E9F2 !important; }
 
 /* ===== TABELAS DE RESULTADO (HTML, negrito + rolagem horizontal) ===== */
 .pol-tab-wrap {
