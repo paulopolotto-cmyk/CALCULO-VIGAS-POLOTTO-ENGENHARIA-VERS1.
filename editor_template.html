@@ -71,8 +71,9 @@ th{background:var(--soft);color:var(--azul);font-weight:800;position:sticky;top:
    <svg id="ov" tabindex="-1" style="outline:none" viewBox="__X0__ __Y0__ __VW__ __VH__" preserveAspectRatio="none">
     <g id="axes"></g><g id="beams"></g><g id="sup"></g><g id="lbl"></g><g id="pil"></g><g id="lajes"></g><g id="pend"></g></svg></div>
   <div class="status" id="status"></div>
-  <div class="legc"><span><i style="background:#EAB308"></i>viga fixa (amarela)</span>
-   <span><i style="background:#16A34A"></i>selecionada / movendo (verde)</span><span style="color:#B91C1C">&#9632; pilar fixo</span><span style="color:#1D4ED8">&#8645; laje (sentido da vigota)</span><span><i style="background:#7C3AED"></i>parede divisa 25 cm</span></div>
+  <div class="legc"><span><i style="background:#EAB308"></i>viga CONTÍNUA (3+ apoios)</span>
+   <span><i style="background:#0D9488"></i>viga BIAPOIADA (2 apoios)</span>
+   <span><i style="background:#16A34A"></i>selecionada / movendo</span><span style="color:#B91C1C">&#9632; pilar fixo</span><span style="color:#1D4ED8">&#8645; laje (sentido da vigota)</span><span><i style="background:#7C3AED"></i>parede divisa 25 cm</span></div>
  </div>
  <div class="right">
   <div class="card"><h2>Resumo</h2><div class="metrics">
@@ -142,7 +143,29 @@ function beamNames(bd){
    if(dx>=dy)Hs.push({id:o.bm.id,pos:(o.a.y+o.c.y)/2});else Vs.push({id:o.bm.id,pos:(o.a.x+o.c.x)/2});}
  function grp(arr){arr.sort((p,q)=>p.pos-q.pos);let L=[];for(const it of arr){let g=L.find(z=>Math.abs(z.pos-it.pos)<=9);if(!g){g={pos:it.pos,ids:[]};L.push(g);}g.ids.push(it.id);}return L;}
  let nm={};grp(Hs).forEach((L,i)=>L.ids.forEach(id=>nm[id]='VH'+(i+1)));grp(Vs).forEach((L,i)=>L.ids.forEach(id=>nm[id]='VV'+(i+1)));return nm;}
-function drawBeams(bd){gB.innerHTML=bd.map(o=>{let sl=(selB&&o.bm.id==selB);let p25=o.bm.p25;let c=sl?'#16A34A':(p25?'#7C3AED':'#EAB308');let w=sl?6:(p25?6.5:3.6);return `<line x1="${o.a.x}" y1="${o.a.y}" x2="${o.c.x}" y2="${o.c.y}" stroke="${c}" stroke-width="${w}" stroke-opacity="0.9"/>`;}).join('');
+// classifica cada viga: 'C'=continua (3+ apoios/pilares na linha) 'B'=biapoiada (2)
+// junta segmentos alinhados (mesma linha, encostando) e conta os pilares no vao
+function tiposVigas(bd){const T=14;
+ let sg=bd.map(o=>{let h=Math.abs(o.a.x-o.c.x)>=Math.abs(o.a.y-o.c.y);
+   return{id:o.bm.id,h,pos:h?(o.a.y+o.c.y)/2:(o.a.x+o.c.x)/2,
+     lo:h?Math.min(o.a.x,o.c.x):Math.min(o.a.y,o.c.y),
+     hi:h?Math.max(o.a.x,o.c.x):Math.max(o.a.y,o.c.y),ch:-1};});
+ let ch=[];
+ for(let i=0;i<sg.length;i++){if(sg[i].ch>=0)continue;
+   let g={h:sg[i].h,pos:sg[i].pos,lo:sg[i].lo,hi:sg[i].hi,ids:[i]};sg[i].ch=ch.length;
+   let cont=true;while(cont){cont=false;
+     for(let j=0;j<sg.length;j++){if(sg[j].ch>=0||sg[j].h!==g.h)continue;
+       if(Math.abs(sg[j].pos-g.pos)>T)continue;
+       if(sg[j].lo>g.hi+T||sg[j].hi<g.lo-T)continue;
+       sg[j].ch=ch.length;g.ids.push(j);g.lo=Math.min(g.lo,sg[j].lo);g.hi=Math.max(g.hi,sg[j].hi);cont=true;}}
+   ch.push(g);}
+ let tp={};
+ for(const g of ch){let n=0;
+   for(const p of pillars){if(g.h){if(Math.abs(p.y-g.pos)<=T&&p.x>=g.lo-T&&p.x<=g.hi+T)n++;}
+     else{if(Math.abs(p.x-g.pos)<=T&&p.y>=g.lo-T&&p.y<=g.hi+T)n++;}}
+   let t=(n>=3)?'C':'B';for(const k of g.ids)tp[sg[k].id]=t;}
+ return tp;}
+function drawBeams(bd){let tp=tiposVigas(bd);gB.innerHTML=bd.map(o=>{let sl=(selB&&o.bm.id==selB);let p25=o.bm.p25;let bi=(tp[o.bm.id]==='B');let c=sl?'#16A34A':(p25?'#7C3AED':(bi?'#0D9488':'#EAB308'));let w=sl?6:(p25?6.5:3.6);return `<line x1="${o.a.x}" y1="${o.a.y}" x2="${o.c.x}" y2="${o.c.y}" stroke="${c}" stroke-width="${w}" stroke-opacity="0.9"/>`;}).join('');
  if(selB){let sb=byBid(selB);if(sb)for(const ep of[sb.A,sb.B])if(ep.t=='xy')gB.innerHTML+='<circle cx="'+ep.x+'" cy="'+ep.y+'" r="5.5" fill="#16A34A" stroke="#fff" stroke-width="1.4"/>';}
  gS.innerHTML=bd.map(o=>{let t='';for(const ep of [o.bm.A,o.bm.B]){if(ep.t=='b'){let q=epXY(ep);if(q)t+=`<path d="M ${q.x} ${q.y-3} L ${q.x-4} ${q.y+4} L ${q.x+4} ${q.y+4} Z" fill="#15803D" stroke="#fff" stroke-width="0.6"/>`;}}return t;}).join('');
  let nm=beamNames(bd),best={};                       // 1 etiqueta por nome (viga mais comprida)
