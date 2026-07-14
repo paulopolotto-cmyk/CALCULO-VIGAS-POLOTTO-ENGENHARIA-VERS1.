@@ -48,16 +48,41 @@ CONCRETO = "#CBD5E1"
 
 _CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800;900&display=swap');
+
 /* ===== TRAVA o app em tema CLARO — o MODO ESCURO do celular escurecia o fundo
    e sumia com os textos escuros. Agora o fundo é sempre claro e o texto escuro
    fica legível em qualquer aparelho (Samsung/iPhone, claro ou escuro). Vale p/
    qualquer projeto. ===== */
 :root, html { color-scheme: light only !important; }
-html, body, .stApp,
-[data-testid="stAppViewContainer"], [data-testid="stMain"],
-[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stBottom"],
-.main, .block-container, section.main {
-    background-color: #F4F6FA !important;
+
+/* ===== FUNDO "prancheta de engenharia": papel milimetrado bem suave ===== */
+html, body, .stApp, [data-testid="stAppViewContainer"] {
+    background-color: #EDF1F8 !important;
+}
+.stApp, [data-testid="stAppViewContainer"] {
+    background-image:
+        linear-gradient(rgba(30,58,138,.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(30,58,138,.045) 1px, transparent 1px) !important;
+    background-size: 26px 26px !important;
+}
+/* os contêineres internos ficam TRANSPARENTES p/ o papel aparecer */
+[data-testid="stMain"], [data-testid="stHeader"], [data-testid="stToolbar"],
+[data-testid="stBottom"], .main, .block-container, section.main {
+    background: transparent !important;
+}
+/* menos espaço morto no topo — o app começa logo */
+.block-container { padding-top: 1.1rem !important; }
+
+/* ===== FONTE NOVA (Inter): cara moderna em todo o app; os ícones do
+   Streamlit mantêm a fonte própria ===== */
+html, body, .stApp, .stApp p, .stApp li, .stApp label, .stApp input,
+.stApp button, .stApp h1, .stApp h2, .stApp h3, .stApp td, .stApp th,
+.stApp div[data-baseweb="select"] {
+    font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+[data-testid="stIconMaterial"] {
+    font-family: 'Material Symbols Rounded' !important;
 }
 /* (o texto padrão fica escuro pelo tema `light` do config.toml + color-scheme
    acima; NÃO forço `color` global para não pintar o texto BRANCO dos botões
@@ -70,11 +95,19 @@ html, body, .stApp,
     font-size: 0.98rem; line-height: 1.5; font-weight: 600; color: #263449;
 }
 [data-testid="stMarkdownContainer"] strong { font-weight: 800; color: #16213E; }
+/* DENTRO de botões o texto HERDA a cor do botão (branco no navy/âmbar) —
+   nunca deixar a cor de parágrafo pintar o rótulo do botão de escuro */
+button [data-testid="stMarkdownContainer"] p,
+button [data-testid="stMarkdownContainer"] li,
+button [data-testid="stMarkdownContainer"] strong,
+a[data-testid="stBaseLinkButton"] p {
+    color: inherit !important;
+}
 [data-testid="stCaptionContainer"],
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaptionContainer"] div {
-    font-size: 0.9rem !important; font-weight: 600 !important;
-    color: #5B6B82 !important;          /* texto de APOIO: cinza-azulado neutro */
+    font-size: 0.92rem !important; font-weight: 700 !important;
+    color: #3D5A80 !important;   /* apoio LEGÍVEL: azul-aço, negrito (regra: nada apagado) */
 }
 [data-testid="stAlert"] p, [data-testid="stAlert"] li {
     font-size: 0.96rem; line-height: 1.45; font-weight: 600;
@@ -107,32 +140,37 @@ html, body, .stApp,
    em contorno navy discreto; tamanho equilibrado, lado a lado */
 .pol-pg-ativo {
     background: linear-gradient(135deg, #F6C86B, #E8A33D);
-    color: #16265B !important; font-weight: 800; font-size: 1.02rem;
-    padding: 11px 10px; border-radius: 12px;
+    color: #16265B !important; font-weight: 800; font-size: .95rem;
+    line-height: 1.25; text-align: center;
+    padding: 10px 10px; border-radius: 12px;
     box-shadow: 0 3px 10px rgba(180,83,9,.26);
-    min-height: 48px; box-sizing: border-box;
+    min-height: 58px; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
 }
 [data-testid="stPageLink"] { width: 100%; }
 [data-testid="stPageLink"] a {
-    background: #F1F5FB; border: 1.5px solid #C9D6F5; border-radius: 12px;
-    padding: 11px 10px !important; min-height: 48px;
+    background: #FFFFFF; border: 1.5px solid #D8E1F0; border-radius: 12px;
+    padding: 10px 10px !important; min-height: 58px;
     width: 100%; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
-    transition: all .12s ease;
+    transition: all .12s ease; box-shadow: 0 1px 4px rgba(16,33,68,.06);
 }
 [data-testid="stPageLink"] a:hover {
-    background: #E6EDF9; border-color: #1E3A8A; transform: translateY(-1px);
+    background: #F3F7FF; border-color: #1E3A8A; transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(30,58,138,.14);
 }
 [data-testid="stPageLink"] a * {
-    color: #1E3A8A !important; font-size: 1.02rem !important;
-    font-weight: 800 !important;
+    color: #1E3A8A !important; font-size: .95rem !important;
+    line-height: 1.25 !important; text-align: center;
+    font-weight: 800 !important; white-space: normal !important;
 }
 .pol-pg-inativo {
-    background: #F1F5FB; border: 1.5px solid #C9D6F5; border-radius: 12px;
-    color: #1E3A8A !important; font-weight: 800; font-size: 1.02rem;
-    padding: 11px 10px; min-height: 48px; box-sizing: border-box;
+    background: #FFFFFF; border: 1.5px solid #D8E1F0; border-radius: 12px;
+    color: #1E3A8A !important; font-weight: 800; font-size: .95rem;
+    line-height: 1.25; text-align: center;
+    padding: 10px 10px; min-height: 58px; box-sizing: border-box;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 1px 4px rgba(16,33,68,.06);
 }
 
 /* ===== ETAPAS 1·Lançar / 2·Conferir / 3·Calcular =====
@@ -144,30 +182,41 @@ html, body, .stApp,
 }
 [class*="st-key-step_"] button[kind="secondary"]:hover:not(:disabled) { filter: brightness(1.05); }
 [class*="st-key-step_"] button[kind="secondary"]:disabled {
-    background: #F1E7CE !important; color: #A78E5C !important;
-    border-color: #E7D8B0 !important; box-shadow: none !important;
+    background: #F3E9D2 !important; color: #7A5B22 !important;   /* legível */
+    border-color: #E3D3AC !important; box-shadow: none !important;
+    opacity: 1 !important;
 }
 [class*="st-key-step_"] button[kind="primary"] {
     background: linear-gradient(135deg, #16265B, #1E3A8A) !important;
     color: #fff !important; border: none !important;
     box-shadow: 0 3px 10px rgba(30,58,138,.32) !important;
 }
-/* mantém os 2 botões (Vigas | Pilares) LADO A LADO mesmo no celular.
-   Escopo: só a linha que contém um stPageLink (o seletor CALCULAR),
-   sem afetar as colunas dos campos de entrada. */
-[data-testid="stHorizontalBlock"]:has([data-testid="stPageLink"]) {
+/* mantém os módulos LADO A LADO (grade 2×2) mesmo no celular.
+   Escopo: só as linhas do seletor de páginas (stPageLink OU o fallback
+   .pol-pg-*), sem afetar as colunas dos campos de entrada. */
+[data-testid="stHorizontalBlock"]:has([data-testid="stPageLink"]),
+[data-testid="stHorizontalBlock"]:has(.pol-pg-ativo),
+[data-testid="stHorizontalBlock"]:has(.pol-pg-inativo) {
     flex-wrap: nowrap !important; gap: 10px !important;
 }
-[data-testid="stHorizontalBlock"]:has([data-testid="stPageLink"])
-    > [data-testid="stColumn"] {
+[data-testid="stHorizontalBlock"]:has([data-testid="stPageLink"]) > [data-testid="stColumn"],
+[data-testid="stHorizontalBlock"]:has(.pol-pg-ativo) > [data-testid="stColumn"],
+[data-testid="stHorizontalBlock"]:has(.pol-pg-inativo) > [data-testid="stColumn"] {
     min-width: 0 !important; flex: 1 1 0 !important; width: 50% !important;
 }
 
-/* cabeçalho da marca */
+/* ===== cabeçalho da marca — "hero" de engenharia: gradiente profundo com
+   grade blueprint sutil e filete âmbar na base ===== */
 .pol-header {
-    background: linear-gradient(135deg, #16265B, #1E3A8A 55%, #24479E);
-    color: #fff; border-radius: 14px; padding: 13px 18px 11px;
-    margin-bottom: 4px; text-align: center;
+    background:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(140deg, #0E1B46, #1E3A8A 62%, #2B4FA8);
+    background-size: 22px 22px, 22px 22px, 100% 100%;
+    color: #fff; border-radius: 16px; padding: 16px 18px 13px;
+    margin-bottom: 6px; text-align: center;
+    border-bottom: 4px solid #E8A33D;
+    box-shadow: 0 8px 26px rgba(14,27,70,.28);
 }
 a.pol-marca-link { text-decoration: none !important; display: block; }
 a.pol-marca-link:hover .marca-txt { color: #F0C879; }
@@ -236,22 +285,100 @@ a.pol-marca-link:hover .pol-site-hint {
     white-space: normal; margin: 16px 0 6px;
 }
 .pol-sec .num {
-    background: #1E3A8A; color: #fff; border-radius: 999px;
+    background: linear-gradient(135deg, #F6C86B, #E8A33D); color: #16265B;
+    border-radius: 999px;
     min-width: 25px; height: 25px; display: inline-flex;
     align-items: center; justify-content: center; font-size: .82rem;
-    flex: 0 0 auto; box-shadow: 0 1px 3px rgba(30,58,138,.3);
+    font-weight: 900;
+    flex: 0 0 auto; box-shadow: 0 1px 3px rgba(180,83,9,.35);
 }
-/* seção de ENTRADA em destaque — CARTÃO claro com barra lateral navy (leve,
-   sem faixa pesada) + número em chip âmbar */
+/* seção de ENTRADA em destaque — CARTÃO branco elevado com barra lateral
+   navy + número em chip âmbar (visual de "ficha de projeto") */
 .pol-sec.destaque {
-    background: #F3F6FC; color: #1E3A8A;
-    padding: 10px 13px; border-radius: 11px;
-    border-left: 4px solid #1E3A8A;
-    margin: 16px 0 8px; box-shadow: 0 1px 3px rgba(16,33,68,.06);
+    background: #FFFFFF; color: #16265B;
+    padding: 11px 14px; border-radius: 12px;
+    border: 1px solid #E2E8F4; border-left: 5px solid #1E3A8A;
+    margin: 18px 0 10px; box-shadow: 0 2px 8px rgba(16,33,68,.08);
 }
 .pol-sec.destaque .num {
     background: linear-gradient(135deg, #F6C86B, #E8A33D); color: #16265B;
 }
+
+/* ===== EXPANDERS como cards brancos ===== */
+[data-testid="stExpander"] {
+    background: #FFFFFF; border: 1px solid #E2E8F4 !important;
+    border-radius: 12px !important; box-shadow: 0 1px 5px rgba(16,33,68,.07);
+    overflow: hidden;
+}
+[data-testid="stExpander"] summary {
+    font-weight: 800 !important; color: #1E3A8A !important;
+}
+[data-testid="stExpander"] summary:hover { color: #B45309 !important; }
+
+/* ===== MÉTRICAS em card (Peso total, Compra +10%…) ===== */
+[data-testid="stMetric"] {
+    background: #FFFFFF; border: 1px solid #E2E8F4; border-radius: 12px;
+    padding: 10px 14px; box-shadow: 0 1px 5px rgba(16,33,68,.07);
+    border-top: 3px solid #E8A33D;
+}
+
+/* ===== FILE UPLOADER: área de soltar em destaque tracejado ===== */
+[data-testid="stFileUploaderDropzone"] {
+    background: #F6F9FF !important;
+    border: 2px dashed #93B4F5 !important; border-radius: 12px !important;
+}
+[data-testid="stFileUploaderDropzone"] button {
+    border-radius: 9px !important; font-weight: 800 !important;
+    border: 1.5px solid #1E3A8A !important; color: #1E3A8A !important;
+}
+
+/* ===== CALLOUTS com BARRA lateral semântica (info azul / sucesso verde /
+   atenção âmbar / erro vermelho) ===== */
+[data-testid="stAlert"] { border-left: 5px solid #94A8CF !important; }
+[data-testid="stAlert"]:has([data-testid="stAlertContentInfo"]) {
+    border-left-color: #1E3A8A !important;
+}
+[data-testid="stAlert"]:has([data-testid="stAlertContentSuccess"]) {
+    border-left-color: #15803D !important;
+}
+[data-testid="stAlert"]:has([data-testid="stAlertContentWarning"]) {
+    border-left-color: #B45309 !important;
+}
+[data-testid="stAlert"]:has([data-testid="stAlertContentError"]) {
+    border-left-color: #B91C1C !important;
+}
+
+/* barra de rolagem fina (desktop) */
+::-webkit-scrollbar { height: 8px; width: 8px; }
+::-webkit-scrollbar-thumb { background: #B9C6DE; border-radius: 99px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* placeholders LEGÍVEIS (ex.: "digite a carga" no Nk do pilar) */
+[data-testid="stNumberInput"] input::placeholder,
+[data-testid="stTextInput"] input::placeholder {
+    color: #64748B !important; font-weight: 600 !important; opacity: 1 !important;
+}
+/* instruções do uploader ("200MB per file · PDF, PNG, JPG") mais legíveis */
+[data-testid="stFileUploaderDropzoneInstructions"] span,
+[data-testid="stFileUploaderDropzoneInstructions"] small {
+    color: #475E7D !important; font-weight: 600 !important;
+}
+
+/* ===== SLIDER no design system (thumb navy + trilho âmbar, toque maior) === */
+[data-testid="stSlider"] [role="slider"] {
+    background: #1E3A8A !important; border: 2px solid #E8A33D !important;
+    width: 24px !important; height: 24px !important;
+}
+[data-testid="stSliderThumbValue"] { color: #1E3A8A !important; font-weight: 800 !important; }
+
+/* pills/chips (ex.: vãos padrão da laje): área de toque confortável */
+[data-testid="stPills"] button {
+    min-height: 42px !important; border-radius: 10px !important;
+    font-weight: 800 !important;
+}
+
+/* rótulos de checkbox equilibrados (sem palavra pendurada) */
+[data-testid="stCheckbox"] label p { text-wrap: balance; }
 
 /* linha de tramo na lista */
 .pol-tramo {
@@ -313,10 +440,16 @@ div.stButton > button, div[data-testid="stFormSubmitButton"] > button {
     box-shadow: 0 3px 10px rgba(180,83,9,.26);
 }
 [data-testid="stFormSubmitButton"] button:hover { filter: brightness(1.07); }
-/* botão primário (Calcular etc.) em NAVY — normal e firme */
+/* botão primário (Calcular etc.) em NAVY gradiente — firme e moderno */
 div.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #16265B, #1E3A8A 70%, #2B4FA8) !important;
+    color: #fff !important; border: none !important;
     font-size: 1.04rem !important; font-weight: 800 !important;
     min-height: 48px !important; border-radius: 10px !important;
+    box-shadow: 0 4px 12px rgba(30,58,138,.28) !important;
+}
+div.stButton > button[kind="primary"]:hover:not(:disabled) {
+    filter: brightness(1.12); transform: translateY(-1px);
 }
 /* botões em geral: cantos suaves e altura confortável de toque */
 div.stButton > button, [data-testid="stFormSubmitButton"] button {
@@ -347,17 +480,20 @@ hr { border-color: #E4E9F2 !important; }
     overflow-x: auto; -webkit-overflow-scrolling: touch;
     margin: 4px 0 10px; border: 1px solid #DDE3EC; border-radius: 10px;
 }
-.pol-tab { border-collapse: collapse; width: 100%; }
+.pol-tab { border-collapse: collapse; width: 100%; background: #fff; }
 .pol-tab th {
-    background: #1E3A8A; color: #fff !important; font-weight: 800;
-    font-size: .95rem; padding: 9px 11px; text-align: left;
-    white-space: nowrap;
+    background: linear-gradient(135deg, #16265B, #1E3A8A);
+    color: #fff !important; font-weight: 800;
+    font-size: .92rem; padding: 9px 11px; text-align: left;
+    white-space: nowrap; border-bottom: 3px solid #E8A33D;
 }
 .pol-tab td {
     border-top: 1px solid #E4E9F1; padding: 8px 11px;
-    font-weight: 700; color: #14213D; font-size: .98rem; white-space: nowrap;
+    font-weight: 700; color: #14213D; font-size: .95rem; white-space: nowrap;
 }
-.pol-tab tbody tr:nth-child(even) td { background: #F4F6FA; }
+.pol-tab tbody tr:nth-child(even) td { background: #F6F8FC; }
+.pol-tab tbody tr:hover td { background: #EEF3FC; }
+.pol-tab-wrap { box-shadow: 0 1px 5px rgba(16,33,68,.07); background: #fff; }
 
 /* ===== FIGURAS DE RESULTADO (rolagem horizontal p/ vigas com muitos vãos) */
 .pol-fig-wrap {
@@ -771,16 +907,19 @@ def seletor_pagina(atual):
     """
     st.markdown('<div class="pol-calc-label">Calcular — clique na opção '
                 'abaixo:</div>', unsafe_allow_html=True)
+    # grade 2×2 (compacta) + Projeto Completo em largura total (destaque)
     c1, c2 = st.columns(2)
     with c1:
         _botao_pagina("vigas", atual, "pagina_vigas.py", "Vigas", "🏗️")
     with c2:
         _botao_pagina("pilar", atual, "pagina_pilar.py", "Pilares", "🏛️")
-    # módulos adicionais (largura total, logo abaixo dos dois botões)
-    _botao_pagina("lajes", atual, "pagina_lajes.py",
-                  "Lajes (maciça e pré-moldada)", "🧱")
-    _botao_pagina("previo", atual, "pagina_pilar_previo.py",
-                  "Pilares Prévios — casas térreas", "🏠")
+    c3, c4 = st.columns(2)
+    with c3:
+        _botao_pagina("lajes", atual, "pagina_lajes.py",
+                      "Lajes (maciça e pré-moldada)", "🧱")
+    with c4:
+        _botao_pagina("previo", atual, "pagina_pilar_previo.py",
+                      "Pilares Prévios — casas térreas", "🏠")
     _botao_pagina("completo", atual, "pagina_projeto_completo.py",
                   "Projeto Completo — inserir planta e lançar", "📐")
 
